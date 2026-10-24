@@ -60,12 +60,14 @@ export function clampRouteDistance(distanceM: number, totalM: number): number {
 
 /**
  * スライダーの値（step刻み）を経路距離へ変換する。
+ * スライダーの最大値は `Math.round(totalM)` なので、その丸めた最大から step 刻みの末尾を求める。
  * 経路長がstepの倍数でないとき、末尾のstepは経路の終点ちょうどに対応させる。
  * それ以外の値はそのまま返し、範囲外だけ丸める。
  */
 export function sliderValueToDistance(valueM: number, totalM: number, stepM: number): number {
   if (!isFiniteNumber(totalM) || totalM <= 0 || !isFiniteNumber(valueM)) return 0;
-  const lastStepM = isFiniteNumber(stepM) && stepM > 0 ? Math.floor(totalM / stepM) * stepM : totalM;
+  const steppedMaxM = Math.round(totalM);
+  const lastStepM = isFiniteNumber(stepM) && stepM > 0 ? Math.floor(steppedMaxM / stepM) * stepM : steppedMaxM;
   if (lastStepM > 0 && valueM >= lastStepM) return totalM;
   return clampRouteDistance(valueM, totalM);
 }

@@ -146,6 +146,8 @@ export function createProfileChart(points: readonly ProfilePoint[], handlers: Pr
     if (pendingClientX === null) return;
     const clientX = pendingClientX;
     pendingClientX = null;
+    // 結果の再描画で置き換えられた古いグラフは、切り離された後に選択を送らない。
+    if (!svg.isConnected) return;
     handlers.onSelect(distanceFromClientX(clientX));
   }
   function schedule(clientX: number): void {

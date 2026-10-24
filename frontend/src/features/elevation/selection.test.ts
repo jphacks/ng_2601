@@ -74,6 +74,16 @@ describe("route distance helpers", () => {
     expect(sliderValueToDistance(10, 0, 10)).toBe(0);
   });
 
+  it("derives the last step from the rounded slider maximum", () => {
+    // slider.max は Math.round(total)。1239.6m の max は 1240 で、末尾の step だけが終点。
+    // 1230m は終点へ飛ばさず、そのままの距離として選べる。
+    expect(sliderValueToDistance(1230, 1239.6, 10)).toBe(1230);
+    expect(sliderValueToDistance(1240, 1239.6, 10)).toBe(1239.6);
+    // 1229.6m の max は 1230（10の倍数）になり、末尾の step は終点ちょうど。
+    expect(sliderValueToDistance(1230, 1229.6, 10)).toBe(1229.6);
+    expect(sliderValueToDistance(1220, 1229.6, 10)).toBe(1220);
+  });
+
   it("maps a distance to an interpolated route coordinate and elevation", () => {
     const route: LngLat[] = [[139, 35], [139.004, 35]];
     const points = makePoints(route, (distance) => 10 + distance * 0.02);
