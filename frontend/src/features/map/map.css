@@ -35,6 +35,11 @@
 .map-marker--hazard { background: var(--color-warning); }
 .map-marker--review { background: var(--color-primary); }
 .map-marker--pick { background: var(--color-route); width: 18px; height: 18px; }
+.map-marker--origin { background: var(--color-primary); }
+.map-marker--destination { background: var(--color-accent); color: var(--color-text); }
+/* 出発地・目的地の指定待ちの間は十字カーソル。 */
+.map__canvas--picking .maplibregl-canvas-container.maplibregl-interactive,
+.map__canvas--picking .maplibregl-canvas { cursor: crosshair; }
 .map-popup h3 { margin: 0 0 var(--space-1); font-size: 14px; color: var(--color-text); }
 .map-popup p { margin: 0; font-size: 13px; color: var(--color-text); }
 

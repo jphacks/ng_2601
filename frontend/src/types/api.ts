@@ -11,12 +11,15 @@ export interface ElevationPoint {
   elevationM: number;
 }
 
-/** @provisional */
+/**
+ * BEが返さない値は null（0や推測値にしない）。表示側（#7）が欠測として扱う。
+ * @provisional
+ */
 export interface ElevationProfile {
   points: ElevationPoint[];
-  totalAscentM: number;
-  totalDescentM: number;
-  maxGradePercent: number;
+  totalAscentM: number | null;
+  totalDescentM: number | null;
+  maxGradePercent: number | null;
 }
 
 /** @provisional */
@@ -60,11 +63,18 @@ export interface Preferences {
   avoidHazardTypes: HazardType[];
 }
 
-/** @provisional 経路検索リクエスト */
+/** 車種。BEの`bike_type`（back/config/routing_catalog.json）に対応。 */
+export type BikeType = "city" | "electric_assist" | "road" | "gravel" | "mamachari";
+
+/** 坂道許容度。BEの`preferences.hill_mode`に対応（avoid=避ける / balanced=ふつう / accept=許容）。 */
+export type HillMode = "avoid" | "balanced" | "accept";
+
+/** 経路検索リクエスト。未指定の条件はBEの既定値（車種ごとのdefaults）が使われる。 */
 export interface RouteSearchRequest {
   origin: LngLat;
   destination: LngLat;
-  preferences?: Preferences;
+  bikeType?: BikeType;
+  hillMode?: HillMode;
 }
 
 /** 共通APIエラー形式 */

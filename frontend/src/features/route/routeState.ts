@@ -1,0 +1,169 @@
+import { toApiError, type ApiClient } from "../../api";
+import { haversineM } from "../../lib/geo";
+import type { BikeType, HillMode, LngLat, Route } from "../../types/api";
+
+export interface SearchConditions {
+  bikeType: BikeType;
+  hillMode: HillMode;
+}
+
+/** 検索結果に実際に適用された条件。編集中の条件(draft)とは別に保持する。 */
+export interface AppliedSearch extends SearchConditions {
+  origin: LngLat;
+  destination: LngLat;
+}
+
+export type SearchStatus =
+  | { kind: "idle" }
+  | { kind: "loading"; applied: AppliedSearch }
+  | { kind: "success"; applied: AppliedSearch; route: Route }
+  | { kind: "empty"; applied: AppliedSearch }
+  | { kind: "error"; applied: AppliedSearch; message: string };
+
+export type PickMode = "origin" | "destination";
+
+export interface RouteSearchState {
+  origin: LngLat | null;
+  destination: LngLat | null;
+  /** 地図タップで指定中の地点。null は指定モードではない。 */
+  pickMode: PickMode | null;
+  /** 編集中の条件。検索するまで結果には影響しない。 */
+  draft: SearchConditions;
+  status: SearchStatus;
+  /** 検索前の入力検証エラー。次の操作で消える。 */
+  validationError: string | null;
+}
+
+export const BIKE_TYPE_OPTIONS: ReadonlyArray<{ value: BikeType; label: string }> = [
+  { value: "city", label: "シティ" },
+  { value: "electric_assist", label: "電動アシスト" },
+  { value: "road", label: "ロード" },
+  { value: "gravel", label: "グラベル" },
+  { value: "mamachari", label: "ママチャリ" },
+];
+
+export const HILL_MODE_OPTIONS: ReadonlyArray<{ value: HillMode; label: string }> = [
+  { value: "avoid", label: "避ける" },
+  { value: "balanced", label: "ふつう" },
+  { value: "accept", label: "許容する" },
+];
+
+export const bikeTypeLabel = (v: BikeType) => BIKE_TYPE_OPTIONS.find((o) => o.value === v)?.label ?? v;
+export const hillModeLabel = (v: HillMode) => HILL_MODE_OPTIONS.find((o) => o.value === v)?.label ?? v;
+
+/** 出発地と目的地がこれ未満しか離れていない場合は検索しない。 */
+const MIN_DISTANCE_M = 20;
+
+const sameLngLat = (a: LngLat, b: LngLat) => a[0] === b[0] && a[1] === b[1];
+
+/** 編集中の入力が、表示中の結果に適用された条件と食い違っているか。 */
+export function isStale(state: RouteSearchState): boolean {
+  const { status } = state;
+  if (status.kind === "idle") return false;
+  const a = status.applied;
+  return (
+    a.bikeType !== state.draft.bikeType ||
+    a.hillMode !== state.draft.hillMode ||
+    !state.origin ||
+    !state.destination ||
+    !sameLngLat(a.origin, state.origin) ||
+    !sameLngLat(a.destination, state.destination)
+  );
+}
+
+export interface RouteStore {
+  getState(): RouteSearchState;
+  subscribe(listener: (state: RouteSearchState) => void): () => void;
+  startPick(mode: PickMode): void;
+  cancelPick(): void;
+  /** 地図タップ。指定モード中なら地点として採用して true（他のクリック処理は不要）。 */
+  pick(lngLat: LngLat): boolean;
+  clearPoint(which: PickMode): void;
+  swap(): void;
+  /** 地点と結果をすべて消す。 */
+  reset(): void;
+  setDraft(patch: Partial<SearchConditions>): void;
+  search(): Promise<void>;
+}
+
+export function createRouteStore(api: ApiClient): RouteStore {
+  let state: RouteSearchState = {
+    origin: null,
+    destination: null,
+    pickMode: null,
+    draft: { bikeType: "city", hillMode: "balanced" },
+    status: { kind: "idle" },
+    validationError: null,
+  };
+  const listeners = new Set<(s: RouteSearchState) => void>();
+  /** 古い応答が新しい検索結果を上書きしないための連番。 */
+  let seq = 0;
+
+  function update(patch: Partial<RouteSearchState>): void {
+    state = { ...state, validationError: null, ...patch };
+    for (const l of listeners) l(state);
+  }
+
+  /** 検索中に地点・結果の前提が変わったら、進行中の応答は捨てる。 */
+  const invalidatePending = () => void seq++;
+
+  return {
+    getState: () => state,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => void listeners.delete(listener);
+    },
+    startPick: (mode) => update({ pickMode: mode }),
+    cancelPick: () => update({ pickMode: null }),
+    pick(lngLat) {
+      const mode = state.pickMode;
+      if (!mode) return false;
+      const origin = mode === "origin" ? lngLat : state.origin;
+      const destination = mode === "destination" ? lngLat : state.destination;
+      // 片方だけ未指定なら続けてもう片方を指定させる。
+      const next: PickMode | null = !origin ? "origin" : !destination ? "destination" : null;
+      update({ origin, destination, pickMode: next });
+      return true;
+    },
+    clearPoint(which) {
+      update(which === "origin" ? { origin: null } : { destination: null });
+    },
+    swap() {
+      update({ origin: state.destination, destination: state.origin });
+    },
+    reset() {
+      invalidatePending();
+      update({ origin: null, destination: null, pickMode: null, status: { kind: "idle" } });
+    },
+    setDraft(patch) {
+      update({ draft: { ...state.draft, ...patch } });
+    },
+    async search() {
+      if (state.status.kind === "loading") return;
+      const { origin, destination, draft } = state;
+      if (!origin || !destination) {
+        update({ validationError: "出発地と目的地を地図で指定してください。" });
+        return;
+      }
+      if (haversineM(origin, destination) < MIN_DISTANCE_M) {
+        update({ validationError: "出発地と目的地が近すぎます。離れた地点を指定してください。" });
+        return;
+      }
+      const applied: AppliedSearch = { origin, destination, ...draft };
+      const mine = ++seq;
+      // 検索を始めた時点で古い経路は表示から外す。失敗しても古いルートが新しい結果に見えない。
+      update({ pickMode: null, status: { kind: "loading", applied } });
+      try {
+        const route = await api.searchRoute({ origin, destination, ...draft });
+        if (mine !== seq) return;
+        update({ status: { kind: "success", applied, route } });
+      } catch (e) {
+        if (mine !== seq) return;
+        const err = toApiError(e);
+        update({
+          status: err.code === "no_route" ? { kind: "empty", applied } : { kind: "error", applied, message: err.message },
+        });
+      }
+    },
+  };
+}
