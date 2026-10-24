@@ -1,6 +1,7 @@
 import "./route.css";
 import type { LngLat } from "../../types/api";
 import { renderAnalysis } from "../elevation/render";
+import type { RouteLink } from "../elevation/link";
 import { el } from "../../ui/dom";
 import { renderState } from "../../ui/state";
 import { MODE_META, bikeTypeLabel, modeLabel } from "../preferences/labels";
@@ -48,8 +49,8 @@ export function renderPickBanner(store: RouteStore): HTMLElement {
   return banner;
 }
 
-/** 「経路」ビュー本体。検索条件とルート結果の2つのサブタブ。 */
-export function renderRouteView(store: RouteStore, prefs: PreferencesStore): HTMLElement {
+/** 「経路」ビュー本体。検索条件とルート結果の2つのサブタブ。link は標高グラフと地図の選択位置を共有する。 */
+export function renderRouteView(store: RouteStore, prefs: PreferencesStore, link: RouteLink): HTMLElement {
   let tab: SubTab = "result";
   let detailsOpen = false;
 
@@ -202,7 +203,12 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore): HTM
       parts.push(
         endpoints(status.applied),
         el("h3", { className: "route__result-heading", text: "検索されたルート" }),
-        renderAnalysis(status.route, state.elevation, () => store.retryElevation(), detailsOpen, (open) => { detailsOpen = open; }),
+        renderAnalysis(status.route, state.elevation, {
+          retry: () => store.retryElevation(),
+          detailsOpen,
+          onDetailsToggle: (open) => { detailsOpen = open; },
+          link,
+        }),
       );
     } else if (status.kind === "empty") {
       parts.push(

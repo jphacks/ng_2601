@@ -3,12 +3,30 @@
 .elevation__note a { color: var(--color-primary); text-underline-offset: 3px; }
 .elevation__error { color: var(--color-warning); }
 .elevation__figure { margin: 0; min-width: 0; }
+.elevation__chart-block { display: grid; gap: var(--space-2); min-width: 0; }
 .elevation__chart { display: block; width: 100%; height: auto; overflow: visible; }
+.elevation__hit { cursor: crosshair; }
+.elevation__cursor-line { stroke: var(--color-text); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
+.elevation__cursor-dot { fill: var(--color-surface); stroke: var(--color-text); stroke-width: 2.5; pointer-events: none; }
+.elevation__cursor-gap { fill: var(--color-surface); stroke: var(--color-warning); stroke-width: 2; pointer-events: none; }
 .elevation__axis-label { fill: var(--color-text); font-size: 12px; }
 .elevation__grid { stroke: var(--color-border); stroke-width: 1; }
 .elevation__line { stroke: var(--color-primary); }
 .elevation__point { fill: var(--color-primary); }
 .elevation__legend { font-size: 12px; line-height: 1.6; }
+.elevation__slider { display: grid; gap: var(--space-1); }
+.elevation__slider-label { font-size: 12px; color: var(--color-text-muted); }
+.elevation__slider-input { width: 100%; min-height: 32px; margin: 0; accent-color: var(--color-primary); }
+.elevation__hint { margin: 0; font-size: 12px; line-height: 1.6; color: var(--color-text-muted); }
+.elevation__readout {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
 .elevation__details { border-block: 1px solid var(--color-border); padding-block: var(--space-2); }
 .elevation__details summary { cursor: pointer; padding: var(--space-2) 0; font-size: 14px; font-weight: 600; }
 .elevation__metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: var(--space-2) 0 0; }

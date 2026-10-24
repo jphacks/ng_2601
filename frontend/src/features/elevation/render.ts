@@ -3,7 +3,8 @@ import type { Route } from "../../types/api";
 import { el } from "../../ui/dom";
 import type { ElevationState } from "./analyze";
 import { GSI_PROVIDER } from "./dem/config";
-import { renderProfileChart } from "./chart";
+import { createProfileChart } from "./chart";
+import type { RouteLink } from "./link";
 import { formatDistance, formatDuration, formatElevation, formatGrade, UNKNOWN } from "./format";
 
 function metrics(rows: Array<[string, string]>, className: string): HTMLElement {
@@ -14,7 +15,15 @@ function metrics(rows: Array<[string, string]>, className: string): HTMLElement 
   return dl;
 }
 
-export function renderAnalysis(route: Route, state: ElevationState, retry: () => void, detailsOpen: boolean, onToggle: (open: boolean) => void): HTMLElement {
+export interface AnalysisViewOptions {
+  retry: () => void;
+  detailsOpen: boolean;
+  onDetailsToggle: (open: boolean) => void;
+  /** グラフと地図の選択位置を共有する（#9）。 */
+  link: RouteLink;
+}
+
+export function renderAnalysis(route: Route, state: ElevationState, options: AnalysisViewOptions): HTMLElement {
   const analysis = state.kind === "ready" ? state.analysis : null;
   const summary = analysis?.summary;
   const partial = !!summary?.missingCount;
@@ -47,18 +56,25 @@ export function renderAnalysis(route: Route, state: ElevationState, retry: () =>
   root.append(status);
   if (analysis && summary!.validCount > 0) {
     const figure = el("figure", { className: "elevation__figure" });
-    figure.append(renderProfileChart(analysis.points), el("figcaption", { className: "elevation__legend", text: "実線・点：推定標高 ／ 線の途切れ：取得不可" }));
+    const chart = createProfileChart(analysis.points, { onSelect: (distanceM) => options.link.select(distanceM) });
+    figure.append(
+      chart.element,
+      el("figcaption", { className: "elevation__legend", text: "実線・点：推定標高 ／ 線の途切れ：取得不可 ／ 縦の破線：選択位置" }),
+    );
     root.append(figure);
+    options.link.attachChart(chart);
+  } else {
+    options.link.attachChart(null);
   }
   if (state.kind === "error" || (analysis && (analysis.errorCount > 0 || summary!.validCount === 0))) {
     const button = el("button", { className: "route__button", text: "標高解析を再試行" });
     button.type = "button";
     button.dataset.resultControl = "retry";
-    button.addEventListener("click", retry);
+    button.addEventListener("click", options.retry);
     root.append(button);
   }
   const details = el("details", { className: "elevation__details" });
-  details.open = detailsOpen;
+  details.open = options.detailsOpen;
   const toggle = el("summary", { text: "ルート詳細" });
   toggle.dataset.resultControl = "details";
   details.append(toggle, metrics([
@@ -69,7 +85,7 @@ export function renderAnalysis(route: Route, state: ElevationState, retry: () =>
     ["最大上り（100m区間）", formatGrade(summary?.steepestUphillPercent ?? null)],
     ["最大下り（100m区間）", formatGrade(summary?.steepestDownhillPercent ?? null)],
   ], "elevation__metrics"));
-  details.addEventListener("toggle", () => { if (details.isConnected) onToggle(details.open); });
+  details.addEventListener("toggle", () => { if (details.isConnected) options.onDetailsToggle(details.open); });
   root.append(details);
   if (analysis?.source === "mock" || (!analysis && import.meta.env.VITE_API_MODE !== "http")) {
     root.append(el("p", { className: "elevation__note", text: "開発用モックの合成データです。実際の標高・勾配ではありません。" }));

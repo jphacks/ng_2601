@@ -10,9 +10,10 @@ import { ATTRIBUTION } from "../map/style";
 import { formatPoint, renderPickBanner, renderRouteView } from "../route/renderRoute";
 import { createPreferencesStore } from "../preferences/preferencesState";
 import { createRouteStore } from "../route/routeState";
-import { mockReviewLocations, mockReviews } from "../../mocks/data";
-import { buildRouteGradientSegments } from "../elevation/gradientSegments";
+import { buildRouteGradientSegments, type RouteGradientSegment } from "../elevation/gradientSegments";
 import type { RouteAnalysis } from "../elevation/analyze";
+import { createRouteLink, type RouteLink } from "../elevation/link";
+import { mockReviewLocations, mockReviews } from "../../mocks/data";
 import type { Route } from "../../types/api";
 
 type ViewId = "route" | "settings" | "hazards" | "reviews" | "layers" | "help" | "about";
@@ -55,8 +56,6 @@ export function renderShell(root: HTMLElement): void {
   let layerPanel: HTMLElement | undefined;
   const routeStore = createRouteStore(api);
   const prefsStore = createPreferencesStore(api, routeStore);
-  const routeView = renderRouteView(routeStore, prefsStore);
-  void prefsStore.load();
 
   // --- map area ---------------------------------------------------------
   const map = el("div", { className: "map" });
@@ -65,10 +64,15 @@ export function renderShell(root: HTMLElement): void {
   // 道路・危険情報は FE-09 で実APIクライアント（モック切替可）に接続済み。詳細カードは地図クリックで開く。
   let hazards: HazardsFeature | undefined;
   // 地点指定モード中の地図タップだけを出発地／目的地として使う。
+  // ルート区間のタップは標高グラフの選択位置へ送る（#9）。
   const mapController: MapController = mountMap(map, {
     onPick: (lngLat) => routeStore.pick(lngLat),
     onSelectRoadInfo: (id) => hazards?.select(id, "map"),
+    onSelectRouteSegment: (distanceM) => link.select(distanceM),
   });
+  const link: RouteLink = createRouteLink(mapController);
+  const routeView = renderRouteView(routeStore, prefsStore, link);
+  void prefsStore.load();
   // 口コミのAPI接続（#12）までは、モックを重ねて表示を確認できるようにする。
   mapController.setReviews(
     mockReviews.flatMap((review) => {
@@ -321,6 +325,7 @@ export function renderShell(root: HTMLElement): void {
   let wasPicking = false;
   let shownRoute: Route | null = null;
   let shownAnalysis: RouteAnalysis | null | undefined;
+  let shownSegments: readonly RouteGradientSegment[] | null = null;
   routeStore.subscribe((state) => {
     syncRoutePanel(state);
     const picking = state.pickMode !== null;
@@ -336,14 +341,16 @@ export function renderShell(root: HTMLElement): void {
       if (route) mapController.fitToRoute(route);
       shownRoute = route;
       shownAnalysis = undefined;
+      shownSegments = null;
     }
     const analysis = route && state.elevation.kind === "ready" ? state.elevation.analysis : null;
     if (analysis !== shownAnalysis) {
-      if (route) {
-        mapController.setRouteGradientSegments(route.id, analysis ? buildRouteGradientSegments(route.coordinates, analysis) : null);
-      }
+      // 区間の生成は解析が変わったときだけ行い、選択位置の更新では作り直さない。
+      shownSegments = route && analysis ? buildRouteGradientSegments(route.coordinates, analysis) : null;
+      if (route) mapController.setRouteGradientSegments(route.id, shownSegments);
       shownAnalysis = analysis;
     }
+    link.setRoute(route, analysis, shownSegments);
 
     // 指定中は地図を見せるためカードを閉じ、指定が終わったら経路ビューに戻す。
     // 閉じるだけだと下へ移動するアニメーション中に案内バナーと重なるので、指定中は隠す。

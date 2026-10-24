@@ -8,7 +8,7 @@ import { CATEGORY_DEFS } from "../hazards/catalog";
 import { geometryBBox } from "../hazards/geometry";
 import { buildRoadInfoCollection } from "../hazards/mapCollection";
 import type { RoadInfoItem } from "../hazards/types";
-import { formatDistance, formatGrade } from "../elevation/format";
+import { formatSegmentText, distanceOnLine, type RouteSelectionTarget, type SegmentFacts } from "../elevation/selection";
 import type { RouteGradientSegment } from "../elevation/gradientSegments";
 import { el } from "../../ui/dom";
 import { renderState } from "../../ui/state";
@@ -49,12 +49,22 @@ export interface MapHandlers {
   onPick?: (lngLat: LngLat) => boolean | void;
   /** 道路・危険情報の図形をクリックしたとき（id）。何もない場所をクリックしたとき（null）。 */
   onSelectRoadInfo?: (id: string | null) => void;
+  /**
+   * 地図上のルート区間を選んだとき。distanceM は区間始点からの経路距離(m)。
+   * グラフ側で同じ位置を選ぶために使う（#9）。
+   */
+  onSelectRouteSegment?: (distanceM: number) => void;
 }
 
 export interface Viewport {
   bbox: BBox;
   zoom: number;
 }
+
+/**
+ * グラフと共有する選択位置。
+ * 地図の描画に必要なカーソル位置・区間・100m計測窓だけを持つ（elevation/selection）。
+ */
 
 /** 出発地・目的地。未指定は null。 */
 export interface Endpoints {
@@ -65,6 +75,8 @@ export interface Endpoints {
 export interface MapController {
   setRoutes(routes: Route[]): void;
   setRouteGradientSegments(routeId: string, segments: readonly RouteGradientSegment[] | null): void;
+  /** グラフ側で選んだ位置を地図へ反映する。null で解除（#9）。 */
+  setRouteSelection(selection: RouteSelectionTarget | null): void;
   setEndpoints(endpoints: Endpoints): void;
   /** 地点指定モードの間、カーソルを十字にして地図を指定待ちと分かるようにする。 */
   setPicking(on: boolean): void;
@@ -92,25 +104,29 @@ export interface MapController {
 const ROUTE_SOURCE = "routes";
 const ROUTE_LAYER = "routes";
 const ROUTE_UNKNOWN_LAYER = "routes-unknown";
+const ROUTE_SELECTION_HALO = "routes-selection-halo";
 
-function selectedSegmentText(properties: Record<string, unknown> | null | undefined): string | null {
+function segmentFacts(properties: Record<string, unknown> | null | undefined): SegmentFacts | null {
   const fromM = properties?.startDistanceM;
   const toM = properties?.endDistanceM;
   if (typeof fromM !== "number" || !Number.isFinite(fromM) || typeof toM !== "number" || !Number.isFinite(toM)) return null;
-
-  const interval = `${formatDistance(fromM)}〜${formatDistance(toM)}`;
   const grade = properties?.gradePercent;
-  if (typeof grade !== "number" || !Number.isFinite(grade)) {
-    return `選択区間 ${interval}：勾配不明（欠測または連続した100mの勾配データなし）`;
-  }
-
-  const direction = grade > 0 ? "上り" : grade < 0 ? "下り" : "平坦";
   const windowFromM = properties?.windowFromM;
   const windowToM = properties?.windowToM;
-  const window = typeof windowFromM === "number" && typeof windowToM === "number"
-    ? `、計測窓 ${formatDistance(windowFromM)}〜${formatDistance(windowToM)} の100m平均`
-    : "、100m平均";
-  return `選択区間 ${interval}：${direction} ${formatGrade(grade)}${window}`;
+  return {
+    fromM,
+    toM,
+    gradePercent: typeof grade === "number" && Number.isFinite(grade) ? grade : null,
+    windowFromM: typeof windowFromM === "number" && Number.isFinite(windowFromM) ? windowFromM : null,
+    windowToM: typeof windowToM === "number" && Number.isFinite(windowToM) ? windowToM : null,
+  };
+}
+
+function createRouteCursor(): HTMLElement {
+  const element = document.createElement("div");
+  element.className = "map-route-cursor";
+  element.setAttribute("aria-hidden", "true");
+  return element;
 }
 
 const ROAD_SOURCE = "road-info";
@@ -155,6 +171,10 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
   let picking = false;
   let gradientRouteId: string | null = null;
   let gradientSegments: readonly RouteGradientSegment[] | null = null;
+  let routeSelection: RouteSelectionTarget | null = null;
+  /** 直前に地図へ反映したハイライト区間。毎フレーム setFilter しないためのキー。 */
+  let appliedSelectionKey: string | null = null;
+  let routeCursor: maplibregl.Marker | null = null;
   let reviewMarkers: maplibregl.Marker[] = [];
   let pickMarker: maplibregl.Marker | null = null;
   let endpointMarkers: maplibregl.Marker[] = [];
@@ -196,7 +216,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
       }
       features.push({
         type: "Feature",
-        properties: { id: route.id, name: route.name, direction: "unknown" },
+        properties: { id: route.id, name: route.name, direction: "unknown", segmentIndex: -1 },
         geometry: { type: "LineString", coordinates: route.coordinates },
       });
     }
@@ -216,7 +236,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
       placeholder.value = "";
       options.push(placeholder);
       segments.forEach((segment, index) => {
-        const option = el("option", { text: selectedSegmentText(segmentProperties(gradientRouteId ?? "", segment, index)) ?? "" });
+        const option = el("option", { text: ((facts) => facts ? formatSegmentText(facts) : null)(segmentFacts(segmentProperties(gradientRouteId ?? "", segment, index))) ?? "" });
         option.value = String(index);
         options.push(option);
       });
@@ -250,13 +270,63 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
       clearGradientSelection();
       return;
     }
-    const text = selectedSegmentText(segmentProperties(gradientRouteId ?? "", segment, index));
+    const text = segmentFacts(segmentProperties(gradientRouteId ?? "", segment, index));
     if (text === null) {
       clearGradientSelection();
       return;
     }
-    showGradientSelection(text, index);
+    showGradientSelection(formatSegmentText(text), index);
+    handlers.onSelectRouteSegment?.((segment.fromM + segment.toM) / 2);
   });
+
+  function selectionKey(): string {
+    return `${gradientRouteId ?? ""}:${routeSelection?.segmentIndex ?? -1}:${routeSelection?.windowFromM ?? ""}:${routeSelection?.windowToM ?? ""}`;
+  }
+
+  /** ハイライト区間が変わったときだけ setFilter する（グラフのホバーで毎フレーム再設定しない）。 */
+  function applyRouteSelectionFilter(): void {
+    if (!map || !loaded || !map.getLayer(ROUTE_SELECTION_HALO)) return;
+    const key = selectionKey();
+    if (key === appliedSelectionKey) return;
+    appliedSelectionKey = key;
+    const selected = routeSelection;
+    if (!selected || gradientRouteId === null) {
+      map.setFilter(ROUTE_SELECTION_HALO, ["==", ["get", "routeId"], ""]);
+      return;
+    }
+    // 20mごとの区間ではなく、勾配の根拠になった100m窓全体を帯で示す。
+    // 各区間は自分の中心に最も近い100m窓を持つため、窓の値では絞れない。距離の範囲で選ぶ。
+    if (selected.windowFromM !== null && selected.windowToM !== null) {
+      map.setFilter(ROUTE_SELECTION_HALO, [
+        "all",
+        ["==", ["get", "routeId"], gradientRouteId],
+        [">=", ["get", "startDistanceM"], selected.windowFromM - 1e-6],
+        ["<=", ["get", "endDistanceM"], selected.windowToM + 1e-6],
+      ]);
+      return;
+    }
+    if (selected.segmentIndex !== null) {
+      map.setFilter(ROUTE_SELECTION_HALO, [
+        "all",
+        ["==", ["get", "routeId"], gradientRouteId],
+        ["==", ["get", "segmentIndex"], selected.segmentIndex],
+      ]);
+      return;
+    }
+    map.setFilter(ROUTE_SELECTION_HALO, ["==", ["get", "routeId"], ""]);
+  }
+
+  /** グラフで選んだ位置をマーカーで示す。区間ハイライトは applyRouteSelectionFilter が担当する。 */
+  function applyRouteSelection(): void {
+    applyRouteSelectionFilter();
+    if (!routeSelection) {
+      routeCursor?.remove();
+      return;
+    }
+    routeCursor ??= new maplibregl.Marker({ element: createRouteCursor(), anchor: "center" });
+    routeCursor.setLngLat(routeSelection.lngLat);
+    if (map && !routeCursor.getElement().isConnected) routeCursor.addTo(map);
+  }
 
   function syncVisibility(): void {
     syncSegmentOptions();
@@ -268,6 +338,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
     for (const id of ROAD_LAYERS) map.setLayoutProperty(id, "visibility", vis(visible.hazards));
     const groups: Array<[boolean, maplibregl.Marker[]]> = [[visible.reviews, reviewMarkers]];
     map.setLayoutProperty(ROUTE_UNKNOWN_LAYER, "visibility", vis(visible.routes));
+    if (map.getLayer(ROUTE_SELECTION_HALO)) map.setLayoutProperty(ROUTE_SELECTION_HALO, "visibility", vis(visible.routes));
     for (const [on, markers] of groups) {
       for (const m of markers) {
         // 既に表示中のマーカーは触らない（開いたポップアップとフォーカスを保つ）。
@@ -403,6 +474,8 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
     canvas.classList.remove("map__canvas--fallback");
     notice.hidden = true;
     loaded = false;
+    // 地図を作り直したら、作った地図に対してハイライトを再設定する。
+    appliedSelectionKey = null;
     try {
       const rootStyles = getComputedStyle(document.documentElement);
       const routeColor = rootStyles.getPropertyValue("--color-route").trim();
@@ -411,6 +484,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
       const flatColor = gradeColor("flat", "#334155");
       const downhillColor = gradeColor("downhill", "#1d4ed8");
       const unknownColor = gradeColor("unknown", "#64748b");
+      const selectionColor = rootStyles.getPropertyValue("--color-accent").trim() || "#dda15e";
       const m = new maplibregl.Map({
         container: canvas,
         style: createStyle(),
@@ -437,6 +511,15 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
             "line-opacity": 0.95,
           },
         });
+        // 選択区間の帯はルート線の下に敷き、色分けを隠さない。
+        m.addLayer({
+          id: ROUTE_SELECTION_HALO,
+          type: "line",
+          source: ROUTE_SOURCE,
+          filter: ["==", ["get", "routeId"], ""],
+          layout: { "line-join": "round", "line-cap": "round" },
+          paint: { "line-color": selectionColor, "line-width": 18, "line-opacity": 0.95 },
+        }, ROUTE_LAYER);
         m.addLayer({
           id: ROUTE_UNKNOWN_LAYER,
           type: "line",
@@ -449,6 +532,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
         syncSelection();
         syncVisibility();
         syncEndpoints();
+        applyRouteSelection();
         emitViewport();
       });
       m.on("moveend", emitViewport);
@@ -483,10 +567,16 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
         const lngLat: LngLat = [e.lngLat.lng, e.lngLat.lat];
         if (handlers.onPick?.(lngLat) === true) return;
         const routeFeature = m.queryRenderedFeatures(e.point, { layers: [ROUTE_LAYER, ROUTE_UNKNOWN_LAYER] })[0];
-        const segmentText = selectedSegmentText(routeFeature?.properties);
-        if (segmentText) {
+        const facts = segmentFacts(routeFeature?.properties);
+        if (facts) {
           const index = routeFeature?.properties?.segmentIndex;
-          showGradientSelection(segmentText, typeof index === "number" ? index : null);
+          showGradientSelection(formatSegmentText(facts), typeof index === "number" ? index : null);
+          // タップ位置を区間内の距離へ投影し、グラフ側で同じ位置を選ぶ（#9）。
+          const geometry = routeFeature?.geometry;
+          const along = geometry?.type === "LineString"
+            ? distanceOnLine(geometry.coordinates as LngLat[], lngLat)
+            : null;
+          handlers.onSelectRouteSegment?.(along === null ? facts.fromM : Math.min(facts.toM, facts.fromM + along));
           return;
         }
         clearGradientSelection();
@@ -534,16 +624,26 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
       routes = next;
       gradientRouteId = null;
       gradientSegments = null;
+      routeSelection = null;
+      appliedSelectionKey = null;
       clearGradientSelection();
       syncSegmentOptions();
+      applyRouteSelection();
       syncRoutes();
     },
     setRouteGradientSegments(routeId, next) {
       gradientRouteId = routeId;
       gradientSegments = next;
+      routeSelection = null;
+      appliedSelectionKey = null;
       clearGradientSelection();
       syncSegmentOptions();
+      applyRouteSelection();
       syncRoutes();
+    },
+    setRouteSelection(selection) {
+      routeSelection = selection;
+      applyRouteSelection();
     },
     setEndpoints({ origin, destination }) {
       // 地点が変わっていなければマーカーを作り直さない（開いたポップアップとフォーカスを保つ）。
