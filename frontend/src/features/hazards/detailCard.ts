@@ -62,7 +62,7 @@ export function renderDetailContent(item: RoadInfoItem, now: Date): HTMLElement 
 
   const when = [
     item.schedule ? scheduleText(item.schedule) : undefined,
-    item.expiresAt.state === "known" && freshness.validity !== "expired" ? `${formatStamp(item.expiresAt)} まで` : undefined,
+    item.expiresAt.state === "known" ? `${formatStamp(item.expiresAt)} まで` : undefined,
   ].filter(Boolean).join(" · ");
   if (when) root.append(el("p", { className: "hazard-detail__when", text: when }));
 
