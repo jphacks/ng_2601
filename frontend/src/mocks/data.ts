@@ -1,4 +1,4 @@
-import type { Hazard, Preferences, Review, Route } from "../types/api";
+import type { Hazard, LngLat, Preferences, Review, Route } from "../types/api";
 
 export const mockRoutes: Route[] = [
   {
@@ -85,6 +85,12 @@ export const mockReviews: Review[] = [
     createdAt: "2026-10-02T18:30:00+09:00",
   },
 ];
+
+/** 口コミは座標を持たないため、地図表示用に位置を添える（地図レイヤー確認用のモック）。 */
+export const mockReviewLocations: Record<string, LngLat> = {
+  "review-1": [139.7685, 35.6825],
+  "review-2": [139.7679, 35.6821],
+};
 
 export const defaultPreferences: Preferences = {
   maxGradePercent: 5,
