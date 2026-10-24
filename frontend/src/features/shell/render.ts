@@ -43,6 +43,8 @@ export function renderShell(root: HTMLElement): void {
   let searchOpen = false;
   let menuOpen = false;
   let view: ViewId = "route";
+  // レイヤーパネルは1つだけ作って使い回す（再訪のたびにリスナーを増やさない）。
+  let layerPanel: HTMLElement | undefined;
 
   // --- map area ---------------------------------------------------------
   const map = el("div", { className: "map" });
@@ -187,7 +189,12 @@ export function renderShell(root: HTMLElement): void {
         : view === "about"
           ? "Nature Ride — 自然の中を走る自転車ルート。"
           : `${def.label}は準備中です（${def.issue}で実装予定）。`;
-    viewBody.replaceChildren(view === "layers" ? renderLayerPanel(mapController) : renderState({ kind: "empty", message }));
+    if (view === "layers") {
+      layerPanel ??= renderLayerPanel(mapController);
+      viewBody.replaceChildren(layerPanel);
+    } else {
+      viewBody.replaceChildren(renderState({ kind: "empty", message }));
+    }
   }
 
   function setView(id: ViewId): void {

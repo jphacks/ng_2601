@@ -5,7 +5,10 @@ import type { StyleSpecification } from "maplibre-gl";
 export const BASEMAP_TILES = "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png";
 export const BASEMAP_MAX_ZOOM = 18;
 
-/** 地図右下に常時表示する帰属。HTMLを含まないので textContent / リンクは呼び出し側で組み立てる。 */
+/** レイヤーパネルの凡例に出すベースマップ名。提供元を変えるときはタイルURLと一緒に直す。 */
+export const BASEMAP_LEGEND_LABEL = "国土地理院 淡色地図";
+
+/** 地図右下に常時表示する帰属。リンクは呼び出し側で組み立てる。 */
 export const ATTRIBUTION = {
   label: "地理院タイル",
   url: "https://maps.gsi.go.jp/development/ichiran.html",

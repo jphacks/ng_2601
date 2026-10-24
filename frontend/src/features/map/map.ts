@@ -7,7 +7,7 @@ import type { Hazard, HazardType, LngLat, Review, Route } from "../../types/api"
 import { el } from "../../ui/dom";
 import { renderState } from "../../ui/state";
 import { createMarker, hideMarker, showMarker, type MarkerSpec } from "./markers";
-import { BASEMAP_MAX_ZOOM, INITIAL_VIEW, createStyle } from "./style";
+import { BASEMAP_LEGEND_LABEL, BASEMAP_MAX_ZOOM, INITIAL_VIEW, createStyle } from "./style";
 
 // MapLibre v6 のWorkerをViteで依存ファイルごとビルドし、生成URLを指定する。
 maplibregl.setWorkerUrl(workerUrl);
@@ -23,7 +23,7 @@ export interface LayerDef {
 
 /** 重ねられるレイヤーの一覧。後続Issue（経路 #6・危険情報 #11・口コミ #12）はここへデータを流し込む。 */
 export const LAYER_DEFS: readonly LayerDef[] = [
-  { id: "basemap", label: "ベースマップ", legend: { shape: "area", cssClass: "basemap", text: "国土地理院 淡色地図" } },
+  { id: "basemap", label: "ベースマップ", legend: { shape: "area", cssClass: "basemap", text: BASEMAP_LEGEND_LABEL } },
   { id: "routes", label: "ルート", legend: { shape: "line", cssClass: "route", text: "ルート" } },
   { id: "hazards", label: "道路・危険情報", legend: { shape: "dot", cssClass: "hazard", text: "危険情報" } },
   { id: "reviews", label: "口コミ", legend: { shape: "dot", cssClass: "review", text: "口コミ" } },
@@ -104,7 +104,12 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
       [visible.reviews, reviewMarkers],
     ];
     for (const [on, markers] of groups) {
-      for (const m of markers) (on ? showMarker(m, map) : hideMarker(m));
+      for (const m of markers) {
+        // 既に表示中のマーカーは触らない（開いたポップアップとフォーカスを保つ）。
+        const attached = m.getElement().isConnected;
+        if (on && !attached) showMarker(m, map);
+        else if (!on && attached) hideMarker(m);
+      }
     }
   }
 
@@ -177,14 +182,19 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
         handlers.onPick?.(lngLat);
       });
 
-      // 失敗したことを隠さない。タイルが読めたら表示を消す。
+      // 失敗したことを隠さない。失敗したタイルが読めるまで表示を残す。
+      const failed = new Set<string>();
+      const tileKey = (tile: { tileID?: { key: number } } | undefined) => (tile?.tileID ? String(tile.tileID.key) : "other");
       m.on("error", (e) => {
         console.error("MapLibre:", e.error);
+        failed.add(tileKey((e as { tile?: { tileID?: { key: number } } }).tile));
         notice.textContent = "地図データを読み込めませんでした。通信環境を確認してください。";
         notice.hidden = false;
       });
       m.on("sourcedata", (e) => {
-        if (e.sourceId === "basemap" && e.isSourceLoaded) notice.hidden = true;
+        if (e.sourceId !== "basemap" || !e.tile) return;
+        failed.delete(tileKey(e.tile));
+        if (failed.size === 0) notice.hidden = true;
       });
     } catch (error) {
       console.error("MapLibre initialization:", error);
