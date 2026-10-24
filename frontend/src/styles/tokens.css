@@ -10,6 +10,11 @@
   --color-surface: #ffffff;
   --color-text: #283326;
   --color-warning: #c2410c;
+  /* 道路・危険情報のカテゴリ色（地図・凡例・バッジで共通）。色だけに頼らず文言・線種も併用する。 */
+  --color-category-danger: var(--color-warning);
+  --color-category-convenience: #0f766e;
+  --color-category-terrain: #92400e;
+  --color-category-facility: #6d28d9;
 
   --color-text-muted: color-mix(in srgb, var(--color-text) 75%, var(--color-background));
   --color-border: color-mix(in srgb, var(--color-primary) 20%, var(--color-surface));

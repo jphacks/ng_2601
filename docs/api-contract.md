@@ -24,7 +24,8 @@
 | --- | --- | --- | --- |
 | 経路検索 | `POST /routes/search` | body: `RouteSearchRequest` | `Route[]` |
 | 経路詳細 | `GET /routes/{id}` | path: `id`（string） | `Route` |
-| 危険情報一覧 | `GET /hazards` | query: 任意の`routeId` | `Hazard[]` |
+| 危険情報一覧（旧・想定） | `GET /hazards` | query: 任意の`routeId` | `Hazard[]`。#11では使わない（`/dev/overview`と#10の`Preferences`が`Hazard`型を参照するため型は残置） |
+| 道路・危険情報（表示領域） | `GET /v1/map-data` | query: `min_lon`,`min_lat`,`max_lon`,`max_lat`、任意`limit`（1〜500、既定200） | `MapDataResponse`（下記）。**BE担当共有のスニペットに基づく暫定。リポジトリ内のどのブランチにも未確認** |
 | 口コミ一覧 | `GET /reviews` | query: 任意の`routeId`、`hazardId` | `Review[]` |
 | 設定取得 | `GET /preferences` | なし | `Preferences` |
 | 設定更新 | `PUT /preferences` | body: `Preferences` | `Preferences` |
@@ -36,7 +37,8 @@
 - PR #16の暫定`ApiErrorBody`は`code`、`message`、任意の`details`。非2xxで本文がこの形でなければ`http_error`、fetch失敗はstatus `0`／`network_error`です。`toApiError`はその他の例外を`unknown`に正規化します。正式なステータスとエラーコード一覧、タイムアウト・再試行方針は未合意です。
 - 成功レスポンスは現状clientで型アサーションされ、実行時の構造検証はありません。型があることを実サーバー応答の検証済みと解釈しません。
 - 暫定`LngLat`は`[経度, 緯度]`順です。距離・標高はm、時間は秒、勾配は%と型名・コメントに示されています。正式な測地系、標高基準、勾配の符号・計算方法・丸め・欠測表現は未合意です。
-- `Review.createdAt`は暫定型でISO 8601と記載されています。タイムゾーン・危険情報の更新日時／有効期限の表現は未合意です。
+- `Review.createdAt`は暫定型でISO 8601と記載されています。タイムゾーンは未合意です。
+- `GET /v1/map-data`の日時は、FEでは「キー欠落＝欠測」「null・空・不正値＝提供元が不明」「文字列＝値あり」と区別して扱います（#11の提案。BEとは未合意）。タイムゾーンの扱い（オフセット付きISO 8601を想定）も未合意です。
 
 ## 接続前に合意する事項
 
@@ -45,7 +47,7 @@
 | Preferences更新 | [#10](https://github.com/jphacks/ng_2601/issues/10)は`PATCH`案、PR #16は`PUT`。どちらを採るかFE・BEで決める |
 | Preferencesの意味 | #10は車種・坂道許容度・設定範囲を取得する要件。暫定型は最大勾配・階段回避・危険種別回避であり、車種・範囲・初期値の取得はない。重みか上限かも含めて合意する |
 | 経路形状・標高 | [#6](https://github.com/jphacks/ng_2601/issues/6)はGeoJSONまたは合意した形状を想定。暫定型は座標配列。区間勾配、形状との対応、null等の欠測表現、計算責務は[#7](https://github.com/jphacks/ng_2601/issues/7)・[#8](https://github.com/jphacks/ng_2601/issues/8)と調整する |
-| 危険情報の取得・鮮度 | [#11](https://github.com/jphacks/ng_2601/issues/11)の表示領域に応じた取得、情報源・更新日・期限は暫定型／clientに揃っていない。取得条件と欠測・期限切れを合意する |
+| 危険情報の取得・鮮度 | [#11](https://github.com/jphacks/ng_2601/issues/11)は`GET /v1/map-data`（`restrictions`／`route_context.accidents`・`traffic`／`observations`のGeoJSON FeatureCollectionと各`source_status`／`source`）に合わせて実装。型は[`frontend/src/types/api.ts`](../frontend/src/types/api.ts)の`MapDataResponse`、取得は`ApiClient.getMapData`。未確認・未合意: (1) `_observation_features`のproperties（FEは`observations`テーブル列名と同名と仮定）と`category`の値一覧（FEは部分一致で4分類に対応づけ、未知は「危険／その他」）、(2) `limit`が`observations`以外にも効くか、広域bboxの上限（FEはzoom12未満で取得しない）、(3) 認証、(4) 他エンドポイントと違い`/v1`接頭辞を持つ点、(5) `restrictions`の`confidence`値（FEは`high`＝確認済み、`low`＝未確認、それ以外＝不明と扱う）、(6) 事故履歴・交通量に更新日時・個別IDがなく、`source_status.metadata`の日時で代替している点 |
 | 口コミの位置・投稿 | [#12](https://github.com/jphacks/ng_2601/issues/12)は地点単位。暫定型は任意のrouteId／hazardIdで、位置は持たない。#13の投稿型、認証・公開位置・投稿制限も調整する |
 | 共通通信仕様 | ベースURL、認証・CORS、入力制約、HTTPステータス、ページング、上限・タイムアウトはBE実装と合わせて決める。clientの既定URLを稼働中サービスとして記載しない |
 

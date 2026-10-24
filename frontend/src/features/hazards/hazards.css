@@ -1,0 +1,154 @@
+/* 道路・危険情報（タブ・詳細カード・バッジ）。色は tokens.css を使う（docs/design-system.md）。 */
+.hazard-swatch {
+  flex: none;
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-border);
+}
+.hazard-swatch--danger { background: var(--color-category-danger); }
+.hazard-swatch--convenience { background: var(--color-category-convenience); }
+.hazard-swatch--terrain { background: var(--color-category-terrain); }
+.hazard-swatch--facility { background: var(--color-category-facility); }
+
+.hazard-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-bar);
+  background: var(--color-surface);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+/* 色だけに頼らず、枠線の種類でも状態を区別する。 */
+.hazard-badge--stale { border: 1px dotted var(--color-warning); color: var(--color-warning); font-weight: 600; }
+.hazard-badge--unverified { border: 1px dashed var(--color-warning); color: var(--color-warning); }
+.hazard-badge--unknown { border-style: dashed; color: var(--color-text-muted); }
+
+/* --- タブ --- */
+.hazard-panel { display: grid; gap: var(--space-3); }
+.hazard-panel__mock, .hazard-panel__hint { margin: 0; font-size: 12px; color: var(--color-text-muted); }
+.hazard-panel__notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-panel);
+  font-size: 13px;
+}
+.hazard-panel__notice p { margin: 0; }
+.hazard-panel__link {
+  flex: none;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-bar);
+  background: var(--color-surface);
+  color: var(--color-primary);
+}
+.hazard-panel__group { margin: 0; padding: 0; border: 0; display: grid; gap: var(--space-1); min-width: 0; }
+.hazard-panel__group--inline { grid-auto-flow: column; justify-content: start; gap: var(--space-3); }
+.hazard-panel__group--inline .hazard-panel__legend { grid-column: 1 / -1; }
+.hazard-panel__legend { padding: 0; margin-bottom: var(--space-1); font-weight: 600; font-size: 14px; }
+.hazard-panel__check { display: flex; align-items: center; gap: var(--space-3); min-height: var(--button-size); }
+.hazard-panel__check input { width: 20px; height: 20px; flex: none; accent-color: var(--color-primary); }
+.hazard-panel__check-text { flex: 1; min-width: 0; }
+.hazard-panel__count { font-size: 12px; color: var(--color-text-muted); }
+.hazard-panel__warn { margin: 0; padding: var(--space-2) var(--space-3); border: 1px dashed var(--color-warning); border-radius: var(--radius-panel); font-size: 13px; color: var(--color-warning); }
+.hazard-panel__sources { font-size: 13px; }
+.hazard-panel__sources summary { min-height: 36px; display: flex; align-items: center; cursor: pointer; }
+.hazard-panel__sources ul { margin: 0 0 var(--space-2); padding-left: var(--space-4); }
+.hazard-panel__source--off { color: var(--color-warning); }
+.hazard-panel__list-title { margin: 0; font-size: 14px; }
+.hazard-panel__list { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-1); }
+.hazard-panel__empty { padding: var(--space-3); font-size: 13px; color: var(--color-text-muted); }
+.hazard-panel__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--button-size);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  text-align: left;
+}
+.hazard-panel__item:hover { background: var(--color-hover); }
+.hazard-panel__item[aria-current="true"] { background: var(--color-selected); border-color: var(--color-selected); }
+.hazard-panel__item .hazard-swatch { margin-top: 4px; }
+.hazard-panel__item.is-stale .hazard-panel__item-title { color: var(--color-text-muted); }
+.hazard-panel__item-body { display: grid; gap: 2px; min-width: 0; }
+.hazard-panel__item-title { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.hazard-panel__item-sub { font-size: 12px; color: var(--color-text-muted); }
+.hazard-panel__item-badges { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.hazard-panel__item-badges:empty { display: none; }
+
+/* --- 詳細カード（地図の上）。スマホは下、PCは右（地図ボタンの左）。 --- */
+.hazard-card {
+  position: absolute;
+  z-index: 15;
+  left: var(--left-offset);
+  right: var(--right-offset);
+  bottom: calc(var(--bottom-offset) + var(--row-height) + var(--space-3));
+  max-height: 45dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-4);
+  padding-right: calc(var(--space-4) + var(--button-size));
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-floating);
+}
+@media (min-width: 768px) {
+  .hazard-card {
+    left: auto;
+    right: calc(var(--right-offset) + var(--button-size) + var(--space-3));
+    /* 検索バー（展開時は上部に全幅）の下に置く。 */
+    top: calc(var(--top-offset) + var(--row-height) + var(--space-2));
+    bottom: auto;
+    width: 360px;
+    max-height: calc(100dvh - var(--top-offset) - var(--row-height) - var(--space-2) - var(--bottom-offset));
+  }
+}
+.hazard-card__close {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: grid;
+  place-items: center;
+  width: var(--button-size);
+  height: var(--button-size);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--color-text);
+}
+.hazard-card__close:hover { background: var(--color-hover); }
+
+.hazard-detail { display: grid; gap: var(--space-2); }
+.hazard-detail__badges { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.hazard-detail__title { margin: 0; font-size: 16px; overflow-wrap: anywhere; }
+.hazard-detail__kind, .hazard-detail__description { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+.hazard-detail__kind { color: var(--color-text-muted); }
+.hazard-detail__cautions {
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+  border-left: 3px dashed var(--color-warning);
+  font-size: 13px;
+  color: var(--color-warning);
+}
+.hazard-detail__facts { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-1) var(--space-3); margin: 0; font-size: 13px; }
+.hazard-detail__facts dt { color: var(--color-text-muted); }
+.hazard-detail__facts dd { margin: 0; overflow-wrap: anywhere; }
+.hazard-detail__value--gap { font-style: italic; color: var(--color-text-muted); }
+.hazard-detail__value--stale { color: var(--color-warning); font-weight: 600; }

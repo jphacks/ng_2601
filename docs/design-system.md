@@ -11,6 +11,7 @@
 | `--color-surface` | `#FFFFFF` | バー・パネル・ボタン |
 | `--color-text` | `#283326` | 文字 |
 | `--color-warning` | `#C2410C` | 警告・エラー |
+| `--color-category-danger` / `-convenience` / `-terrain` / `-facility` | `--color-warning` / `#0F766E` / `#92400E` / `#6D28D9` | 道路・危険情報のカテゴリ（危険／便利／地形／道路設備）。地図・凡例・一覧で共通。色だけに頼らず、ラベルと線種（実線＝有効、破線＝未確認、点線＝期限切れ・解消済み）でも区別する |
 
 ## 検索バーと展開UIの統一ルール
 

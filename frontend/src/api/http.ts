@@ -10,15 +10,18 @@ function isApiErrorBody(v: unknown): v is ApiErrorBody {
 
 // エンドポイントは暫定。バックエンド確定後に合わせる。
 export function createHttpClient(baseUrl: string): ApiClient {
-  async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
     let res: Response;
     try {
       res = await fetch(baseUrl + path, {
         method,
         headers: body === undefined ? undefined : { "Content-Type": "application/json" },
         body: body === undefined ? undefined : JSON.stringify(body),
+        signal,
       });
     } catch (e) {
+      // 呼び出し側が中断した要求はエラー扱いにしない。
+      if (e instanceof DOMException && e.name === "AbortError") throw e;
       throw new ApiError(0, {
         code: "network_error",
         message: e instanceof Error ? e.message : "network error",
@@ -43,6 +46,19 @@ export function createHttpClient(baseUrl: string): ApiClient {
     searchRoutes: (req) => request("POST", "/routes/search", req),
     getRoute: (id) => request("GET", `/routes/${encodeURIComponent(id)}`),
     listHazards: (routeId) => request("GET", `/hazards${qs({ routeId })}`),
+    getMapData: ([minLon, minLat, maxLon, maxLat], { limit, signal } = {}) =>
+      request(
+        "GET",
+        `/v1/map-data${qs({
+          min_lon: String(minLon),
+          min_lat: String(minLat),
+          max_lon: String(maxLon),
+          max_lat: String(maxLat),
+          limit: limit === undefined ? undefined : String(limit),
+        })}`,
+        undefined,
+        signal,
+      ),
     listReviews: (params = {}) => request("GET", `/reviews${qs(params)}`),
     getPreferences: () => request("GET", "/preferences"),
     updatePreferences: (p) => request("PUT", "/preferences", p),

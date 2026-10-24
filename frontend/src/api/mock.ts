@@ -7,9 +7,20 @@ import {
   mockReviews,
   mockRoutes,
 } from "../mocks/data";
-import type { Preferences } from "../types/api";
+import { bboxIntersects } from "../features/hazards/bbox";
+import { geometryBBox } from "../features/hazards/geometry";
+import { buildMockMapData } from "../mocks/mapData";
+import type { BBox, Preferences } from "../types/api";
 
 const delay = (ms = 150) => new Promise((r) => setTimeout(r, ms));
+
+/** 範囲外の feature を除く。BEの bbox 絞り込みに相当。 */
+function inBBox<F extends { geometry: Parameters<typeof geometryBBox>[0] }>(features: F[], bbox: BBox): F[] {
+  return features.filter((f) => {
+    const box = f.geometry && geometryBBox(f.geometry);
+    return box !== null && bboxIntersects(bbox, box);
+  });
+}
 
 const copyPrefs = (p: Preferences): Preferences => ({
   ...p,
@@ -34,6 +45,25 @@ export function createMockClient(): ApiClient {
       await delay();
       if (!routeId) return mockHazards;
       return mockHazards.filter((h) => mockHazardRouteIds[h.id]?.includes(routeId));
+    },
+    async getMapData(bbox, { limit = 200, signal } = {}) {
+      await delay();
+      if (signal?.aborted) throw new DOMException("aborted", "AbortError");
+      const data = buildMockMapData();
+      return {
+        restrictions: { ...data.restrictions, features: inBBox(data.restrictions.features, bbox) },
+        route_context: {
+          accidents: {
+            ...data.route_context.accidents,
+            features: inBBox(data.route_context.accidents.features, bbox),
+          },
+          traffic: { ...data.route_context.traffic, features: inBBox(data.route_context.traffic.features, bbox) },
+        },
+        observations: {
+          ...data.observations,
+          features: inBBox(data.observations.features, bbox).slice(0, limit),
+        },
+      };
     },
     async listReviews({ routeId, hazardId } = {}) {
       await delay();
