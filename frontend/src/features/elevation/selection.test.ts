@@ -12,6 +12,7 @@ import {
   formatSegmentText,
   GRADE_UNKNOWN_TEXT,
   locateRouteCoordinate,
+  sliderValueToDistance,
   type SegmentFacts,
 } from "./selection";
 
@@ -59,6 +60,18 @@ describe("route distance helpers", () => {
     expect(clampRouteDistance(700, 500)).toBe(500);
     expect(clampRouteDistance(Number.NaN, 500)).toBe(0);
     expect(clampRouteDistance(120, 0)).toBe(0);
+  });
+
+  it("maps the last slider step to the exact route end", () => {
+    expect(sliderValueToDistance(1920, 1931, 10)).toBe(1920);
+    // max 1931 は10の倍数ではないので、末尾のstep(1930)は終点ちょうどとして扱う。
+    expect(sliderValueToDistance(1930, 1931, 10)).toBe(1931);
+    expect(sliderValueToDistance(1931, 1931, 10)).toBe(1931);
+    expect(sliderValueToDistance(1930, 1930, 10)).toBe(1930);
+    expect(sliderValueToDistance(10, 5, 10)).toBe(5);
+    expect(sliderValueToDistance(10, 500, 10)).toBe(10);
+    expect(sliderValueToDistance(Number.NaN, 1931, 10)).toBe(0);
+    expect(sliderValueToDistance(10, 0, 10)).toBe(0);
   });
 
   it("maps a distance to an interpolated route coordinate and elevation", () => {

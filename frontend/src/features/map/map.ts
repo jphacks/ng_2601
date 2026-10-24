@@ -572,10 +572,10 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
           const index = routeFeature?.properties?.segmentIndex;
           showGradientSelection(formatSegmentText(facts), typeof index === "number" ? index : null);
           // タップ位置を区間内の距離へ投影し、グラフ側で同じ位置を選ぶ（#9）。
-          const geometry = routeFeature?.geometry;
-          const along = geometry?.type === "LineString"
-            ? distanceOnLine(geometry.coordinates as LngLat[], lngLat)
-            : null;
+          // 描画用のジオメトリはタイル境界で分割・単純化され得るため、元の区間形状を使う。
+          const segmentIndex = routeFeature?.properties?.segmentIndex;
+          const source = typeof segmentIndex === "number" && gradientSegments ? gradientSegments[segmentIndex] : undefined;
+          const along = source ? distanceOnLine(source.coordinates, lngLat) : null;
           handlers.onSelectRouteSegment?.(along === null ? facts.fromM : Math.min(facts.toM, facts.fromM + along));
           return;
         }

@@ -1,6 +1,6 @@
 import type { ProfilePoint } from "./profile";
 import type { RouteGradientSegment } from "./gradientSegments";
-import { describeSelection, type RouteSelection } from "./selection";
+import { describeSelection, sliderValueToDistance, type RouteSelection } from "./selection";
 import { formatDistance, formatElevation } from "./format";
 import { el } from "../../ui/dom";
 
@@ -188,7 +188,7 @@ export function createProfileChart(points: readonly ProfilePoint[], handlers: Pr
   slider.setAttribute("aria-describedby", hintId);
   slider.setAttribute("aria-label", "標高グラフの選択位置（経路に沿った距離）");
   slider.setAttribute("aria-valuetext", "未選択");
-  slider.addEventListener("input", () => handlers.onSelect(Number(slider.value)));
+  slider.addEventListener("input", () => handlers.onSelect(sliderValueToDistance(Number(slider.value), total, SLIDER_STEP_M)));
   const sliderLabel = el("label", { className: "elevation__slider-label", text: "グラフ位置（←→キー・10m単位）" });
   sliderLabel.htmlFor = sliderId;
 
