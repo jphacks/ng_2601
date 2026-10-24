@@ -10,7 +10,7 @@ cd ng_2601
 git status --short --branch
 ```
 
-1. [プロジェクトREADME](../README.md)と[AGENTS.md](../AGENTS.md)を読む。AIが規約を自動読込しない場合は、AGENTS.mdを読むよう指示する。
+1. [プロジェクトREADME](../../README.md)と[AGENTS.md](../AGENTS.md)を読む。AIが規約を自動読込しない場合は、AGENTS.mdを読むよう指示する。
 2. [architecture.md](architecture.md)で現在の実装範囲と計画を、[api-contract.md](api-contract.md)で型・通信境界と未合意点を確認する。
 3. [Issues](https://github.com/jphacks/ng_2601/issues)で担当タスク・受入条件・依存関係を確認し、[PR一覧](https://github.com/jphacks/ng_2601/pulls)から同じ機能の進行中変更を探す。
 4. 対象機能に関係する[ADR](decisions/README.md)と[Handoff](handoffs/README.md)を読み、対象ブランチの実装・差分を確認する。IssueやPRのリンク先に記録があれば併せて読む。
@@ -22,7 +22,7 @@ clone直後に起動できる機能があるとは限りません。[アーキ�
 
 | 情報 | 正本・役割 |
 | --- | --- |
-| 製品概要・提出情報 | ルートの[README](../README.md)。JPHACKS提出用テンプレートを維持する |
+| 製品概要・提出情報 | ルートの[README](../../README.md)。JPHACKS提出用テンプレートを維持する |
 | 人間向け開発参加案内 | この文書。各資料への入口と運用手順 |
 | AIの作業規約 | [AGENTS.md](../AGENTS.md)。[CLAUDE.md](../CLAUDE.md)は参照のみ |
 | 現在の構成・責務・実装状態 | [architecture.md](architecture.md)。確認したコミットと根拠を添える |
@@ -41,7 +41,7 @@ clone直後に起動できる機能があるとは限りません。[アーキ�
 
 ## 完了・交代する場合
 
-1. [PRテンプレート](../.github/pull_request_template.md)に変更・判断・検証結果・未検証事項・残課題を書く。
+1. [PRテンプレート](../../.github/pull_request_template.md)に変更・判断・検証結果・未検証事項・残課題を書く。
 2. [Handoffの条件](handoffs/README.md)に該当する場合は[TEMPLATE](handoffs/TEMPLATE.md)から作り、Issue・PR・Handoffを相互に辿れるようにする。小規模変更はPR本文を使う。
 3. 次担当者は参照順に読み、ブランチとコミット、差分、未解決事項を照合し、Next Actionsの先頭から再開する。過去チャットの提出を前提にしない。
 

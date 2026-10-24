@@ -4,7 +4,7 @@
 
 ## 作業開始時
 
-1. [README](README.md)でプロジェクト概要、[開発参加案内](docs/README.md)で資料の役割を確認する。
+1. [README](../README.md)でプロジェクト概要、[開発参加案内](docs/README.md)で資料の役割を確認する。
 2. [アーキテクチャ](docs/architecture.md)、[API契約の案内](docs/api-contract.md)、対象機能の仕様・必要な[ADR](docs/decisions/README.md)を読む。
 3. [対象Issue](https://github.com/jphacks/ng_2601/issues)の受入条件、依存Issue、[関連PR](https://github.com/jphacks/ng_2601/pulls)の差分・レビュー・マージ状態を確認する。未マージの内容を採用済みとして扱わない。
 4. 関連する[Handoff](docs/handoffs/README.md)と実装を読み、既存機能や進行中の機能を重複実装しない。
@@ -25,7 +25,7 @@
 - 変更点と理由、主要ファイル、実行した検証コマンド・実行場所・結果をPRに残す。失敗、未実施、既知の制約も明示する。
 - [Handoff作成条件](docs/handoffs/README.md)を確認し、必要なら[TEMPLATE](docs/handoffs/TEMPLATE.md)から記録する。小規模変更はPR本文でよい。
 - 設計を変更したらアーキテクチャとAPIの正本・参照を更新する。重要な意思決定だけADRに残す。過去の判断を推測で後付けしない。
-- [PRテンプレート](.github/pull_request_template.md)を使い、関連Issue・更新文書・必要なHandoffをリンクする。別Issueを誤って閉じるキーワードを付けない。
+- [PRテンプレート](../.github/pull_request_template.md)を使い、関連Issue・更新文書・必要なHandoffをリンクする。別Issueを誤って閉じるキーワードを付けない。
 - 中断時はブランチ、保存済みコミット／未コミット差分、失敗した受入条件、再開の最初の操作を残す。次担当はHandoffの時点と現在の差分を確認して再開する。
 
 ## 禁止事項
