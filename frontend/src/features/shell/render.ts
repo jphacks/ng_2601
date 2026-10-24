@@ -293,6 +293,8 @@ export function renderShell(root: HTMLElement): void {
     }
 
     // 指定中は地図を見せるためカードを閉じ、指定が終わったら経路ビューに戻す。
+    // 閉じるだけだと下へ移動するアニメーション中に案内バナーと重なるので、指定中は隠す。
+    card.hidden = picking;
     if (picking) closeSearch(true);
     else if (wasPicking) openSearch("route");
     wasPicking = picking;
