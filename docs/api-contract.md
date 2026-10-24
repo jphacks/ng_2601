@@ -22,12 +22,14 @@
 
 | 用途 | PR #16内のHTTP呼び出し | 入力（bodyまたはquery） | 応答型 |
 | --- | --- | --- | --- |
-| 経路検索 | `POST /routes/search` | body: `RouteSearchRequest` | `Route[]` |
+| 経路検索 | `POST /v1/routes`（BE実装に合わせた。[#6](https://github.com/jphacks/ng_2601/issues/6)） | body: `RouteSearchRequest`をBEの`{start,end,bike_type,preferences}`へ変換 | `Route`（単一）。BEの`{route: BRouter GeoJSON,...}`から変換 |
 | 経路詳細 | `GET /routes/{id}` | path: `id`（string） | `Route` |
 | 危険情報一覧 | `GET /hazards` | query: 任意の`routeId` | `Hazard[]` |
 | 口コミ一覧 | `GET /reviews` | query: 任意の`routeId`、`hazardId` | `Review[]` |
 | 設定取得 | `GET /preferences` | なし | `Preferences` |
 | 設定更新 | `PUT /preferences` | body: `Preferences` | `Preferences` |
+
+経路検索のみ、マージ済みの`frontend/src/api/http.ts`が`POST /v1/routes`を呼びます（BE: `back/backend/app/main.py`）。リクエスト／応答の変換は[`routeAdapter.ts`](../frontend/src/api/routeAdapter.ts)、エラーは`{detail}`をFE形式へ正規化（409=`no_route`、422=`invalid_request`、502/503=`routing_unavailable`、タイムアウト=`timeout`）。BEが返さない下降量・最大勾配は`null`で、FEで推測しません。実BEとの結合は未検証です。他の行は引き続き暫定です。
 
 [#13](https://github.com/jphacks/ng_2601/issues/13)には口コミ投稿の想定`POST /reviews`がありますが、確認したPRのApiClientに投稿操作・リクエスト型はありません。未実装・未合意として扱います。
 

@@ -2,10 +2,14 @@ import "./shell.css";
 import { el } from "../../ui/dom";
 import { icon, type IconName } from "../../ui/icon";
 import { renderState } from "../../ui/state";
+import { api } from "../../api";
 import { renderLayerPanel } from "../map/layerPanel";
 import { mountMap, type MapController } from "../map/map";
 import { ATTRIBUTION } from "../map/style";
-import { mockHazards, mockReviewLocations, mockReviews, mockRoutes } from "../../mocks/data";
+import { formatPoint, renderPickBanner, renderRouteView } from "../route/renderRoute";
+import { createRouteStore } from "../route/routeState";
+import { mockHazards, mockReviewLocations, mockReviews } from "../../mocks/data";
+import type { Route } from "../../types/api";
 
 type ViewId = "route" | "settings" | "hazards" | "reviews" | "layers" | "help" | "about";
 
@@ -43,16 +47,18 @@ export function renderShell(root: HTMLElement): void {
   let searchOpen = false;
   let menuOpen = false;
   let view: ViewId = "route";
-  // レイヤーパネルは1つだけ作って使い回す（再訪のたびにリスナーを増やさない）。
+  // レイヤーパネルと経路ビューは1つだけ作って使い回す（再訪のたびにリスナーを増やさない）。
   let layerPanel: HTMLElement | undefined;
+  const routeStore = createRouteStore(api);
+  const routeView = renderRouteView(routeStore);
 
   // --- map area ---------------------------------------------------------
   const map = el("div", { className: "map" });
   map.setAttribute("role", "region");
   map.setAttribute("aria-label", "地図エリア");
-  const mapController: MapController = mountMap(map);
-  // 経路・危険情報・口コミのAPI接続（#6/#11/#12）までは、モックを重ねて表示を確認できるようにする。
-  mapController.setRoutes(mockRoutes);
+  // 地点指定モード中の地図タップだけを出発地／目的地として使う。
+  const mapController: MapController = mountMap(map, { onPick: (lngLat) => routeStore.pick(lngLat) });
+  // 危険情報・口コミのAPI接続（#11/#12）までは、モックを重ねて表示を確認できるようにする。
   mapController.setHazards(mockHazards);
   mapController.setReviews(
     mockReviews.flatMap((review) => {
@@ -107,8 +113,10 @@ export function renderShell(root: HTMLElement): void {
   const controls = el("div", { className: "map-controls" }, [layersButton, compass, locate, zoomIn, zoomOut]);
 
   // --- search card: one DOM instance, only its position/size changes ----
+  // 住所検索（ジオコーディング）は未対応のため、目的地・出発地は地図で指定した地点を表示するだけの読み取り専用。
   const input = el("input", { className: "bar__input" });
   input.type = "text";
+  input.readOnly = true;
   input.placeholder = "どこへ行く？";
   input.setAttribute("aria-label", "目的地");
   input.autocomplete = "off";
@@ -122,9 +130,14 @@ export function renderShell(root: HTMLElement): void {
 
   const origin = el("input", { className: "row__input" });
   origin.type = "text";
-  origin.placeholder = "出発地（現在地）";
+  origin.readOnly = true;
+  origin.placeholder = "出発地（タップして地図で指定）";
   origin.setAttribute("aria-label", "出発地");
   origin.autocomplete = "off";
+  origin.addEventListener("click", () => routeStore.startPick("origin"));
+  origin.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") routeStore.startPick("origin");
+  });
   const originRow = el("label", { className: "row" }, [
     el("span", { className: "row__icon" }, [icon("pin")]),
     origin,
@@ -189,7 +202,9 @@ export function renderShell(root: HTMLElement): void {
         : view === "about"
           ? "Nature Ride — 自然の中を走る自転車ルート。"
           : `${def.label}は準備中です（${def.issue}で実装予定）。`;
-    if (view === "layers") {
+    if (view === "route") {
+      viewBody.replaceChildren(routeView);
+    } else if (view === "layers") {
       layerPanel ??= renderLayerPanel(mapController);
       viewBody.replaceChildren(layerPanel);
     } else {
@@ -259,9 +274,34 @@ export function renderShell(root: HTMLElement): void {
   scrim.addEventListener("click", () => setMenu(false));
   panel.addEventListener("focusin", revealFocused);
 
+  // --- route search state -> map / search card ------------------------------
+  let wasPicking = false;
+  let shownRoute: Route | null = null;
+  routeStore.subscribe((state) => {
+    const picking = state.pickMode !== null;
+    mapController.setPicking(picking);
+    mapController.setEndpoints({ origin: state.origin, destination: state.destination });
+    origin.value = state.origin ? formatPoint(state.origin) : "";
+    input.value = state.destination ? formatPoint(state.destination) : "";
+
+    // 結果が成功のときだけ経路を描く。検索中・空・失敗で古い経路を残さない。
+    const route = state.status.kind === "success" ? state.status.route : null;
+    if (route !== shownRoute) {
+      mapController.setRoutes(route ? [route] : []);
+      if (route) mapController.fitToRoute(route);
+      shownRoute = route;
+    }
+
+    // 指定中は地図を見せるためカードを閉じ、指定が終わったら経路ビューに戻す。
+    if (picking) closeSearch(true);
+    else if (wasPicking) openSearch("route");
+    wasPicking = picking;
+  });
+
   root.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       if (menuOpen) setMenu(false);
+      else if (routeStore.getState().pickMode) routeStore.cancelPick();
       else if (searchOpen) closeSearch(false);
       return;
     }
@@ -285,5 +325,5 @@ export function renderShell(root: HTMLElement): void {
   syncViewport();
   renderView();
 
-  root.replaceChildren(map, attribution, menuButton, controls, card, scrim, drawer);
+  root.replaceChildren(map, attribution, menuButton, controls, renderPickBanner(routeStore), card, scrim, drawer);
 }

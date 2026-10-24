@@ -5,8 +5,8 @@ import { el } from "../../ui/dom";
 export async function renderOverview(root: HTMLElement): Promise<void> {
   root.replaceChildren(el("p", { text: "読み込み中…" }));
   try {
-    const [routes, hazards, reviews, prefs] = await Promise.all([
-      api.searchRoutes({ origin: [139.7671, 35.6812], destination: [139.7702, 35.6838] }),
+    const [route, hazards, reviews, prefs] = await Promise.all([
+      api.searchRoute({ origin: [139.7671, 35.6812], destination: [139.7702, 35.6838] }),
       api.listHazards(),
       api.listReviews(),
       api.getPreferences(),
@@ -20,8 +20,9 @@ export async function renderOverview(root: HTMLElement): Promise<void> {
       el("h1", { text: "ng_2601 開発基盤" }),
       list(
         "経路",
-        routes.map(
-          (r) => `${r.name} / ${r.distanceM}m / 最大勾配 ${r.elevationProfile.maxGradePercent}%`,
+        [route].map(
+          (r) =>
+            `${r.name} / ${r.distanceM}m / 最大勾配 ${r.elevationProfile.maxGradePercent ?? "不明"}${r.elevationProfile.maxGradePercent === null ? "" : "%"}`,
         ),
       ),
       list("危険情報", hazards.map((h) => `[${h.type}] ${h.description}`)),
