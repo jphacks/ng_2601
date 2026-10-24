@@ -22,21 +22,21 @@
 
 | 用途 | PR #16内のHTTP呼び出し | 入力（bodyまたはquery） | 応答型 |
 | --- | --- | --- | --- |
-| 経路検索 | `POST /v1/routes`（BE実装に合わせた。[#6](https://github.com/jphacks/ng_2601/issues/6)） | body: `RouteSearchRequest`をBEの`{start,end,bike_type,preferences}`へ変換 | `Route`（単一）。BEの`{route: BRouter GeoJSON,...}`から変換 |
+| 経路検索 | PR #16の暫定契約: `POST /routes/search`。現行実装（[PR #25](https://github.com/jphacks/ng_2601/pull/25)・未マージ）: `POST /v1/routes`（[#6](https://github.com/jphacks/ng_2601/issues/6)） | PR #16: body `RouteSearchRequest`。PR #25: `RouteSearchRequest`をBEの`{start,end,bike_type,preferences}`へ変換 | PR #16: `Route[]`。PR #25: `Route`（単一）。BEの`{route: BRouter GeoJSON,...}`から変換 |
 | 経路詳細 | `GET /routes/{id}` | path: `id`（string） | `Route` |
 | 危険情報一覧 | `GET /hazards` | query: 任意の`routeId` | `Hazard[]` |
 | 口コミ一覧 | `GET /reviews` | query: 任意の`routeId`、`hazardId` | `Review[]` |
 | 設定取得 | `GET /preferences` | なし | `Preferences` |
 | 設定更新 | `PUT /preferences` | body: `Preferences` | `Preferences` |
 
-経路検索のみ、マージ済みの`frontend/src/api/http.ts`が`POST /v1/routes`を呼びます（BE: `back/backend/app/main.py`）。リクエスト／応答の変換は[`routeAdapter.ts`](../frontend/src/api/routeAdapter.ts)、エラーは`{detail}`をFE形式へ正規化（409=`no_route`、422=`invalid_request`、502/503=`routing_unavailable`、タイムアウト=`timeout`）。BEが返さない下降量・最大勾配は`null`で、FEで推測しません。実BEとの結合は未検証です。他の行は引き続き暫定です。
+経路検索のみ、[PR #25（未マージ）](https://github.com/jphacks/ng_2601/pull/25)（確認したhead `9715d5b1f6f5002a669041fb89ac48e6b0cec479`）の`frontend/src/api/http.ts`が`POST /v1/routes`を呼びます（BE: `back/backend/app/main.py`）。リクエスト／応答の変換はPR #25の`frontend/src/api/routeAdapter.ts`、エラーは`{detail}`をFE形式へ正規化（409=`no_route`、422=`invalid_request`、502/503=`routing_unavailable`、タイムアウト=`timeout`）。HTTP 200でもGeoJSONの形式が不正なら、`fromBackendResponse`がstatus 502／`invalid_response`のエラーにします。BEが返さない下降量・最大勾配は`null`で、FEで推測しません。実BEとの結合は未検証です。他の行は引き続き暫定です。
 
 [#13](https://github.com/jphacks/ng_2601/issues/13)には口コミ投稿の想定`POST /reviews`がありますが、確認したPRのApiClientに投稿操作・リクエスト型はありません。未実装・未合意として扱います。
 
 ## エラー・単位・座標
 
-- PR #16の暫定`ApiErrorBody`は`code`、`message`、任意の`details`。非2xxで本文がこの形でなければ`http_error`、fetch失敗はstatus `0`／`network_error`です。`toApiError`はその他の例外を`unknown`に正規化します。正式なステータスとエラーコード一覧、タイムアウト・再試行方針は未合意です。
-- 成功レスポンスは現状clientで型アサーションされ、実行時の構造検証はありません。型があることを実サーバー応答の検証済みと解釈しません。
+- PR #16の暫定`ApiErrorBody`は`code`、`message`、任意の`details`。非2xxで本文がこの形でなければ`http_error`、fetch失敗はstatus `0`／`network_error`です。`toApiError`はその他の例外を`unknown`に正規化します。正式なステータスとエラーコード一覧、タイムアウト・再試行方針は未合意です（経路検索のタイムアウトはPR #25で40秒としたFE側の暫定値）。
+- 経路検索以外の成功レスポンスは現状clientで型アサーションされ、実行時の構造検証はありません（経路検索はPR #25で応答の形を検証）。型があることを実サーバー応答の検証済みと解釈しません。
 - 暫定`LngLat`は`[経度, 緯度]`順です。距離・標高はm、時間は秒、勾配は%と型名・コメントに示されています。正式な測地系、標高基準、勾配の符号・計算方法・丸め・欠測表現は未合意です。
 - `Review.createdAt`は暫定型でISO 8601と記載されています。タイムゾーン・危険情報の更新日時／有効期限の表現は未合意です。
 

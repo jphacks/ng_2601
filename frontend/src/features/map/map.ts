@@ -91,6 +91,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
   let reviewMarkers: maplibregl.Marker[] = [];
   let pickMarker: maplibregl.Marker | null = null;
   let endpointMarkers: maplibregl.Marker[] = [];
+  let endpoints: Endpoints = { origin: null, destination: null };
   const visible: Record<LayerId, boolean> = { basemap: true, routes: true, hazards: true, reviews: true };
   const listeners: Array<() => void> = [];
 
@@ -235,6 +236,13 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
       syncRoutes();
     },
     setEndpoints({ origin, destination }) {
+      // 地点が変わっていなければマーカーを作り直さない（開いたポップアップとフォーカスを保つ）。
+      const same = (a: LngLat | null, b: LngLat | null) => (a === null || b === null ? a === b : a[0] === b[0] && a[1] === b[1]);
+      if (same(origin, endpoints.origin) && same(destination, endpoints.destination)) {
+        syncEndpoints();
+        return;
+      }
+      endpoints = { origin, destination };
       const specs: MarkerSpec[] = [];
       const coords = (p: LngLat) => `緯度 ${p[1].toFixed(5)} / 経度 ${p[0].toFixed(5)}`;
       if (origin) {

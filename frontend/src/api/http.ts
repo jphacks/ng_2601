@@ -32,33 +32,42 @@ export function createHttpClient(baseUrl: string): ApiClient {
     opts: { timeoutMs?: number; toError?: (status: number, parsed: unknown) => ApiErrorBody } = {},
   ): Promise<T> {
     const controller = new AbortController();
+    // タイムアウトは本文の読み取りが終わるまで有効にする（ヘッダー受信後に本文が止まる場合も打ち切る）。
     const timer = opts.timeoutMs ? setTimeout(() => controller.abort(), opts.timeoutMs) : undefined;
-    let res: Response;
+    const timeoutError = () =>
+      new ApiError(0, { code: "timeout", message: "ルート探索に時間がかかっています。時間をおいて再試行してください。" });
     try {
-      res = await fetch(baseUrl + path, {
-        method,
-        headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: controller.signal,
-      });
-    } catch (e) {
-      if (controller.signal.aborted) {
-        throw new ApiError(0, { code: "timeout", message: "ルート探索に時間がかかっています。時間をおいて再試行してください。" });
+      let res: Response;
+      try {
+        res = await fetch(baseUrl + path, {
+          method,
+          headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+          body: body === undefined ? undefined : JSON.stringify(body),
+          signal: controller.signal,
+        });
+      } catch (e) {
+        if (controller.signal.aborted) throw timeoutError();
+        throw new ApiError(0, {
+          code: "network_error",
+          message: e instanceof Error ? e.message : "network error",
+        });
       }
-      throw new ApiError(0, {
-        code: "network_error",
-        message: e instanceof Error ? e.message : "network error",
-      });
+      if (!res.ok) {
+        const parsed: unknown = await res.json().catch(() => null);
+        if (controller.signal.aborted) throw timeoutError();
+        if (opts.toError) throw new ApiError(res.status, opts.toError(res.status, parsed));
+        const fallback: ApiErrorBody = { code: "http_error", message: res.statusText };
+        throw new ApiError(res.status, isApiErrorBody(parsed) ? parsed : fallback);
+      }
+      try {
+        return (await res.json()) as T;
+      } catch (e) {
+        if (controller.signal.aborted) throw timeoutError();
+        throw e;
+      }
     } finally {
       clearTimeout(timer);
     }
-    if (!res.ok) {
-      const parsed: unknown = await res.json().catch(() => null);
-      if (opts.toError) throw new ApiError(res.status, opts.toError(res.status, parsed));
-      const fallback: ApiErrorBody = { code: "http_error", message: res.statusText };
-      throw new ApiError(res.status, isApiErrorBody(parsed) ? parsed : fallback);
-    }
-    return (await res.json()) as T;
   }
 
   const qs = (o: Record<string, string | undefined>) => {
