@@ -49,22 +49,20 @@ function row(term: string, value: string, modifier?: string): HTMLElement[] {
 /** 詳細カードの中身。全て textContent で組み立て、提供元の文字列をHTMLとして解釈しない。 */
 export function renderDetailContent(item: RoadInfoItem, now: Date): HTMLElement {
   const freshness = evaluateItem(item, now);
-  const root = el("div", { className: "hazard-detail" });
+  const root = el("div", { className: `hazard-detail hazard-detail--${item.category}` });
 
-  const swatch = el("span", { className: `hazard-swatch hazard-swatch--${item.category}` });
-  swatch.setAttribute("aria-hidden", "true");
-  const badges = el("div", { className: "hazard-detail__badges" }, [
-    el("span", { className: "hazard-badge hazard-badge--category" }, [swatch, el("span", { text: CATEGORY_LABEL[item.category] })]),
-    badge(INFO_CLASS_LABEL[item.infoClass], "class"),
-    badge(TEMPORALITY_LABEL[item.temporality], "temporality"),
-    ...stateBadges(item, freshness),
-  ]);
-
+  const icon = el("span", { className: "hazard-detail__icon" }, [el("span", { className: `hazard-swatch hazard-swatch--${item.category}` })]);
+  icon.setAttribute("aria-hidden", "true");
+  const eyebrow = [CATEGORY_LABEL[item.category], INFO_CLASS_LABEL[item.infoClass], TEMPORALITY_LABEL[item.temporality]].join(" · ");
   const title = el("h3", { className: "hazard-detail__title", text: item.title });
   title.id = "hazard-detail-title";
   title.tabIndex = -1;
-  root.append(badges, title);
-  if (item.kindLabel !== item.title) root.append(el("p", { className: "hazard-detail__kind", text: item.kindLabel }));
+  const heading = el("div", { className: "hazard-detail__heading" }, [el("p", { className: "hazard-detail__eyebrow", text: eyebrow }), title]);
+  if (item.kindLabel !== item.title) heading.append(el("p", { className: "hazard-detail__kind", text: item.kindLabel }));
+  root.append(el("header", { className: "hazard-detail__header" }, [icon, heading]));
+
+  const badges = stateBadges(item, freshness);
+  if (badges.length > 0) root.append(el("div", { className: "hazard-detail__badges" }, badges));
   if (item.description) root.append(el("p", { className: "hazard-detail__description", text: item.description }));
 
   const cautions = [...freshness.cautions, ...item.notes];
