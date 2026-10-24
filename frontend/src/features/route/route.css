@@ -80,6 +80,17 @@
 .route__segment:has(input:focus-visible) { outline: 3px solid var(--color-focus); outline-offset: 2px; }
 .route__segment:has(input:disabled) { opacity: 0.6; cursor: not-allowed; }
 
+/* 条件が長くスクロールしても、検索ボタンをパネル下部から離さない。 */
+.route__submit-bar {
+  position: sticky;
+  bottom: calc(-1 * var(--space-3));
+  z-index: 1;
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: calc(-1 * var(--space-3));
+  padding-block: var(--space-2) var(--space-3);
+  background: linear-gradient(to bottom, transparent, var(--color-surface) var(--space-2));
+}
 .route__validation { margin: 0; color: var(--color-warning); font-size: 13px; }
 
 .route__summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin: 0; }

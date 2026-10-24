@@ -1,22 +1,23 @@
 import { haversineM } from "../lib/geo";
 import type { ElevationPoint, LngLat, Route, RouteSearchRequest } from "../types/api";
 import { ApiError } from "./errors";
+import { toBackendRoutePreferences } from "./preferencesAdapter";
 
 /** `POST /v1/routes` のリクエストbody（back/backend/app/main.py の RouteRequest）。 */
 export interface BackendRouteRequest {
   start: { lat: number; lon: number };
   end: { lat: number; lon: number };
-  bike_type?: string;
-  preferences?: Record<string, string>;
+  bike_type: string;
+  preferences: Record<string, string>;
 }
 
 export function toBackendRequest(req: RouteSearchRequest): BackendRouteRequest {
   const body: BackendRouteRequest = {
     start: { lon: req.origin[0], lat: req.origin[1] },
     end: { lon: req.destination[0], lat: req.destination[1] },
+    bike_type: req.bikeType,
+    preferences: toBackendRoutePreferences(req),
   };
-  if (req.bikeType) body.bike_type = req.bikeType;
-  if (req.hillMode) body.preferences = { hill_mode: req.hillMode };
   return body;
 }
 

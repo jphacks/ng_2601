@@ -8,6 +8,7 @@ import { renderLayerPanel } from "../map/layerPanel";
 import { mountMap, type MapController } from "../map/map";
 import { ATTRIBUTION } from "../map/style";
 import { formatPoint, renderPickBanner, renderRouteView } from "../route/renderRoute";
+import { createPreferencesStore } from "../preferences/preferencesState";
 import { createRouteStore } from "../route/routeState";
 import { mockReviewLocations, mockReviews } from "../../mocks/data";
 import type { Route } from "../../types/api";
@@ -51,7 +52,9 @@ export function renderShell(root: HTMLElement): void {
   // レイヤーパネルと経路ビューは1つだけ作って使い回す（再訪のたびにリスナーを増やさない）。
   let layerPanel: HTMLElement | undefined;
   const routeStore = createRouteStore(api);
-  const routeView = renderRouteView(routeStore);
+  const prefsStore = createPreferencesStore(api, routeStore);
+  const routeView = renderRouteView(routeStore, prefsStore);
+  void prefsStore.load();
 
   // --- map area ---------------------------------------------------------
   const map = el("div", { className: "map" });
@@ -215,6 +218,8 @@ export function renderShell(root: HTMLElement): void {
         ? "使い方は準備中です。"
         : view === "about"
           ? "Nature Ride — 自然の中を走る自転車ルート。"
+          : view === "settings"
+          ? "車種と坂道許容度は、「経路」タブの「検索条件」で設定できます。"
           : `${def.label}は準備中です（${def.issue}で実装予定）。`;
     if (view === "route") {
       viewBody.replaceChildren(routeView);

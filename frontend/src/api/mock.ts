@@ -1,23 +1,25 @@
 import type { ApiClient } from "./client";
 import { ApiError } from "./errors";
 import {
-  defaultPreferences,
   mockHazardRouteIds,
   mockHazards,
   mockReviews,
   mockRoutes,
+  mockRoutingOptions,
+  mockSavedConditions,
 } from "../mocks/data";
 import { bboxIntersects } from "../features/hazards/bbox";
 import { geometryBBox } from "../features/hazards/geometry";
 import { haversineM } from "../lib/geo";
 import { buildMockMapData } from "../mocks/mapData";
-import type { BBox, LngLat, Preferences, Route, RouteSearchRequest } from "../types/api";
+import type { BBox, LngLat, Route, RouteConditions, RouteSearchRequest } from "../types/api";
 
 const delay = (ms = 150) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * 開発時の状態確認用。URLの`?mock=empty|error|timeout|slow`で経路検索の結果を切り替える。
- * 未指定は通常の成功。
+ * 開発時の状態確認用。URLの`?mock=`で結果を切り替える。未指定は通常の成功。
+ * 経路検索: empty | error | timeout | slow
+ * 設定: options-error（選択肢の取得失敗） | prefs-unauthorized（未ログイン） | prefs-error（取得失敗） | save-error（保存失敗）
  */
 function mockScenario(): string | null {
   return new URLSearchParams(location.search).get("mock");
@@ -65,13 +67,9 @@ function inBBox<F extends { geometry: Parameters<typeof geometryBBox>[0] }>(feat
   });
 }
 
-const copyPrefs = (p: Preferences): Preferences => ({
-  ...p,
-  avoidHazardTypes: [...p.avoidHazardTypes],
-});
-
 export function createMockClient(): ApiClient {
-  let prefs = copyPrefs(defaultPreferences);
+  // 保存した設定は、ページを読み込み直すまでメモリ上に保持する（再取得して同じ値を確認できる）。
+  let prefs: RouteConditions = { ...mockSavedConditions };
 
   return {
     async searchRoute(req) {
@@ -127,14 +125,31 @@ export function createMockClient(): ApiClient {
         (r) => (!routeId || r.routeId === routeId) && (!hazardId || r.hazardId === hazardId),
       );
     },
+    async getRoutingOptions() {
+      await delay();
+      if (mockScenario() === "options-error") {
+        throw new ApiError(503, { code: "http_error", message: "選択肢の取得に失敗しました（HTTP 503）。" });
+      }
+      return structuredClone(mockRoutingOptions);
+    },
     async getPreferences() {
       await delay();
-      return copyPrefs(prefs);
+      const scenario = mockScenario();
+      if (scenario === "prefs-unauthorized") {
+        throw new ApiError(401, { code: "unauthorized", message: "設定の保存・取得にはログインが必要です。" });
+      }
+      if (scenario === "prefs-error") {
+        throw new ApiError(503, { code: "http_error", message: "設定の通信に失敗しました（HTTP 503）。" });
+      }
+      return { ...prefs };
     },
     async updatePreferences(p) {
-      await delay();
-      prefs = copyPrefs(p);
-      return copyPrefs(prefs);
+      await delay(600);
+      if (mockScenario() === "save-error") {
+        throw new ApiError(503, { code: "http_error", message: "設定の通信に失敗しました（HTTP 503）。" });
+      }
+      prefs = { ...p };
+      return { ...prefs };
     },
   };
 }

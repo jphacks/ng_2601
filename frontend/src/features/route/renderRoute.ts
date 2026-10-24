@@ -2,11 +2,10 @@ import "./route.css";
 import type { LngLat, Route } from "../../types/api";
 import { el } from "../../ui/dom";
 import { renderState } from "../../ui/state";
+import { MODE_META, bikeTypeLabel, modeLabel } from "../preferences/labels";
+import type { PreferencesStore } from "../preferences/preferencesState";
+import { renderPreferences } from "../preferences/renderPreferences";
 import {
-  BIKE_TYPE_OPTIONS,
-  HILL_MODE_OPTIONS,
-  bikeTypeLabel,
-  hillModeLabel,
   isStale,
   type AppliedSearch,
   type PickMode,
@@ -58,7 +57,7 @@ export function renderPickBanner(store: RouteStore): HTMLElement {
 }
 
 /** 「経路」ビュー本体。検索条件とルート結果の2つのサブタブ。 */
-export function renderRouteView(store: RouteStore): HTMLElement {
+export function renderRouteView(store: RouteStore, prefs: PreferencesStore): HTMLElement {
   let tab: SubTab = "conditions";
 
   // --- sub tabs ---------------------------------------------------------
@@ -113,51 +112,19 @@ export function renderRouteView(store: RouteStore): HTMLElement {
   const swap = textButton("出発地と目的地を入れ替え");
   swap.addEventListener("click", () => store.swap());
 
-  const bikeSelect = el("select", { className: "route__select" });
-  bikeSelect.id = "route-bike-type";
-  for (const o of BIKE_TYPE_OPTIONS) {
-    const opt = el("option", { text: o.label });
-    opt.value = o.value;
-    bikeSelect.append(opt);
-  }
-  bikeSelect.addEventListener("change", () => {
-    const v = BIKE_TYPE_OPTIONS.find((o) => o.value === bikeSelect.value);
-    if (v) store.setDraft({ bikeType: v.value });
-  });
-  const bikeLabel = el("label", { className: "route__field-label", text: "車種" });
-  bikeLabel.htmlFor = bikeSelect.id;
-
-  const hillSet = el("fieldset", { className: "route__fieldset" }, [
-    el("legend", { className: "route__field-label", text: "坂道許容度" }),
-  ]);
-  const hillRadios = new Map<string, HTMLInputElement>();
-  const segments = el("div", { className: "route__segments" });
-  for (const o of HILL_MODE_OPTIONS) {
-    const input = el("input");
-    input.type = "radio";
-    input.name = "route-hill-mode";
-    input.value = o.value;
-    input.addEventListener("change", () => {
-      if (input.checked) store.setDraft({ hillMode: o.value });
-    });
-    hillRadios.set(o.value, input);
-    segments.append(el("label", { className: "route__segment" }, [input, el("span", { text: o.label })]));
-  }
-  hillSet.append(segments);
-
   const submit = textButton("経路を検索", "route__submit");
   submit.addEventListener("click", () => void store.search());
   const validation = el("p", { className: "route__validation" });
   validation.setAttribute("role", "alert");
   validation.hidden = true;
 
+  // 車種・坂道許容度・詳細パラメータ(#10)。縦に長くなるので、検索ボタンはパネル下部に固定して常に押せるようにする。
+  const submitBar = el("div", { className: "route__submit-bar" }, [validation, submit]);
   const conditionsPane = el("div", { className: "route__pane" }, [
     ...pointRows,
     swap,
-    el("div", { className: "route__field" }, [bikeLabel, bikeSelect]),
-    hillSet,
-    validation,
-    submit,
+    renderPreferences(store, prefs),
+    submitBar,
   ]);
   conditionsPane.id = "route-pane-conditions";
   conditionsPane.setAttribute("role", "tabpanel");
@@ -187,7 +154,10 @@ export function renderRouteView(store: RouteStore): HTMLElement {
       ["出発地", formatPoint(applied.origin)],
       ["目的地", formatPoint(applied.destination)],
       ["車種", bikeTypeLabel(applied.bikeType)],
-      ["坂道許容度", hillModeLabel(applied.hillMode)],
+      ["坂道許容度", modeLabel("hillMode", applied.hillMode)],
+      [MODE_META.trafficMode.title, modeLabel("trafficMode", applied.trafficMode)],
+      [MODE_META.surfaceMode.title, modeLabel("surfaceMode", applied.surfaceMode)],
+      [MODE_META.walkingMode.title, modeLabel("walkingMode", applied.walkingMode)],
     ];
     const dl = el("dl", { className: "route__applied" });
     for (const [k, v] of rows) dl.append(el("dt", { text: k }), el("dd", { text: v }));
@@ -261,19 +231,15 @@ export function renderRouteView(store: RouteStore): HTMLElement {
       v.clear.disabled = loading || p === null;
     }
     swap.disabled = loading || (!state.origin && !state.destination);
-    bikeSelect.value = state.draft.bikeType;
-    bikeSelect.disabled = loading;
-    for (const [value, input] of hillRadios) {
-      input.checked = value === state.draft.hillMode;
-      input.disabled = loading;
-    }
     validation.textContent = state.validationError ?? "";
     validation.hidden = state.validationError === null;
     submit.textContent = state.status.kind === "idle" ? "経路を検索" : "この条件で再検索";
-    submit.disabled = loading;
+    // 選択肢の取得中は、仮の条件で検索しないよう待たせる。取得に失敗した場合は仮の条件のまま検索できる。
+    submit.disabled = loading || prefs.getState().options.kind === "loading";
   }
 
   let prevKind = store.getState().status.kind;
+  prefs.subscribe(() => syncConditions(store.getState()));
   store.subscribe((state) => {
     syncConditions(state);
     renderResult(state);

@@ -57,26 +57,47 @@ export interface Review {
   createdAt: string; // ISO 8601
 }
 
-/** @provisional */
-export interface Preferences {
-  /** 許容する最大勾配 (%) */
-  maxGradePercent: number;
-  avoidStairs: boolean;
-  avoidHazardTypes: HazardType[];
-}
-
 /** 車種。BEの`bike_type`（back/config/routing_catalog.json）に対応。 */
 export type BikeType = "city" | "electric_assist" | "road" | "gravel" | "mamachari";
 
-/** 坂道許容度。BEの`preferences.hill_mode`に対応（avoid=避ける / balanced=ふつう / accept=許容）。 */
+/** 坂道許容度。BEの`preferences.hill_mode`に対応（avoid=避ける / balanced=ふつう / accept=許容）。回避の強さを段階で選ぶ値で、最大勾配(%)ではない。 */
 export type HillMode = "avoid" | "balanced" | "accept";
 
-/** 経路検索リクエスト。未指定の条件はBEの既定値（車種ごとのdefaults）が使われる。 */
-export interface RouteSearchRequest {
+/** 交通量の許容度。BEの`preferences.traffic_mode`に対応。 */
+export type TrafficMode = "avoid" | "balanced" | "direct";
+
+/** 路面の許容度。BEの`preferences.surface_mode`に対応。 */
+export type SurfaceMode = "paved" | "comfortable" | "rough_ok";
+
+/** 押し歩きの許容度。BEの`preferences.walking_mode`に対応。 */
+export type WalkingMode = "never" | "short" | "long";
+
+/** 車種以外の経路条件（BEの`preferences`）。 */
+export interface PreferenceModes {
+  hillMode: HillMode;
+  trafficMode: TrafficMode;
+  surfaceMode: SurfaceMode;
+  walkingMode: WalkingMode;
+}
+
+/** 車種と経路条件。保存・取得・検索リクエストで共通。 */
+export interface RouteConditions extends PreferenceModes {
+  bikeType: BikeType;
+}
+
+/**
+ * 選択肢と車種ごとの初期値。BEの`GET /v1/routing-options`から取得する。
+ * 選択肢の並びはBEの`values`の順（slider等の段階の順序）。
+ */
+export interface RoutingOptions {
+  bikeTypes: Partial<Record<BikeType, { defaults: PreferenceModes }>>;
+  modes: { [K in keyof PreferenceModes]: PreferenceModes[K][] };
+}
+
+/** 経路検索リクエスト。 */
+export interface RouteSearchRequest extends RouteConditions {
   origin: LngLat;
   destination: LngLat;
-  bikeType?: BikeType;
-  hillMode?: HillMode;
 }
 
 /** 共通APIエラー形式 */

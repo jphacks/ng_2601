@@ -1,4 +1,4 @@
-import type { Hazard, LngLat, Preferences, Review, Route } from "../types/api";
+import type { Hazard, LngLat, Review, Route, RouteConditions, RoutingOptions } from "../types/api";
 
 export const mockRoutes: Route[] = [
   {
@@ -92,8 +92,25 @@ export const mockReviewLocations: Record<string, LngLat> = {
   "review-2": [139.7679, 35.6821],
 };
 
-export const defaultPreferences: Preferences = {
-  maxGradePercent: 5,
-  avoidStairs: true,
-  avoidHazardTypes: ["steep_slope", "construction"],
+/** 選択肢と初期値のモック。back/config/routing_catalog.json の車種・初期値に合わせている。 */
+export const mockRoutingOptions: RoutingOptions = {
+  bikeTypes: {
+    city: { defaults: { hillMode: "balanced", trafficMode: "balanced", surfaceMode: "comfortable", walkingMode: "short" } },
+    electric_assist: { defaults: { hillMode: "balanced", trafficMode: "balanced", surfaceMode: "comfortable", walkingMode: "short" } },
+    road: { defaults: { hillMode: "accept", trafficMode: "balanced", surfaceMode: "paved", walkingMode: "never" } },
+    gravel: { defaults: { hillMode: "balanced", trafficMode: "balanced", surfaceMode: "rough_ok", walkingMode: "short" } },
+    mamachari: { defaults: { hillMode: "avoid", trafficMode: "avoid", surfaceMode: "comfortable", walkingMode: "short" } },
+  },
+  modes: {
+    hillMode: ["avoid", "balanced", "accept"],
+    trafficMode: ["avoid", "balanced", "direct"],
+    surfaceMode: ["paved", "comfortable", "rough_ok"],
+    walkingMode: ["never", "short", "long"],
+  },
+};
+
+/** モックに最初から保存されている設定（BEの新規ユーザーの既定と同じ city の初期値）。 */
+export const mockSavedConditions: RouteConditions = {
+  bikeType: "city",
+  ...mockRoutingOptions.bikeTypes.city!.defaults,
 };
