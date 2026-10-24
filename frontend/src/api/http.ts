@@ -2,6 +2,12 @@ import type { ApiClient } from "./client";
 import { ApiError } from "./errors";
 import type { ApiErrorBody } from "../types/api";
 
+function isApiErrorBody(v: unknown): v is ApiErrorBody {
+  if (typeof v !== "object" || v === null) return false;
+  const o = v as Record<string, unknown>;
+  return typeof o.code === "string" && typeof o.message === "string";
+}
+
 // エンドポイントは暫定。バックエンド確定後に合わせる。
 export function createHttpClient(baseUrl: string): ApiClient {
   async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -19,10 +25,9 @@ export function createHttpClient(baseUrl: string): ApiClient {
       });
     }
     if (!res.ok) {
-      const err: ApiErrorBody = await res
-        .json()
-        .catch(() => ({ code: "http_error", message: res.statusText }));
-      throw new ApiError(res.status, err);
+      const fallback: ApiErrorBody = { code: "http_error", message: res.statusText };
+      const parsed: unknown = await res.json().catch(() => null);
+      throw new ApiError(res.status, isApiErrorBody(parsed) ? parsed : fallback);
     }
     return (await res.json()) as T;
   }

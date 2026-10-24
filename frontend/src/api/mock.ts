@@ -1,11 +1,23 @@
 import type { ApiClient } from "./client";
 import { ApiError } from "./errors";
-import { defaultPreferences, mockHazards, mockReviews, mockRoutes } from "../mocks/data";
+import {
+  defaultPreferences,
+  mockHazardRouteIds,
+  mockHazards,
+  mockReviews,
+  mockRoutes,
+} from "../mocks/data";
+import type { Preferences } from "../types/api";
 
 const delay = (ms = 150) => new Promise((r) => setTimeout(r, ms));
 
+const copyPrefs = (p: Preferences): Preferences => ({
+  ...p,
+  avoidHazardTypes: [...p.avoidHazardTypes],
+});
+
 export function createMockClient(): ApiClient {
-  let prefs = { ...defaultPreferences };
+  let prefs = copyPrefs(defaultPreferences);
 
   return {
     async searchRoutes() {
@@ -18,9 +30,10 @@ export function createMockClient(): ApiClient {
       if (!r) throw new ApiError(404, { code: "not_found", message: `route ${id} not found` });
       return r;
     },
-    async listHazards() {
+    async listHazards(routeId) {
       await delay();
-      return mockHazards;
+      if (!routeId) return mockHazards;
+      return mockHazards.filter((h) => mockHazardRouteIds[h.id]?.includes(routeId));
     },
     async listReviews({ routeId, hazardId } = {}) {
       await delay();
@@ -30,12 +43,12 @@ export function createMockClient(): ApiClient {
     },
     async getPreferences() {
       await delay();
-      return prefs;
+      return copyPrefs(prefs);
     },
     async updatePreferences(p) {
       await delay();
-      prefs = { ...p };
-      return prefs;
+      prefs = copyPrefs(p);
+      return copyPrefs(prefs);
     },
   };
 }

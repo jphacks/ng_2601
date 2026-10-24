@@ -62,6 +62,12 @@ export const mockHazards: Hazard[] = [
   },
 ];
 
+/** 危険情報が影響する経路ID */
+export const mockHazardRouteIds: Record<string, string[]> = {
+  "hazard-1": ["route-2"],
+  "hazard-2": ["route-1"],
+};
+
 export const mockReviews: Review[] = [
   {
     id: "review-1",
