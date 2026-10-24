@@ -4,10 +4,26 @@ import { classifyObservation, ORIGIN_DEFAULTS, ORIGIN_LABEL } from "./catalog";
 import { representativePoint } from "./geometry";
 import type { ItemStatus, Origin, RoadInfoItem, SourceAvailability, Stamp, Temporality, Verification } from "./types";
 
+// 日付のみ(YYYY-MM-DD)か、オフセット付きの日時(YYYY-MM-DDThh:mm[:ss[.fff]](Z|±hh:mm))。
+const ISO_DATETIME = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:\d{2}))?$/;
+
+/** 構文と各成分の範囲を確認する。オフセットの無い日時はビューアのタイムゾーンで解釈が変わるため認めない。 */
+function isValidTimestamp(value: string): boolean {
+  const m = ISO_DATETIME.exec(value);
+  if (!m) return false;
+  const [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const calendar = new Date(Date.UTC(year, month - 1, day));
+  if (calendar.getUTCFullYear() !== year || calendar.getUTCMonth() !== month - 1 || calendar.getUTCDate() !== day) return false;
+  if (m[4] === undefined) return true;
+  if (Number(m[4]) > 23 || Number(m[5]) > 59 || (m[6] !== undefined && Number(m[6]) > 59)) return false;
+  const offset = m[7]!;
+  return offset === "Z" || (Number(offset.slice(1, 3)) <= 23 && Number(offset.slice(4)) <= 59);
+}
+
 /** undefined=欠測、null/空/不正な日時=不明、それ以外=値あり。 */
 export function stampOf(value: unknown): Stamp {
   if (value === undefined) return { state: "missing" };
-  if (typeof value !== "string" || value === "" || Number.isNaN(new Date(value).getTime())) return { state: "unknown" };
+  if (typeof value !== "string" || !isValidTimestamp(value) || Number.isNaN(new Date(value).getTime())) return { state: "unknown" };
   return { state: "known", value };
 }
 

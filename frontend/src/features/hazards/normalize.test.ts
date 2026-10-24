@@ -14,6 +14,15 @@ describe("stampOf / firstStamp", () => {
     expect(stampOf("2026-10-24T00:00:00Z")).toEqual({ state: "known", value: "2026-10-24T00:00:00Z" });
   });
 
+  it("オフセットの無い日時・暦として不正な日付・範囲外の時刻は不明にする", () => {
+    expect(stampOf("2026-10-24T09:00:00+09:00")).toEqual({ state: "known", value: "2026-10-24T09:00:00+09:00" });
+    expect(stampOf("2026-10-24")).toEqual({ state: "known", value: "2026-10-24" });
+    expect(stampOf("2026-10-24T09:00:00")).toEqual({ state: "unknown" });
+    expect(stampOf("2026-02-30T00:00:00Z")).toEqual({ state: "unknown" });
+    expect(stampOf("2026-10-24T25:00:00Z")).toEqual({ state: "unknown" });
+    expect(stampOf("2026-10-24T09:00:00+25:00")).toEqual({ state: "unknown" });
+  });
+
   it("最初に値のあるものを採用し、なければ null があれば不明、全て欠落なら欠測", () => {
     expect(firstStamp(null, "2026-10-24T00:00:00Z").state).toBe("known");
     expect(firstStamp(undefined, null).state).toBe("unknown");

@@ -66,6 +66,13 @@ export function renderDetailContent(item: RoadInfoItem, now: Date): HTMLElement 
   ].filter(Boolean).join(" · ");
   if (when) root.append(el("p", { className: "hazard-detail__when", text: when }));
 
+  // 更新日時の不明・欠測、開始前の予定などの注意は、バッジやメタ情報に出ないのでここで必ず見せる。
+  if (freshness.cautions.length > 0) {
+    const cautions = el("ul", { className: "hazard-detail__cautions" });
+    for (const c of freshness.cautions) cautions.append(el("li", { text: c }));
+    root.append(cautions);
+  }
+
   if (item.notes.length > 0) {
     const notes = el("ul", { className: "hazard-detail__notes" });
     for (const n of item.notes) notes.append(el("li", { text: n }));
