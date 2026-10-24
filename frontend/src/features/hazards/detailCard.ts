@@ -30,6 +30,7 @@ function badge(label: string, modifier: string): HTMLElement {
 export function stateBadges(item: RoadInfoItem, freshness: Freshness): HTMLElement[] {
   const badges: HTMLElement[] = [];
   if (freshness.validity === "expired") badges.push(badge("期限切れ", "stale"));
+  if (freshness.validity === "upcoming") badges.push(badge("開始前", "stale"));
   if (freshness.validity === "inactive") {
     badges.push(badge(item.status === "withdrawn" ? "取り下げ" : item.status === "expired" ? "期限切れ" : "解消済み", "stale"));
   }
@@ -80,6 +81,7 @@ export function renderDetailContent(item: RoadInfoItem, now: Date): HTMLElement 
   dl.append(...row("更新日時", formatStamp(item.updatedAt), freshness.updated === "known" ? undefined : "gap"));
   if (item.retrievedAt.state !== "missing") dl.append(...row("取得日時", formatStamp(item.retrievedAt)));
   dl.append(...row("有効期限", expiryText(item, freshness), freshness.validity === "expired" ? "stale" : undefined));
+  if (item.startsAt.state === "known") dl.append(...row("開始日時", formatStamp(item.startsAt)));
   if (item.schedule) dl.append(...row("有効な時間帯", scheduleText(item.schedule)));
   root.append(dl);
   return root;

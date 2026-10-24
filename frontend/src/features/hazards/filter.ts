@@ -9,7 +9,7 @@ export interface HazardFilter {
   infoClasses: Set<InfoClass>;
   /** temporary=期間限定のみ。permanent=恒常（時間帯で繰り返すものを含む）のみ。 */
   temporality: TemporalityFilter;
-  /** 期限切れ・解消済み・未確認を隠す。 */
+  /** 期限切れ・解消済み・開始前・未確認を隠す。 */
   hideStale: boolean;
 }
 

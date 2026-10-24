@@ -30,7 +30,7 @@ export function renderLayerPanel(controller: MapController): HTMLElement {
     return [
       ...CATEGORY_DEFS.map((c) => legendItem(`legend__swatch--dot legend__swatch--cat-${c.id}`, c.label, " legend__item--sub")),
       legendItem("legend__swatch--line-dashed", "未確認（破線・薄い表示）", " legend__item--sub"),
-      legendItem("legend__swatch--line-dotted", "期限切れ・解消済み（点線・薄い表示）", " legend__item--sub"),
+      legendItem("legend__swatch--line-dotted", "期限切れ・解消済み・開始前（点線・薄い表示）", " legend__item--sub"),
     ];
   }
 

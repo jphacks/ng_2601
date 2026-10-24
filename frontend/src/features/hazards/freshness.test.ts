@@ -17,6 +17,7 @@ function item(overrides: Partial<RoadInfoItem> = {}): RoadInfoItem {
     temporality: "temporary",
     updatedAt: { state: "known", value: "2026-10-24T00:00:00Z" },
     retrievedAt: { state: "missing" },
+    startsAt: { state: "missing" },
     expiresAt: { state: "known", value: "2026-10-25T00:00:00Z" },
     source: {},
     verification: "verified",
@@ -60,6 +61,22 @@ describe("evaluateItem", () => {
     expect(unknown.cautions.join("")).toContain("不明");
     expect(missing.cautions.join("")).toContain("欠測");
     expect(unknown.cautions).not.toEqual(missing.cautions);
+  });
+
+  it("開始前の予定は upcoming として stale 扱いにし、現在の事実と断定しない", () => {
+    const future = { state: "known" as const, value: "2026-10-25T00:00:00Z" };
+    const f = evaluateItem(item({ startsAt: future, expiresAt: { state: "known", value: "2026-10-26T00:00:00Z" } }), NOW);
+    expect(f).toMatchObject({ validity: "upcoming", stale: true });
+    expect(f.cautions.join("")).toContain("開始前");
+    // 開始時刻を過ぎれば有効、開始が不明・欠測なら従来どおり。
+    expect(evaluateItem(item({ startsAt: { state: "known", value: "2026-10-24T00:00:00Z" } }), NOW).validity).toBe("current");
+    expect(evaluateItem(item({ startsAt: { state: "unknown" } }), NOW).validity).toBe("current");
+  });
+
+  it("開始前でも解消済み・期限切れが優先される", () => {
+    const future = { state: "known" as const, value: "2026-10-25T00:00:00Z" };
+    expect(evaluateItem(item({ startsAt: future, status: "withdrawn" }), NOW).validity).toBe("inactive");
+    expect(evaluateItem(item({ startsAt: future, expiresAt: { state: "known", value: "2026-10-20T00:00:00Z" } }), NOW).validity).toBe("expired");
   });
 
   it("未確認は stale ではないが unverified として扱う", () => {

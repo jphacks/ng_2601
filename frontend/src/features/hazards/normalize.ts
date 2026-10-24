@@ -71,7 +71,8 @@ function normalizeRestriction(feature: Feature<Geometry, RestrictionProps>, make
     temporality: scheduled ? "scheduled" : "permanent",
     updatedAt: stampOf(p.observed_at),
     retrievedAt: stampOf(p.retrieved_at),
-    // 規制データは有効期限を持たない。BEが取得時刻で絞った結果だけが返る。
+    // 規制データは開始・有効期限を持たない。BEが取得時刻で絞った結果だけが返る。
+    startsAt: { state: "missing" },
     expiresAt: { state: "missing" },
     source: { name: text(p.source), authority: text(p.authority), kind: text(p.source_kind) },
     verification: restrictionVerification(p.confidence),
@@ -117,6 +118,7 @@ function normalizeStatistics(
     temporality: "permanent",
     updatedAt: firstStamp(meta.generated_at, meta.retrieved_at),
     retrievedAt: stampOf(meta.retrieved_at),
+    startsAt: { state: "missing" },
     expiresAt: { state: "missing" },
     source: { name: text(meta.source), authority: text(meta.authority) },
     verification: "n/a",
@@ -148,6 +150,7 @@ function normalizeObservation(
     temporality: observationTemporality(p.temporal_kind),
     updatedAt: firstStamp(p.updated_at, p.observed_at),
     retrievedAt: { state: "missing" },
+    startsAt: stampOf(p.starts_at),
     expiresAt: firstStamp(p.expires_at, p.ends_at),
     source: { name: "ユーザー報告", authority: source.authority, kind: "community" },
     status,

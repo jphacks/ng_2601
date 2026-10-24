@@ -117,7 +117,7 @@ export function renderHazardPanel(filter: HazardFilter, actions: PanelActions): 
     temporalityGroup.append(el("label", { className: "hazard-panel__check" }, [input, el("span", { className: "hazard-panel__check-text", text: opt.label })]));
   }
 
-  const stale = checkbox([el("span", { className: "hazard-panel__check-text", text: "期限切れ・解消済み・未確認を隠す" })], filter.hideStale, (on) => {
+  const stale = checkbox([el("span", { className: "hazard-panel__check-text", text: "期限切れ・解消済み・開始前・未確認を隠す" })], filter.hideStale, (on) => {
     filter.hideStale = on;
     actions.onFilterChange();
   });

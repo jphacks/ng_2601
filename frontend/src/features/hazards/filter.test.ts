@@ -54,6 +54,7 @@ describe("applyFilter", () => {
     expect(ids).not.toContain("observation:mock-o2"); // 期限切れ＋未確認
     expect(ids).not.toContain("observation:mock-o5"); // 解消済み
     expect(ids).not.toContain("restriction:mock-r3"); // 未確認(low)
+    expect(ids).not.toContain("observation:mock-o7"); // 開始前
     expect(ids).toContain("observation:mock-o1"); // 有効
   });
 });
@@ -75,6 +76,6 @@ describe("buildRoadInfoCollection", () => {
     expect(state("observation:mock-o1")).toBe("current");
     expect(state("observation:mock-o2")).toBe("stale");
     expect(state("observation:mock-o5")).toBe("stale");
-    expect(state("observation:mock-o7")).toBe("unverified");
+    expect(state("observation:mock-o7")).toBe("stale"); // 開始前（未確認でもある）
   });
 });

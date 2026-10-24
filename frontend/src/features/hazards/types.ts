@@ -38,6 +38,8 @@ export interface RoadInfoItem {
   updatedAt: Stamp;
   /** FEの取得元（提供元）がデータを取得した日時。 */
   retrievedAt: Stamp;
+  /** 開始日時。未来なら「開始前の予定」で、現在は適用されていない可能性がある。 */
+  startsAt: Stamp;
   expiresAt: Stamp;
   source: { name?: string; authority?: string; kind?: string };
   status?: ItemStatus;

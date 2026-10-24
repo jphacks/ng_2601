@@ -26,6 +26,23 @@ describe("assertMapData", () => {
     expect(() => assertMapData(data)).not.toThrow();
   });
 
+  it("必須の提供元が欠けた応答（route_context なしを含む）は拒否する", () => {
+    const cases: Array<[string, (d: Record<string, unknown>) => void, RegExp]> = [
+      ["route_context", (d) => delete d.route_context, /route_context/],
+      ["restrictions", (d) => delete d.restrictions, /restrictions/],
+      ["observations", (d) => delete d.observations, /observations/],
+      ["accidents", (d) => delete (d.route_context as Record<string, unknown>).accidents, /accidents/],
+      ["traffic", (d) => delete (d.route_context as Record<string, unknown>).traffic, /traffic/],
+      ["features が配列でない", (d) => ((d.observations as Record<string, unknown>).features = null), /observations/],
+    ];
+    for (const [, mutate, message] of cases) {
+      const data = buildMockMapData() as unknown as Record<string, unknown>;
+      mutate(data);
+      expect(() => assertMapData(data)).toThrowError(ApiError);
+      expect(() => assertMapData(data)).toThrowError(message);
+    }
+  });
+
   it("オブジェクトでない応答は拒否する", () => {
     expect(() => assertMapData(null)).toThrowError(ApiError);
     expect(() => assertMapData("x")).toThrowError(ApiError);

@@ -53,6 +53,11 @@ describe("normalizeMapData (モック)", () => {
     expect(byId("observation:mock-o3").temporality).toBe("permanent");
   });
 
+  it("starts_at を開始日時として保持し、無ければ欠測", () => {
+    expect(byId("observation:mock-o7").startsAt.state).toBe("known");
+    expect(byId("observation:mock-o1").startsAt.state).toBe("missing");
+  });
+
   it("事故履歴は過去の記録である注記を必ず持つ", () => {
     const accidents = items.filter((i) => i.origin === "accident");
     expect(accidents.length).toBeGreaterThan(0);
