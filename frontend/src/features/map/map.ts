@@ -127,6 +127,20 @@ const ROAD_LAYERS = [ROAD_HALO_LINE, ROAD_HALO_CIRCLE, ROAD_FILL, ROAD_LINE, ROA
 const ROAD_HIT_LAYERS = [ROAD_FILL, ROAD_CIRCLE, ROAD_LINE, ROAD_LINE_UNVERIFIED, ROAD_LINE_STALE];
 const HIT_TOLERANCE_PX = 8;
 
+/** 地図のクリック判定と区間セレクターで同じ説明文を作れるよう、区間を地物の属性に落とす。 */
+function segmentProperties(routeId: string, segment: RouteGradientSegment, index: number): Record<string, unknown> {
+  return {
+    routeId,
+    segmentIndex: index,
+    direction: segment.direction,
+    startDistanceM: segment.fromM,
+    endDistanceM: segment.toM,
+    gradePercent: segment.gradePercent,
+    windowFromM: segment.windowFromM,
+    windowToM: segment.windowToM,
+  };
+}
+
 /**
  * 地図を container に初期化する。WebGL不可などで失敗したら再試行付きの表示に切り替える。
  * 返す controller は再試行しても同じものを使え、保持したデータと表示状態を作り直した地図へ反映する。
@@ -151,13 +165,21 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
 
   const canvas = el("div", { className: "map__canvas" });
   const notice = el("p", { className: "map__notice" });
+  // クリック以外でも区間を選べるよう、区間一覧をキーボード操作可能なselectで置く。
+  const gradientPanel = el("div", { className: "map__gradient-panel" });
+  const segmentSelect = el("select", { className: "map__gradient-select" });
+  segmentSelect.setAttribute("aria-label", "勾配区間を選択");
+  segmentSelect.hidden = true;
   const gradientSelection = el("p", { className: "map__gradient-selection" });
   notice.setAttribute("role", "status");
   gradientSelection.setAttribute("role", "status");
   gradientSelection.setAttribute("aria-live", "polite");
   notice.hidden = true;
   gradientSelection.hidden = true;
-  container.append(canvas, notice, gradientSelection);
+  gradientPanel.hidden = true;
+  gradientPanel.append(segmentSelect, gradientSelection);
+  container.append(canvas, notice, gradientPanel);
+  let selectedSegmentIndex: number | null = null;
 
   function routeCollection(): FeatureCollection<LineString> {
     const features: Array<Feature<LineString>> = [];
@@ -167,15 +189,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
         segments.forEach((segment, index) => features.push({
           type: "Feature",
           id: `${route.id}:${index}`,
-          properties: {
-            routeId: route.id,
-            direction: segment.direction,
-            startDistanceM: segment.fromM,
-            endDistanceM: segment.toM,
-            gradePercent: segment.gradePercent,
-            windowFromM: segment.windowFromM,
-            windowToM: segment.windowToM,
-          },
+          properties: segmentProperties(route.id, segment, index),
           geometry: { type: "LineString", coordinates: segment.coordinates },
         }));
         continue;
@@ -189,12 +203,64 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
     return { type: "FeatureCollection", features };
   }
 
+  function syncGradientPanel(): void {
+    gradientPanel.hidden = segmentSelect.hidden && gradientSelection.hidden;
+  }
+
+  /** 区間セレクターの表示状態を、描画中の区間とルートレイヤーの表示に合わせる。 */
+  function syncSegmentOptions(): void {
+    const segments = visible.routes && gradientSegments?.length ? gradientSegments : null;
+    const options: HTMLOptionElement[] = [];
+    if (segments) {
+      const placeholder = el("option", { text: "勾配区間を選択" });
+      placeholder.value = "";
+      options.push(placeholder);
+      segments.forEach((segment, index) => {
+        const option = el("option", { text: selectedSegmentText(segmentProperties(gradientRouteId ?? "", segment, index)) ?? "" });
+        option.value = String(index);
+        options.push(option);
+      });
+    }
+    segmentSelect.replaceChildren(...options);
+    segmentSelect.hidden = options.length === 0;
+    segmentSelect.value = selectedSegmentIndex === null ? "" : String(selectedSegmentIndex);
+    syncGradientPanel();
+  }
+
+  function showGradientSelection(text: string, index: number | null): void {
+    gradientSelection.textContent = text;
+    gradientSelection.hidden = false;
+    selectedSegmentIndex = index;
+    segmentSelect.value = index === null ? "" : String(index);
+    syncGradientPanel();
+  }
+
   function clearGradientSelection(): void {
     gradientSelection.textContent = "";
     gradientSelection.hidden = true;
+    selectedSegmentIndex = null;
+    segmentSelect.value = "";
+    syncGradientPanel();
   }
 
+  segmentSelect.addEventListener("change", () => {
+    const index = segmentSelect.value === "" ? null : Number(segmentSelect.value);
+    const segment = index === null ? undefined : gradientSegments?.[index];
+    if (index === null || !segment) {
+      clearGradientSelection();
+      return;
+    }
+    const text = selectedSegmentText(segmentProperties(gradientRouteId ?? "", segment, index));
+    if (text === null) {
+      clearGradientSelection();
+      return;
+    }
+    showGradientSelection(text, index);
+  });
+
   function syncVisibility(): void {
+    syncSegmentOptions();
+    if (!visible.routes) clearGradientSelection();
     if (!map || !loaded) return;
     const vis = (on: boolean) => (on ? "visible" : "none");
     map.setLayoutProperty("basemap", "visibility", vis(visible.basemap));
@@ -419,10 +485,11 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
         const routeFeature = m.queryRenderedFeatures(e.point, { layers: [ROUTE_LAYER, ROUTE_UNKNOWN_LAYER] })[0];
         const segmentText = selectedSegmentText(routeFeature?.properties);
         if (segmentText) {
-          gradientSelection.textContent = segmentText;
-          gradientSelection.hidden = false;
+          const index = routeFeature?.properties?.segmentIndex;
+          showGradientSelection(segmentText, typeof index === "number" ? index : null);
           return;
         }
+        clearGradientSelection();
         if (pickMarker) hideMarker(pickMarker);
         pickMarker = createMarker({
           id: "pick",
@@ -468,12 +535,14 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
       gradientRouteId = null;
       gradientSegments = null;
       clearGradientSelection();
+      syncSegmentOptions();
       syncRoutes();
     },
     setRouteGradientSegments(routeId, next) {
       gradientRouteId = routeId;
       gradientSegments = next;
       clearGradientSelection();
+      syncSegmentOptions();
       syncRoutes();
     },
     setEndpoints({ origin, destination }) {
