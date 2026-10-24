@@ -28,7 +28,9 @@
 /* 色だけに頼らず、枠線の種類でも状態を区別する。 */
 .hazard-badge--stale { border: 1px dotted var(--color-warning); color: var(--color-warning); font-weight: 600; }
 .hazard-badge--unverified { border: 1px dashed var(--color-warning); color: var(--color-warning); }
-.hazard-badge--unknown { border-style: dashed; color: var(--color-text-muted); }
+.hazard-badge svg { width: 14px; height: 14px; }
+.hazard-badge--block { border-color: var(--color-warning); background: var(--color-warning); color: var(--color-surface); font-weight: 700; }
+.hazard-badge--warn { border-color: var(--color-warning); color: var(--color-warning); font-weight: 600; }
 
 /* --- タブ --- */
 .hazard-panel { display: grid; gap: var(--space-3); }
@@ -140,40 +142,12 @@
 .hazard-detail--terrain { --category-color: var(--color-category-terrain); }
 .hazard-detail--facility { --category-color: var(--color-category-facility); }
 .hazard-detail__header { display: flex; align-items: flex-start; gap: var(--space-3); padding-right: var(--button-size); }
-.hazard-detail__icon {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--category-color) 14%, var(--color-surface));
-}
 .hazard-detail__heading { display: grid; gap: 2px; min-width: 0; }
-.hazard-detail__eyebrow { margin: 0; font-size: 12px; font-weight: 600; color: var(--category-color); }
 .hazard-detail__title { margin: 0; font-size: 17px; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
 .hazard-detail__badges { display: flex; flex-wrap: wrap; gap: var(--space-1); }
-.hazard-detail__kind, .hazard-detail__description { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
-.hazard-detail__kind { color: var(--color-text-muted); }
-.hazard-detail__cautions {
-  margin: 0;
-  padding: var(--space-2) var(--space-3) var(--space-2) calc(var(--space-3) + var(--space-4));
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--color-warning) 8%, var(--color-surface));
-  font-size: 13px;
-  line-height: 1.6;
-}
-.hazard-detail__cautions li::marker { color: var(--color-warning); }
-.hazard-detail__facts {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: var(--space-2) var(--space-4);
-  margin: 0;
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--color-border);
-  font-size: 13px;
-}
-.hazard-detail__facts dt { font-size: 12px; color: var(--color-text-muted); }
-.hazard-detail__facts dd { margin: 0; overflow-wrap: anywhere; }
-.hazard-detail__value--gap { font-style: italic; color: var(--color-text-muted); }
-.hazard-detail__value--stale { color: var(--color-warning); font-weight: 600; }
+.hazard-detail__description { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
+.hazard-detail__meta { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: 12px; color: var(--color-text-muted); }
+.hazard-detail__class { display: inline-flex; color: var(--category-color); }
+.hazard-detail__class svg { width: 16px; height: 16px; }
+.hazard-detail__when { margin: 0; font-size: 13px; font-weight: 600; }
+.hazard-detail__notes { margin: 0; padding-left: var(--space-4); font-size: 12px; color: var(--color-text-muted); }

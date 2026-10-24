@@ -39,7 +39,7 @@ export function buildMockMapData(now: Date = new Date()): MapDataResponse {
         source: "JARTIC 交通規制情報（モック）",
         authority: "警察庁",
         source_kind: "official",
-        enforcement: "prohibit",
+        enforcement: "block",
         observed_at: at(-24),
         retrieved_at: retrievedAt,
         confidence: "high",

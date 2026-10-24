@@ -44,6 +44,8 @@ export interface RoadInfoItem {
   source: { name?: string; authority?: string; kind?: string };
   status?: ItemStatus;
   verification: Verification;
+  /** 交通規制の強さ。block=通行止め、warn=注意喚起。 */
+  enforcement?: "block" | "warn";
   schedule?: { days?: number[]; start?: string; end?: string };
   /** 詳細カードに必ず添える注記（例: 事故履歴は過去の発生地点）。 */
   notes: string[];

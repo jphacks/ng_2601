@@ -65,7 +65,7 @@ function normalizeRestriction(feature: Feature<Geometry, RestrictionProps>, make
     ...ORIGIN_DEFAULTS.restriction,
     kindLabel: ORIGIN_LABEL.restriction,
     title: text(p.name) ?? "交通規制",
-    description: text(p.enforcement) ? `規制の強さ: ${p.enforcement}` : undefined,
+    enforcement: p.enforcement === "block" || p.enforcement === "warn" ? p.enforcement : undefined,
     geometry,
     position,
     temporality: scheduled ? "scheduled" : "permanent",
@@ -128,7 +128,7 @@ function normalizeStatistics(
 
 function normalizeObservation(
   feature: Feature<Geometry, ObservationProps>,
-  source: { authority: string; routingEffect?: string },
+  source: { authority: string },
   makeId: IdMaker,
 ): RoadInfoItem | null {
   const geometry = feature.geometry;
@@ -155,10 +155,7 @@ function normalizeObservation(
     source: { name: "ユーザー報告", authority: source.authority, kind: "community" },
     status,
     verification: observationVerification(p.verification_state),
-    notes: [
-      "ユーザーからの報告です。公的な情報ではありません。",
-      ...(source.routingEffect === "none_until_validated" ? ["検証されるまで経路探索には反映されません。"] : []),
-    ],
+    notes: [],
   };
 }
 
@@ -207,7 +204,6 @@ export function normalizeMapData(data: MapDataResponse): NormalizedMapData {
   for (const f of traffic?.features ?? []) push(normalizeStatistics("traffic", f, traffic.source_status, makeId));
   const observationSource = {
     authority: observations?.source?.authority ?? "community",
-    routingEffect: observations?.source?.routing_effect,
   };
   for (const f of observations?.features ?? []) push(normalizeObservation(f, observationSource, makeId));
 
