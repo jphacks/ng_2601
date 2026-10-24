@@ -52,7 +52,7 @@ fi
 mkdir -p "$app_dir/brouter_extension/segments" "$app_dir/data/jartic/raw" "$app_dir/data/restrictions"
 
 if [ ! -f "$app_dir/backend/.env" ]; then
-  cp "$app_dir/backend/.env.example" "$app_dir/backend/.env"
+  ( umask 077 && cp "$app_dir/backend/.env.example" "$app_dir/backend/.env" )
   echo "Created backend/.env from backend/.env.example; replace development placeholders before starting the backend."
 fi
 

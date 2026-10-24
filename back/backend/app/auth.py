@@ -15,7 +15,7 @@ import smtplib
 from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 from typing import Any, Literal
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 import httpx
 import jwt
@@ -147,7 +147,22 @@ class AuthService:
     def request_magic_link(self, email: str) -> None:
         normalized = email.strip().lower()
         raw_token = secrets.token_urlsafe(32)
+        if not self.smtp_password or not self.smtp_sender or not self.smtp_username:
+            raise HTTPException(status_code=503, detail="SMTP is not fully configured")
+
+        link = f"{self.frontend_origin}/auth/magic-link?token={raw_token}"
+        message = EmailMessage()
+        message["Subject"] = "Your CyclerHub-back sign-in link"
+        message["From"] = self.smtp_sender
+        message["To"] = normalized
+        message.set_content(
+            "Sign in to CyclerHub-back using this link. It expires in 15 minutes.\n\n" + link
+        )
+
         with self._connect() as connection:
+            # Serialize requests for the same address so concurrent calls cannot
+            # both pass the cooldown check and send two messages.
+            connection.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (normalized,))
             recent = connection.execute(
                 "SELECT 1 FROM email_login_tokens WHERE email = %s AND consumed_at IS NULL AND expires_at > %s",
                 (normalized, _now() + MAGIC_LINK_TTL - timedelta(seconds=60)),
@@ -162,26 +177,15 @@ class AuthService:
                 "INSERT INTO email_login_tokens (email, token_hash, expires_at) VALUES (%s, %s, %s)",
                 (normalized, _hash(raw_token), _now() + MAGIC_LINK_TTL),
             )
-
-        link = f"{self.frontend_origin}/auth/magic-link?token={raw_token}"
-        message = EmailMessage()
-        message["Subject"] = "Your CyclerHub-back sign-in link"
-        message["From"] = self.smtp_sender
-        message["To"] = normalized
-        message.set_content(
-            "Sign in to CyclerHub-back using this link. It expires in 15 minutes.\n\n" + link
-        )
-        if not self.smtp_password:
-            raise HTTPException(status_code=503, detail="SMTP password is not configured")
-        try:
-            with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=20) as smtp:
-                smtp.ehlo()
-                smtp.starttls()
-                smtp.ehlo()
-                smtp.login(self.smtp_username, self.smtp_password)
-                smtp.send_message(message)
-        except (OSError, smtplib.SMTPException) as error:
-            raise HTTPException(status_code=502, detail="Unable to send sign-in email") from error
+            try:
+                with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=20) as smtp:
+                    smtp.ehlo()
+                    smtp.starttls()
+                    smtp.ehlo()
+                    smtp.login(self.smtp_username, self.smtp_password)
+                    smtp.send_message(message)
+            except (OSError, smtplib.SMTPException) as error:
+                raise HTTPException(status_code=502, detail="Unable to send sign-in email") from error
 
     def consume_magic_link(self, raw_token: str) -> SessionResponse:
         now = _now()
@@ -330,9 +334,10 @@ class AuthService:
         return f"https://accounts.google.com/o/oauth2/v2/auth?{query}"
 
     def consume_oauth_state(self, state: str, browser_state: str | None) -> None:
-        expiry = self._oauth_states.pop(state, None)
+        expiry = self._oauth_states.get(state)
         if expiry is None or expiry <= _now() or not browser_state or not hmac.compare_digest(state, browser_state):
             raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
+        self._oauth_states.pop(state, None)
 
 
 class ModeratorTokenVerifier:
@@ -372,9 +377,12 @@ def build_auth_router(service: AuthService) -> APIRouter:
         return service.consume_magic_link(request.token)
 
     @router.get("/google")
-    async def start_google(request: Request, response: Response) -> dict[str, str]:
+    async def start_google(response: Response) -> dict[str, str]:
         url = service.begin_google()
-        state = url.split("state=", 1)[1].split("&", 1)[0]
+        state_values = parse_qs(urlsplit(url).query).get("state", [])
+        if len(state_values) != 1:
+            raise HTTPException(status_code=503, detail="OAuth state could not be created")
+        state = state_values[0]
         response.set_cookie("cyclerhub_oauth", state, httponly=True, secure=service.google_callback_url.startswith("https://"), samesite="lax", max_age=600)
         return {"authorization_url": url}
 
