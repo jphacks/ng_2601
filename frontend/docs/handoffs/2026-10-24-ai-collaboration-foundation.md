@@ -26,7 +26,7 @@
 - [architecture.md](../architecture.md)、[api-contract.md](../api-contract.md): 確認済み状態と進行中の提案、未合意点の索引
 - [decisions/README.md](../decisions/README.md): 必要時だけ使うADRの書式
 - [handoffs/README.md](README.md)、[TEMPLATE.md](TEMPLATE.md)、本ファイル: 引き継ぎの条件・書式・導入記録
-- [PRテンプレート](../../.github/pull_request_template.md): 人間とAI共通の変更・検証・残課題の記録
+- [PRテンプレート](../../../.github/pull_request_template.md): 人間とAI共通の変更・検証・残課題の記録
 
 ## Design Decisions
 
