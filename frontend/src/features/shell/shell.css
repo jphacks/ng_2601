@@ -158,9 +158,46 @@ button { cursor: pointer; }
   visibility: visible;
   transition-delay: 0s;
 }
+.search-card--route-results {
+  top: auto;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: none;
+}
+.search-card--route-results .bar { display: none; }
+.search-card--route-results .panel {
+  margin-top: 0;
+  border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+}
+.search-card--route-results.is-open .panel {
+  --avail: calc(var(--vvh) - var(--top-offset) - var(--gutter));
+  height: min(calc(var(--vvh) * 0.65), var(--avail));
+  padding: var(--space-3) var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom));
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
 @media (min-width: 768px) {
   .panel { width: min(400px, 100%); }
   .is-open .panel { height: calc(var(--avail) - var(--attr-h)); }
+  .search-card--route-results {
+    top: var(--top-offset);
+    right: auto;
+    bottom: var(--bottom-offset);
+    left: var(--left-offset);
+    width: min(400px, calc(100% - var(--left-offset) - var(--right-offset)));
+  }
+  .search-card--route-results .panel {
+    width: 100%;
+    height: 100%;
+    margin-top: 0;
+    padding: var(--space-3);
+    border-radius: var(--radius-panel);
+    opacity: 1;
+    visibility: visible;
+  }
+  .search-card--route-results.is-open .panel { height: 100%; }
 }
 
 .row {

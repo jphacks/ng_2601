@@ -201,10 +201,16 @@ export function renderShell(root: HTMLElement): void {
   const card = el("div", { className: "search-card" }, [bar, panel]);
 
   // --- behaviour --------------------------------------------------------
+  function syncRoutePanel(state = routeStore.getState()): void {
+    const showRouteResults = searchOpen && view === "route" && state.status.kind !== "idle";
+    card.classList.toggle("search-card--route-results", showRouteResults);
+    bar.hidden = showRouteResults;
+    originRow.hidden = view !== "route" || showRouteResults;
+  }
+
   function renderView(): void {
     const def = ALL_VIEWS.find((v) => v.id === view)!;
     viewTitle.textContent = def.label;
-    originRow.hidden = view !== "route";
     for (const [id, t] of tabs) {
       const selected = id === view;
       t.setAttribute("aria-selected", String(selected));
@@ -231,6 +237,7 @@ export function renderShell(root: HTMLElement): void {
     } else {
       viewBody.replaceChildren(renderState({ kind: "empty", message }));
     }
+    syncRoutePanel();
   }
 
   function setView(id: ViewId): void {
@@ -242,10 +249,14 @@ export function renderShell(root: HTMLElement): void {
     // 指定中は何もしないようにするとメニューやレイヤーのボタンが効かなくなるので、指定をやめてから開く。
     if (routeStore.getState().pickMode) routeStore.cancelPick();
     setView(id);
-    if (searchOpen) return;
+    if (searchOpen) {
+      syncRoutePanel();
+      return;
+    }
     searchOpen = true;
     card.classList.add("is-open");
     panel.inert = false;
+    syncRoutePanel();
     barClose.hidden = false;
     menuButton.hidden = true;
     input.focus({ preventScroll: true });
@@ -256,6 +267,7 @@ export function renderShell(root: HTMLElement): void {
     if (!searchOpen) return;
     searchOpen = false;
     card.classList.remove("is-open");
+    syncRoutePanel();
     panel.inert = true;
     barClose.hidden = true;
     menuButton.hidden = false;
@@ -275,7 +287,12 @@ export function renderShell(root: HTMLElement): void {
   /** キーボード表示で隠れないよう、フォーカス中の入力を内容領域内に収める。 */
   function revealFocused(): void {
     const active = document.activeElement;
-    if (searchOpen && active instanceof HTMLElement && panel.contains(active)) {
+    if (
+      searchOpen &&
+      active instanceof HTMLElement &&
+      panel.contains(active) &&
+      active.matches("input:not([readonly]), textarea, select, [contenteditable='true']")
+    ) {
       active.scrollIntoView({ block: "nearest" });
     }
   }
@@ -283,6 +300,7 @@ export function renderShell(root: HTMLElement): void {
   const syncViewport = (): void => {
     const vv = window.visualViewport;
     document.documentElement.style.setProperty("--vvh", `${vv ? vv.height : window.innerHeight}px`);
+    mapController.resize();
     revealFocused();
   };
 
@@ -301,6 +319,7 @@ export function renderShell(root: HTMLElement): void {
   let wasPicking = false;
   let shownRoute: Route | null = null;
   routeStore.subscribe((state) => {
+    syncRoutePanel(state);
     const picking = state.pickMode !== null;
     mapController.setPicking(picking);
     mapController.setEndpoints({ origin: state.origin, destination: state.destination });
@@ -352,4 +371,6 @@ export function renderShell(root: HTMLElement): void {
   renderView();
 
   root.replaceChildren(map, attribution, hazards.card, menuButton, controls, renderPickBanner(routeStore), card, scrim, drawer);
+  // MapLibre initializes while the shell is being assembled off-DOM; size it after insertion.
+  mapController.resize();
 }

@@ -81,6 +81,8 @@ export interface MapController {
   zoomIn(): void;
   zoomOut(): void;
   resetNorth(): void;
+  /** コンテナをDOMへ接続した後、地図キャンバスを実際の表示サイズに合わせる。 */
+  resize(): void;
   destroy(): void;
 }
 
@@ -466,6 +468,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
     zoomIn: () => void map?.zoomIn(),
     zoomOut: () => void map?.zoomOut(),
     resetNorth: () => void map?.resetNorth(),
+    resize: () => map?.resize(),
     destroy() {
       map?.remove();
       map = null;
