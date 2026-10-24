@@ -6,6 +6,7 @@
 
 - [Issue #2（FE Epic）](https://github.com/jphacks/ng_2601/issues/2)と子Issue #3〜#15はすべてOPENでした。要件の記載は、実装完了やBEとの合意を意味しません。
 - [FE-01 / Issue #3](https://github.com/jphacks/ng_2601/issues/3)の[PR #16](https://github.com/jphacks/ng_2601/pull/16)はOPEN・未マージでした。確認したheadは[b9de6e2](https://github.com/jphacks/ng_2601/tree/b9de6e2bc07f173f00ae6cb8491bf348974578ea)。以下のPR内実装はこのコミットだけを指します。
+- [FE-03 / Issue #5](https://github.com/jphacks/ng_2601/issues/5)の[PR #22](https://github.com/jphacks/ng_2601/pull/22)はOPEN・未マージでした。確認したheadは[e52f8c5](https://github.com/jphacks/ng_2601/tree/e52f8c5e34b4f6e883a7b7821d2a7f50123b45d1)。地図表示の実装は[`frontend/src/features/map/`](https://github.com/jphacks/ng_2601/tree/e52f8c5e34b4f6e883a7b7821d2a7f50123b45d1/frontend/src/features/map)のこのコミットだけを指します。
 - [Issue #1](https://github.com/jphacks/ng_2601/issues/1)が示す技術検証用リポジトリは参考資料です。そこにある機能を本リポジトリの実装済み機能として扱いません。
 
 状態が変わるPRでは、この確認時点と影響する節を更新してください。最新の担当・進捗はGitHubで再確認します。
