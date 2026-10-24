@@ -54,6 +54,8 @@ function submitErrorMessage(error: ApiError): string {
       return `投稿に時間がかかっています。サーバーには届いている可能性があるため、口コミの一覧を確認してから再度お試しください。${RETAINED}`;
     case "network_error":
       return `通信に失敗しました。通信環境を確認して、もう一度お試しください。${RETAINED}`;
+    case "invalid_response":
+      return `投稿の結果を確認できませんでした。サーバーには届いている可能性があるため、口コミの一覧を確認してから再度お試しください。${RETAINED}`;
     default:
       return `投稿に失敗しました。時間をおいてもう一度お試しください。${RETAINED}`;
   }
