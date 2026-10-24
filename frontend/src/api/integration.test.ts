@@ -99,4 +99,28 @@ describe("main の経路・道路情報と口コミのAPI統合", () => {
     await vi.runAllTimersAsync();
     await check;
   });
+
+  it("口コミの通信タイムアウトに専用メッセージを返す", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn((_url, init: RequestInit) => new Promise((_resolve, reject) => {
+      init.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+    })));
+    const pending = createHttpClient("https://example.test").listReviews({ bbox: BOUNDS });
+    const check = expect(pending).rejects.toMatchObject({
+      code: "timeout", message: "口コミの取得に時間がかかっています。時間をおいて再試行してください。",
+    });
+    await vi.advanceTimersByTimeAsync(15_000);
+    await check;
+  });
+
+  it("範囲外座標の口コミを除き、有効な口コミは表示用に返す", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({
+      type: "FeatureCollection",
+      features: [observation, ...[[181, 35], [139, 91], [-181, 35], [139, -91]].map((coordinates) => ({
+        ...observation, id: `invalid-${coordinates}`, geometry: { type: "Point", coordinates },
+      }))],
+    })));
+    const reviews = await createHttpClient("https://example.test").listReviews({ bbox: BOUNDS });
+    expect(reviews.map((review) => review.id)).toEqual(["observation-1"]);
+  });
 });

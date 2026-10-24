@@ -2,7 +2,7 @@ import "./shell.css";
 import { el } from "../../ui/dom";
 import { icon, type IconName } from "../../ui/icon";
 import { renderState } from "../../ui/state";
-import { api } from "../../api";
+import { api, isMockApi } from "../../api";
 import { createHazardsFeature, type HazardsFeature } from "../hazards/hazardsFeature";
 import { renderLayerPanel } from "../map/layerPanel";
 import { mountMap, type MapController } from "../map/map";
@@ -84,7 +84,7 @@ export function renderShell(root: HTMLElement): void {
   hazards = createHazardsFeature({
     map: mapController,
     client: api,
-    mock: import.meta.env.VITE_API_MODE !== "http",
+    mock: isMockApi,
     // スマホでは一覧パネルが詳細カードを覆うため、一覧から選んだら閉じて地図と詳細を見せる。
     onSelect: (fromList) => {
       reviews?.close();

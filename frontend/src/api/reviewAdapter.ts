@@ -25,6 +25,8 @@ function toLngLat(geometry: unknown): LngLat | null {
   if (!isRecord(geometry) || geometry.type !== "Point" || !Array.isArray(geometry.coordinates)) return null;
   const [lng, lat] = geometry.coordinates;
   if (typeof lng !== "number" || typeof lat !== "number" || !Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+  // 範囲外はマーカー生成(MapLibre)で例外になり、口コミ全体の読み込みが失敗するため、この1件だけ捨てる。
+  if (lng < -180 || lng > 180 || lat < -90 || lat > 90) return null;
   return [lng, lat];
 }
 

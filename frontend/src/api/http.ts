@@ -18,6 +18,9 @@ function isApiErrorBody(v: unknown): v is ApiErrorBody {
 const ROUTE_TIMEOUT_MS = 40_000;
 const MAP_DATA_TIMEOUT_MS = 15_000;
 
+/** 口コミ取得が止まったままにならないよう打ち切るまでの時間。 */
+const REVIEWS_TIMEOUT_MS = 15_000;
+
 /** `POST /v1/routes` のエラー（FastAPIの`{detail}`）をFEのエラー形式へ。BEの英語detailは`details`に残す。 */
 function routeError(status: number, parsed: unknown): ApiErrorBody {
   const details = typeof parsed === "object" && parsed !== null ? (parsed as { detail?: unknown }).detail : undefined;
@@ -143,7 +146,11 @@ export function createHttpClient(baseUrl: string, getAccessToken?: () => string 
         max_lat: String(maxLat),
       });
       try {
-        return observationsToReviews(await request<unknown>("GET", `/v1/observations?${query}`));
+        const response = await request<unknown>("GET", `/v1/observations?${query}`, undefined, {
+          timeoutMs: REVIEWS_TIMEOUT_MS,
+          timeoutMessage: "口コミの取得に時間がかかっています。時間をおいて再試行してください。",
+        });
+        return observationsToReviews(response);
       } catch (e) {
         if (e instanceof ApiError) throw e;
         throw new ApiError(502, { code: "invalid_response", message: "口コミの応答形式が不正です" });
