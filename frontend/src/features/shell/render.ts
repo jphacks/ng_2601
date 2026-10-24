@@ -218,6 +218,8 @@ export function renderShell(root: HTMLElement): void {
   }
 
   function openSearch(id: ViewId = view): void {
+    // 指定中は何もしないようにするとメニューやレイヤーのボタンが効かなくなるので、指定をやめてから開く。
+    if (routeStore.getState().pickMode) routeStore.cancelPick();
     setView(id);
     if (searchOpen) return;
     searchOpen = true;
