@@ -2,7 +2,15 @@
 
 ## 状態と正本
 
-確認時点は[architecture.md](architecture.md)と同じです。mainにはAPI型定義、OpenAPI、サーバー実装がなく、正式に合意・実装されたAPIは確認できません。
+### 2026-10-25 / FE-05の更新
+
+作業基準はmainの`6493512`（PR #25マージ済み）。経路検索の現行実装は[`routeAdapter.ts`](../src/api/routeAdapter.ts)、型は[`types/api.ts`](../src/types/api.ts)。以下に残る未マージ表記は2026-10-24時点の履歴であり、経路検索についてはこの更新を優先する。
+
+Issue #7では、依頼者の指定したPoC方式に合わせ、検索経路の標高をFEから国土地理院DEMへ問い合わせ、獲得標高・下降量・平均勾配等を**推定値として別途算出**する。外部APIの応答・`Route`契約は変更せず、API由来の標高集計とは混在させない。内部の解析点は欠測を`null`として保持し、解析状態・出典・集計値は[`analyze.ts`](../src/features/elevation/analyze.ts)が定義する。計算責務・欠測規則・出典は[ルート標高解析](route-elevation.md)を参照。地図の区間色分け・形状との対応契約（#8）はこの変更では確定しない。
+
+### 2026-10-24の記録
+
+以下は[architecture.md](architecture.md)にある2026-10-24時点の記録です。その時点のmainにはAPI型定義、OpenAPI、サーバー実装がなく、正式に合意・実装されたAPIは確認できませんでした。
 
 [PR #16（未マージ）](https://github.com/jphacks/ng_2601/pull/16)には暫定型とHTTP clientがあります。以下はhead `b9de6e2`を参照する索引であり、正式なBE仕様ではありません。型の全フィールドやJSON例をこの文書に複製しません。
 

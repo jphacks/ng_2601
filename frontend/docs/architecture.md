@@ -4,6 +4,13 @@
 
 2026-10-25確認。mainの基準は[6493512](https://github.com/jphacks/ng_2601/commit/6493512fa8197d974b593437661cbc69886ead12)（PR #25のマージ）です。`frontend/`（FE-01〜FE-04）と`back/`（[PR #18](https://github.com/jphacks/ng_2601/pull/18)、マージ済み）が含まれます。
 
+### 2026-10-25 / FE-05の更新
+
+Issue #7の作業基準はmainの`6493512`（PR #25マージ済み）。このcheckoutにはFE基盤・画面シェル・MapLibre地図・単一ルート検索とBEが存在する。以下の2026-10-24時点の履歴より、該当機能ではこの更新と現行ソースを優先する。
+
+標高表示は[`features/elevation/`](../src/features/elevation/)で実装。`RouteStore`は経路検索と標高解析を別状態で管理し、経路成功後にブラウザから国土地理院DEMを取得する。`ApiClient`経由の距離・時間と、DEMからFEで計算した推定標高を結果タブで表示する。解析中断は共有タイル通信を妨げず、古い応答は捨てる。モックモードでは合成標高を同じ解析処理に渡す。詳しい計算・出典・欠測規則は[ルート標高解析](route-elevation.md)、APIへの影響は[API契約](api-contract.md)を参照。地図勾配色分け（#8）・ポインタ連動（#9）は未実装のまま。
+
+
 - [Issue #2（FE Epic）](https://github.com/jphacks/ng_2601/issues/2)はOPENです。子Issueは#3・#4・#5がCLOSED、#11を含む他はOPENでした。要件の記載は、実装完了やBEとの合意を意味しません。
 - [FE-01 / Issue #3](https://github.com/jphacks/ng_2601/issues/3)の[PR #16](https://github.com/jphacks/ng_2601/pull/16)はマージ済みです。導入されたAPI基盤は`frontend/src/api/`等にあります（初回確認のhead: [b9de6e2](https://github.com/jphacks/ng_2601/tree/b9de6e2bc07f173f00ae6cb8491bf348974578ea)）。
 - [FE-03 / Issue #5](https://github.com/jphacks/ng_2601/issues/5)の[PR #22](https://github.com/jphacks/ng_2601/pull/22)はマージ済み（取り込み後のHEADは`abe740b`）。地図表示の実装は[`frontend/src/features/map/`](../src/features/map)です。

@@ -7,7 +7,7 @@ Vite + TypeScript（UIライブラリなし）。画面は `src/api` の `ApiCli
 npm install
 npm run dev        # 開発サーバー（既定はモック）
 npm run typecheck  # 型チェック
-npm test           # 単体テスト（vitest。鮮度判定・フィルタ・取得制御などの純ロジック）
+npm test           # 単体テスト（vitest。鮮度判定・フィルタ・取得制御、DEM・標高解析・状態管理）
 npm run build      # 型チェック + 本番ビルド
 ```
 
@@ -17,6 +17,10 @@ npm run build      # 型チェック + 本番ビルド
 * `VITE_API_MODE=http`: `VITE_API_BASE_URL` のバックエンドを呼ぶ（`src/api/http.ts`）。経路検索は `POST /v1/routes`、道路・危険情報は `GET /v1/map-data`。
 
 モックの経路検索は、URLに `?mock=empty|error|timeout|slow` を付けると0件・通信エラー・タイムアウト・遅延を再現できる。
+
+標高解析は `?elevation=flat|hill|partial|missing|slow|error` で平坦・起伏・部分欠測・全欠測・遅延・通信失敗を再現できる（`mock` と併用可能）。モックでは外部DEMへ通信しない。HTTPモードでは検索成功後に国土地理院の標高タイルをブラウザから取得する。計算規則・出典・欠測表示は[ルート標高解析](docs/route-elevation.md)を参照。
+
+テストにはmainと同じ開発用依存のVitest 2を使用する。標高解析による新規ランタイム依存はない。
 
 ## ディレクトリ構成
 * `src/types/api.ts` … 暫定API型（経路・標高プロファイル・Preferences・危険情報・口コミ・共通エラー）。`@provisional` は本番API確定後に差し替える。
