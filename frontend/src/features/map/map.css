@@ -1,0 +1,56 @@
+/* 地図本体。色は tokens.css を使う（docs/design-system.md）。 */
+.map__canvas { position: absolute; inset: 0; }
+.map__canvas--fallback { display: grid; place-items: center; background: var(--color-map-placeholder); }
+.map__notice {
+  position: absolute;
+  top: var(--top-offset);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  margin: 0;
+  max-width: calc(100% - 2 * var(--gutter) - 2 * var(--button-size));
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  border: 1px solid var(--color-warning);
+  color: var(--color-warning);
+  font-size: 13px;
+  box-shadow: var(--shadow-floating);
+}
+
+/* マーカー（DOM）。 */
+.map-marker {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--color-surface);
+  box-shadow: var(--shadow-floating);
+  color: var(--color-surface);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.map-marker--hazard { background: var(--color-warning); }
+.map-marker--review { background: var(--color-primary); }
+.map-marker--pick { background: var(--color-route); width: 18px; height: 18px; }
+.map-popup h3 { margin: 0 0 var(--space-1); font-size: 14px; color: var(--color-text); }
+.map-popup p { margin: 0; font-size: 13px; color: var(--color-text); }
+
+/* レイヤーパネルと凡例。 */
+.layer-panel { display: grid; gap: var(--space-4); }
+.layer-panel__list { margin: 0; padding: 0; border: 0; display: grid; gap: var(--space-1); }
+.layer-panel__legend { padding: 0; margin-bottom: var(--space-2); font-weight: 600; }
+.layer-panel__item { display: flex; align-items: center; gap: var(--space-3); min-height: var(--button-size); }
+.layer-panel__item input { width: 20px; height: 20px; accent-color: var(--color-primary); }
+.legend { border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
+.legend__title { margin: 0 0 var(--space-2); font-size: 14px; }
+.legend__list { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-2); }
+.legend__item { display: flex; align-items: center; gap: var(--space-3); font-size: 13px; }
+.legend__swatch { flex: none; display: inline-block; }
+.legend__swatch--area { width: 24px; height: 14px; background: #e9eee8; border: 1px solid var(--color-border); }
+.legend__swatch--line { width: 24px; height: 5px; border-radius: 3px; background: var(--color-route); }
+.legend__swatch--dot { width: 14px; height: 14px; border-radius: 50%; }
+.legend__swatch--hazard { background: var(--color-warning); }
+.legend__swatch--review { background: var(--color-primary); }

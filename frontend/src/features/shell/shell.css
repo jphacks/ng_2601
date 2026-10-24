@@ -24,16 +24,12 @@ button { cursor: pointer; }
   overflow: hidden;
 }
 
-/* --- map area (placeholder until #5) ---------------------------------- */
+/* --- map area (MapLibre mounts into .map__canvas, see features/map) ---- */
 .map {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
   background: var(--color-map-placeholder);
-  touch-action: none;
 }
-.map__note { margin: 0; color: var(--color-text-muted); }
 .attribution {
   position: absolute;
   right: var(--space-2);
@@ -46,6 +42,7 @@ button { cursor: pointer; }
   color: var(--color-text-muted);
   z-index: 5;
 }
+.attribution a { color: inherit; }
 
 /* --- shared look of every floating surface ---------------------------- */
 .float-button, .bar, .row, .panel, .drawer {

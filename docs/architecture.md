@@ -17,7 +17,7 @@
 | フロントエンド | 地点・設定入力、地図と検索結果・標高・危険情報・口コミの表示、読み込み／空／失敗状態を扱う | mainに実装なし。[Epic #2](https://github.com/jphacks/ng_2601/issues/2)の要件 |
 | FE開発・通信基盤 | Vite + TypeScript、UIライブラリなし。画面はApiClient経由でモック／HTTPを切り替える | PR #16内の提案。`frontend/src/features/`、`frontend/src/ui/`、`frontend/src/api/`、`frontend/src/types/`、`frontend/src/mocks/`に分離。mainには未導入 |
 | バックエンド | FEから経路探索を依頼し、Preferencesを取得・保存する連携を想定 | [#6](https://github.com/jphacks/ng_2601/issues/6)、[#10](https://github.com/jphacks/ng_2601/issues/10)の要件。mainおよび確認したPRにBE実装なし。言語・フレームワーク・DB・デプロイ構成は未確認／未決定 |
-| 地図表示 | MapLibreで地点選択、ルート・危険情報・口コミのレイヤー表示、帰属表示 | [#5](https://github.com/jphacks/ng_2601/issues/5)の計画。PR #16はデータ確認用一覧画面であり、地図基盤の実装ではない。地図スタイル・タイル提供元は未合意 |
+| 地図表示 | MapLibreで地点選択、ルート・危険情報・口コミのレイヤー表示、帰属表示 | [#5](https://github.com/jphacks/ng_2601/issues/5)で`frontend/src/features/map/`に実装（PR未マージ）。ベースマップは国土地理院の淡色地図ラスタ（`style.ts`）、帰属は「地理院タイル」を常時表示。ルート・危険情報・口コミはモックを重ねており、API接続は#6・#11・#12。標高・勾配は#7〜#9 |
 | 経路探索 | FEは出発地・目的地・設定を送り、返却された経路を描画する | [#6](https://github.com/jphacks/ng_2601/issues/6)の計画。探索エンジン、道路グラフ、計算・保存基盤は未決定。PR #16はモックと暫定HTTP clientのみ |
 | 標高・勾配 | 距離・獲得標高・下降量・標高プロファイルの表示と勾配色分け | [#7](https://github.com/jphacks/ng_2601/issues/7)、[#8](https://github.com/jphacks/ng_2601/issues/8)の計画。データ提供元、計算をFE／BEのどちらが担うか、欠測表現・勾配閾値は未合意 |
 | 道路・危険情報 | レイヤー・フィルタ・詳細で種類、情報源、更新日時、有効期限を表示 | [#11](https://github.com/jphacks/ng_2601/issues/11)の計画。収集・配信元、保存方式は未決定。期限切れ／未確認／欠測を区別する要件がある |

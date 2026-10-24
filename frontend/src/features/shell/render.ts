@@ -2,6 +2,10 @@ import "./shell.css";
 import { el } from "../../ui/dom";
 import { icon, type IconName } from "../../ui/icon";
 import { renderState } from "../../ui/state";
+import { renderLayerPanel } from "../map/layerPanel";
+import { mountMap, type MapController } from "../map/map";
+import { ATTRIBUTION } from "../map/style";
+import { mockHazards, mockReviewLocations, mockReviews, mockRoutes } from "../../mocks/data";
 
 type ViewId = "route" | "settings" | "hazards" | "reviews" | "layers" | "help" | "about";
 
@@ -44,8 +48,21 @@ export function renderShell(root: HTMLElement): void {
   const map = el("div", { className: "map" });
   map.setAttribute("role", "region");
   map.setAttribute("aria-label", "地図エリア");
-  map.append(el("p", { className: "map__note", text: "地図は準備中です（#5で接続）" }));
-  const attribution = el("div", { className: "attribution", text: "地図の帰属表示（#5で表示）" });
+  const mapController: MapController = mountMap(map);
+  // 経路・危険情報・口コミのAPI接続（#6/#11/#12）までは、モックを重ねて表示を確認できるようにする。
+  mapController.setRoutes(mockRoutes);
+  mapController.setHazards(mockHazards);
+  mapController.setReviews(
+    mockReviews.flatMap((review) => {
+      const lngLat = mockReviewLocations[review.id];
+      return lngLat ? [{ review, lngLat }] : [];
+    }),
+  );
+  const attributionLink = el("a", { text: ATTRIBUTION.label });
+  attributionLink.href = ATTRIBUTION.url;
+  attributionLink.target = "_blank";
+  attributionLink.rel = "noopener noreferrer";
+  const attribution = el("div", { className: "attribution" }, [attributionLink]);
 
   // --- hamburger + drawer -----------------------------------------------
   const menuButton = button("メニューを開く", "float-button menu-button", "menu");
@@ -72,17 +89,19 @@ export function renderShell(root: HTMLElement): void {
   drawer.append(el("h2", { className: "drawer__title", text: "Nature Ride" }), drawerItems, drawerClose);
 
   // --- map controls (right) ---------------------------------------------
-  const unavailable = "地図の接続後に使えます";
+  const unavailable = "準備中です";
   const layersButton = button("地図レイヤー", "float-button", "layers");
   layersButton.addEventListener("click", () => openSearch("layers"));
-  const compass = button(`方位をリセット（${unavailable}）`, "float-button float-button--accent", "compass");
+  const compass = button("方位をリセット", "float-button float-button--accent", "compass");
+  compass.addEventListener("click", () => mapController.resetNorth());
+  const zoomIn = button("ズームイン", "float-button map-controls__zoom", "plus");
+  zoomIn.addEventListener("click", () => mapController.zoomIn());
+  const zoomOut = button("ズームアウト", "float-button map-controls__zoom", "minus");
+  zoomOut.addEventListener("click", () => mapController.zoomOut());
+  // 現在地はGPS対応（#14）で接続する。
   const locate = button(`現在地を表示（${unavailable}）`, "float-button", "locate");
-  const zoomIn = button(`ズームイン（${unavailable}）`, "float-button map-controls__zoom", "plus");
-  const zoomOut = button(`ズームアウト（${unavailable}）`, "float-button map-controls__zoom", "minus");
-  for (const b of [compass, locate, zoomIn, zoomOut]) {
-    b.disabled = true;
-    b.title = unavailable;
-  }
+  locate.disabled = true;
+  locate.title = unavailable;
   const controls = el("div", { className: "map-controls" }, [layersButton, compass, locate, zoomIn, zoomOut]);
 
   // --- search card: one DOM instance, only its position/size changes ----
@@ -168,7 +187,7 @@ export function renderShell(root: HTMLElement): void {
         : view === "about"
           ? "Nature Ride — 自然の中を走る自転車ルート。"
           : `${def.label}は準備中です（${def.issue}で実装予定）。`;
-    viewBody.replaceChildren(renderState({ kind: "empty", message }));
+    viewBody.replaceChildren(view === "layers" ? renderLayerPanel(mapController) : renderState({ kind: "empty", message }));
   }
 
   function setView(id: ViewId): void {
