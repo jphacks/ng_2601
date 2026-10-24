@@ -1,0 +1,3 @@
+[submodule "brouter"]
+	path = brouter
+	url = https://github.com/abrensch/brouter.git

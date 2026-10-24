@@ -1,0 +1,12 @@
+.git
+.gitignore
+**/.env
+**/.env.*
+!backend/.env.example
+backend/.venv
+backend/.pytest_cache
+backend/**/__pycache__
+brouter_extension/segments
+data
+docs
+tests

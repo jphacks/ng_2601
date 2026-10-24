@@ -1,0 +1,32 @@
+# macOS/editor metadata
+.DS_Store
+**/.DS_Store
+
+# Local Python environments, caches, and bytecode
+.venv/
+**/.venv/
+.pytest_cache/
+**/.pytest_cache/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+
+# Local secrets and environment files
+**/.env
+**/.env.*
+!**/.env.example
+
+# CyclerHub-back generated build marker
+/back/.cyclerhub-back-build-fingerprint
+
+# Upstream BRouter checkout. Keep it out of ordinary commits; add it as a
+# submodule explicitly when the dependency is ready to be recorded.
+/brouter/
+
+# Downloaded BRouter extension data; routing data is fetched locally
+/back/brouter_extension/segments/
+
+# Downloaded and generated external datasets
+/back/data/jartic/raw/
+/back/data/restrictions/*.geojson
+/back/data/context/*.geojson

@@ -1,0 +1,61 @@
+name: cyclerhub-back
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: cyclerhub-back
+      POSTGRES_USER: cyclerhub-back
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cyclerhub-back-local-dev}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - cyclerhub-back-postgres:/var/lib/postgresql/data
+      - ./backend/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cyclerhub-back -d cyclerhub-back"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  brouter:
+    build:
+      context: ../brouter
+    image: cyclerhub-back-brouter:local
+    volumes:
+      - ./brouter_extension/segments:/segments4:ro
+      - ./brouter_extension/profiles/japan_bicycle.brf:/profiles2/japan_bicycle.brf:ro
+    expose:
+      - "17777"
+    environment:
+      MAXTHREADS: 4
+      JAVA_OPTS: "-Xms512M -Xmx4G -DmaxRunningTime=300 -DusePOSTRequests=true"
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      BROUTER_URL: http://brouter:17777
+      ROUTING_CATALOG_PATH: /app/config/routing_catalog.json
+      RESTRICTIONS_PATH: /data/restrictions/jartic.geojson
+      JARTIC_RESTRICTIONS_PATH: /data/restrictions/jartic.geojson
+      MLIT_RESTRICTIONS_PATH: /data/restrictions/mlit.geojson
+      NPA_ACCIDENTS_PATH: /data/context/npa_accidents.geojson
+      TRAFFIC_VOLUME_PATH: /data/context/mlit_jartic_traffic.geojson
+      DATABASE_URL: postgresql://cyclerhub-back:${POSTGRES_PASSWORD:-cyclerhub-back-local-dev}@db:5432/cyclerhub-back
+    env_file:
+      - path: ./backend/.env
+        required: false
+    volumes:
+      - ./data:/data:ro
+    depends_on:
+      brouter:
+        condition: service_started
+      db:
+        condition: service_healthy
+
+volumes:
+  cyclerhub-back-postgres:
