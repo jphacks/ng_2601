@@ -26,6 +26,7 @@ clone直後に起動できる機能があるとは限りません。[アーキ�
 | 人間向け開発参加案内 | この文書。各資料への入口と運用手順 |
 | AIの作業規約 | [AGENTS.md](../AGENTS.md)。[CLAUDE.md](../CLAUDE.md)は参照のみ |
 | 現在の構成・責務・実装状態 | [architecture.md](architecture.md)。確認したコミットと根拠を添える |
+| 継続使用する配色・共通UI方針 | [Nature Ride](design-system.md)。色値の正本は[CSSトークン](../frontend/src/styles/tokens.css)。今後のUI・地図でも使用する |
 | APIの構造・通信仕様 | [api-contract.md](api-contract.md)が案内する型・仕様を正本とする。独立した型の写しを作らない |
 | 重要な判断の理由・履歴 | [decisions/](decisions/README.md)のADR。提案／採用／廃止を区別 |
 | タスク・受入条件・担当範囲 | GitHub Issue。仕様の未合意点も関係Issueで追跡 |

@@ -1,0 +1,90 @@
+[
+  {
+    "background": "rgb(255, 255, 255)",
+    "foreground": "rgb(40, 51, 38)",
+    "minimum": 4.5,
+    "name": "Text / Surface",
+    "passed": true,
+    "ratio": 13.19
+  },
+  {
+    "background": "rgb(247, 247, 242)",
+    "foreground": "rgb(40, 51, 38)",
+    "minimum": 4.5,
+    "name": "Text / Background",
+    "passed": true,
+    "ratio": 12.28
+  },
+  {
+    "background": "rgb(255, 255, 255)",
+    "foreground": "color(srgb 0.359804 0.392157 0.34902)",
+    "minimum": 4.5,
+    "name": "Muted / Surface",
+    "passed": true,
+    "ratio": 6.14
+  },
+  {
+    "background": "rgb(247, 247, 242)",
+    "foreground": "color(srgb 0.359804 0.392157 0.34902)",
+    "minimum": 4.5,
+    "name": "Muted / Background",
+    "passed": true,
+    "ratio": 5.71
+  },
+  {
+    "background": "rgb(221, 161, 94)",
+    "foreground": "rgb(40, 51, 38)",
+    "minimum": 4.5,
+    "name": "Selected text / Accent",
+    "passed": true,
+    "ratio": 5.86
+  },
+  {
+    "background": "#FFFFFF",
+    "foreground": "#386641",
+    "minimum": 4.5,
+    "name": "Primary / Surface",
+    "passed": true,
+    "ratio": 6.68
+  },
+  {
+    "background": "#FFFFFF",
+    "foreground": "rgb(56, 102, 65)",
+    "minimum": 3,
+    "name": "Focus / Surface",
+    "passed": true,
+    "ratio": 6.68
+  },
+  {
+    "background": "rgb(247, 247, 242)",
+    "foreground": "color(srgb 0.414706 0.55 0.441176)",
+    "minimum": 3,
+    "name": "Input border / Background",
+    "passed": true,
+    "ratio": 3.48
+  },
+  {
+    "background": "#FFFFFF",
+    "foreground": "color(srgb 0.414706 0.55 0.441176)",
+    "minimum": 3,
+    "name": "Input border / Surface",
+    "passed": true,
+    "ratio": 3.74
+  },
+  {
+    "background": "#FFFFFF",
+    "foreground": "#C2410C",
+    "minimum": 3,
+    "name": "Warning / Surface",
+    "passed": true,
+    "ratio": 5.18
+  },
+  {
+    "background": "#F7F7F2",
+    "foreground": "#2563EB",
+    "minimum": 3,
+    "name": "Route / Background",
+    "passed": true,
+    "ratio": 4.81
+  }
+]

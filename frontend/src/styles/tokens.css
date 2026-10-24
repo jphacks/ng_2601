@@ -1,0 +1,27 @@
+/** Nature Ride: shared palette. Keep future UI and map styles on these tokens.
+ * Route is a single route color; slope colors and thresholds belong to another issue.
+ * Usage and contrast checks: docs/design-system.md (repository root).
+ */
+:root {
+  --color-primary: #386641;
+  --color-accent: #DDA15E;
+  --color-route: #2563EB;
+  --color-background: #F7F7F2;
+  --color-surface: #FFFFFF;
+  --color-text: #283326;
+  --color-warning: #C2410C;
+
+  /* Semantic roles derive from the palette; avoid local component color literals. */
+  --color-text-muted: color-mix(in srgb, var(--color-text) 75%, var(--color-background));
+  --color-border: color-mix(in srgb, var(--color-primary) 20%, var(--color-surface));
+  --color-input-border: color-mix(in srgb, var(--color-primary) 75%, var(--color-surface));
+  --color-hover: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+  --color-active: color-mix(in srgb, var(--color-accent) 35%, var(--color-surface));
+  --color-selected: var(--color-accent);
+  --color-selected-hover: color-mix(in srgb, var(--color-accent) 85%, var(--color-surface));
+  --color-focus: var(--color-primary);
+  --color-surface-floating: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  --color-surface-attribution: color-mix(in srgb, var(--color-surface) 90%, transparent);
+  --color-overlay: color-mix(in srgb, var(--color-text) 18%, transparent);
+  --shadow-floating: 0 3px 16px color-mix(in srgb, var(--color-text) 10%, transparent);
+}

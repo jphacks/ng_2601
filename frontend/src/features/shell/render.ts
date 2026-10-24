@@ -310,7 +310,11 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}) {
     /** Feature owners supply their own content/state without changing the shell. */
     setViewContent(view: ViewId, content: HTMLElement) {
       contents.set(view, content);
-      if (currentView === view) panelBody.replaceChildren(content);
+      if (currentView === view) {
+        const restoreFocus = panelBody.contains(document.activeElement);
+        panelBody.replaceChildren(content);
+        if (restoreFocus) panelTitle.focus({ preventScroll: true });
+      }
     },
     destroy() {
       if (drawer.open) drawer.close();

@@ -2,6 +2,8 @@
 
 対象は[Issue #4](https://github.com/jphacks/ng_2601/issues/4)の画面骨格・ナビゲーション。地図・ピン・GPS・検索実行・API接続は関連Issueの担当範囲であり、この判定には含めない。モック全体の機能完成を意味しない。
 
+初期実装（`51df251`まで）のモック比較を以下に保持する。現在の配色は依頼者指定のNature Rideへ更新しており、最新の検証は末尾の追記を参照。
+
 ## 比較対象と証跡
 
 - Source visual truth: [Issueの画像モック](https://github.com/jphacks/ng_2601/issues/4#issuecomment-6380585729)。元画像1671×941。PC領域`(22,58,1162,858)`、スマホのOS表示を除いた領域`(1216,96,435,819)`を使用。
@@ -38,5 +40,15 @@
 - 実機のsafe-area／仮想キーボード、Safari、スクリーンリーダー、実地図の操作・帰属表示は未検証。#5／#15で実施する。
 
 実装チェック: 対象範囲の修正と再撮影を完了。後続担当の接続口・ライセンス・残課題は[Handoff](docs/handoffs/2026-10-24-issue-4-map-shell.md)に記録した。
+
+## Nature Ride追加の検証（2026-10-24）
+
+- 新しい配色の基準は[依頼者指定を記録した共通テーマ](docs/design-system.md)と[CSSトークン](frontend/src/styles/tokens.css)。元モックの青系配色は今回の指定で置き換える。フォント、アイコン資産、文言、パネル構成・ブレークポイントは維持。
+- 本番プレビューから取得: [PC初期](docs/verification/issue-4/nature-ride/desktop-initial.jpg)、[PCパネル](docs/verification/issue-4/nature-ride/desktop-panel.jpg)は1162×858。[スマホパネル](docs/verification/issue-4/nature-ride/mobile-panel.jpg)・[展開](docs/verification/issue-4/nature-ride/mobile-expanded.jpg)は375×812。[レイヤー](docs/verification/issue-4/nature-ride/layers.jpg)も確認。
+- [主要5領域の変更前後計測](docs/verification/issue-4/nature-ride/layout.json): PC／375pxのヘッダー、検索バー、操作群、パネル、内容領域の矩形が一致。見出しと入力欄のフォーカス輪郭はNature Rideの緑で明示する。
+- [実表示色の測定](docs/verification/issue-4/nature-ride/contrast.json): 文字・補助文字・選択状態・フォーカス・入力枠・警告・将来ルート色の11組が基準以上。砂色を白背景上の小さな文字に使わず、濃色文字と選択背景を組み合わせる。
+- CodeRabbitの3件を修正。内容置換で消えたフォーカスは見出しへ戻し、パネル外や非表示ビュー更新のフォーカスは維持。見出しに可視輪郭を付け、スマホ・低い画面でも接続済みズームを表示する。これに伴う低い画面の操作群の横並びは意図的な修正。
+- [ブラウザテスト結果](docs/verification/issue-4/nature-ride/browser-tests.json): 1162×858、375×812、375×360、812×375で各PASS (21)。新規6件はズーム可視性2件、見出し可視性1件、置換時のフォーカス3件。コンソールerror／warnなし。
+- 未検証: 実機safe-area／キーボード、Safari、スクリーンリーダー、実地図上のルート・警告。地図・勾配色・閾値の追加なし。
 
 final result: passed

@@ -46,6 +46,8 @@ FE-01では、画面 → `ApiClient` → `createMockClient`または`createHttpC
 
 FEは表示と利用者操作、BEは合意したAPIの提供を境界として調整します。ただし標高計算の配置や実データの取得責務などは未確定です。[API契約の未合意点](api-contract.md)を先に解決してください。モック結果を実測値・安全性の保証として扱いません。
 
+画面と将来の地図の配色は[Nature Ride](design-system.md)を継続使用します。色値の正本は[共通CSSトークン](../frontend/src/styles/tokens.css)。ルート色・警告色もここから参照し、機能側にパレットを複製しません。導入はPR #19の変更で、地図・API・勾配の契約は変更しません。
+
 ## 次に確認すること
 
 - FE-03 / [#5](https://github.com/jphacks/ng_2601/issues/5)ではFE-02の`mapHost`・`attribution`へ地図を接続する。シェルの開閉で地図を再作成しない。

@@ -50,9 +50,13 @@ npm run build      # 型チェック + 本番ビルド
 
 ### ブラウザテスト
 
-`npm run dev`後、`/tests/shell.html`を開く。`PASS (15)`なら地図DOM保持・操作コールバック・入力保持・共通状態・フォーカス循環・破棄の15チェックが成功。テストファイルも`npm run typecheck`の対象。本番ビルドには含めない。
+`npm run dev`後、`/tests/shell.html`を開く。`PASS (21)`なら地図DOM保持・操作コールバック・入力保持・共通状態・フォーカス循環・破棄の15チェックと、レビュー対応の6チェック（接続済みズームの表示2件、見出しフォーカス表示1件、表示更新時のフォーカス保持3件）が成功。テストファイルも`npm run typecheck`の対象。本番ビルドには含めない。
 
 レイアウトはPC、375px縦向き、横向き、キーボード相当の低いviewportで別途確認する。検証記録と実機未検証事項は[Handoff](../docs/handoffs/2026-10-24-issue-4-map-shell.md)を参照。
+
+### 継続使用するテーマ
+
+今後のUIとMapLibreの共通パレットは **Nature Ride**。[`src/styles/tokens.css`](src/styles/tokens.css)へ色値と意味別トークンを一元定義し、`shell.css`から読み込む。各コンポーネントへ色値を複製しない。使い分け・地図側からの読み取り・コントラストは[共通テーマの案内](../docs/design-system.md)を参照。勾配別の色分け・閾値は別Issue。
 
 ### 使用アイコン
 

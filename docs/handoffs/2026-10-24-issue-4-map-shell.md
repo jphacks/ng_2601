@@ -6,7 +6,7 @@
 - Issue: [#4](https://github.com/jphacks/ng_2601/issues/4) / FE-02
 - PR: [#19](https://github.com/jphacks/ng_2601/pull/19)
 - Branch: `norinori1/issue-4-map-shell`
-- Base / Saved Commit: mainの`3c29233`を基準。実装コミット`7c8b532`。文書更新を含む最新の保存済みコミットは関連PRのheadを参照
+- Base / Saved Commit: mainの`3c29233`を基準。初期実装`7c8b532`、Nature Ride追加前`51df251`。テーマ・レビュー修正を含む最新の保存済みコミットは関連PRのheadを参照
 - Working Tree: 開始時クリーン。この変更のコード・テスト・文書・検証画像だけを保存
 - Status: レビュー待ち（マージ済みを意味しない）
 - Author / Agent: Codex
@@ -58,6 +58,15 @@ Issue本文に加え、追記の[Map First仕様](https://github.com/jphacks/ng_
 - 検索入力とレイヤー選択の保持はページ内だけ。永続化やPreferences保存はしない。
 - パネル外の地図領域は操作可能だが、実際のパン・ズームと帰属文字のサイズ／重なりは#5接続時に確認する。
 - APIの未合意事項は[api-contract](../api-contract.md)に残す。このPRでBE接続済み・安全なルート案内が完成したとは扱わない。
+
+## Nature Ride追加・CodeRabbit対応（2026-10-24）
+
+- 今後の共通配色をNature Rideとする依頼者指定を反映。[tokens.css](../../frontend/src/styles/tokens.css)を色値の正本とし、操作、選択、入力、フォーカス、背景、警告、影を統一。Route／Warningも公開。継続方針と利用方法は[design-system](../design-system.md)を参照。
+- 元モックの配色は今回の依頼で置き換える。旧画像・検証は初期実装時の記録として残し、現在の証跡は[design-qaの追記](../../design-qa.md#nature-ride追加の検証2026-10-24)を参照。Bootstrap Iconsの使用・ライセンスは維持。
+- CodeRabbitの[表示更新時のフォーカス](https://github.com/jphacks/ng_2601/pull/19#discussion_r4366401075)、[見出しのフォーカス表示](https://github.com/jphacks/ng_2601/pull/19#discussion_r4366401079)、[接続済みズームの表示](https://github.com/jphacks/ng_2601/pull/19#discussion_r4366401082)を確認して修正。小画面で無効なズームだけを隠し、低い画面の操作群は横並びにする。新機能は追加していない。
+- `frontend/`で`npm run typecheck`・`npm run build`成功。Edgeの`/tests/shell.html`でPC 1162×858、375×812、375×360、812×375の各サイズで**PASS (21)**。旧15件に上記レビューの回帰6件を追加。
+- 本番プレビューで11組のコントラストを測定し、文字4.5:1／対象UI3:1の基準以上を確認。PC／375px通常パネルの主要5領域は変更前と寸法が一致。測定・試験結果は[検証ディレクトリ](../verification/issue-4/nature-ride/)に保存。
+- 実機・Safari・実地図の未検証事項は従来どおり。勾配色・閾値・API・依存関係の変更なし。
 
 ## Next Actions
 
