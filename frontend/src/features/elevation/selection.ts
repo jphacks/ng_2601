@@ -120,18 +120,25 @@ export function locateRouteCoordinate(
   };
 }
 
-/** 距離を含む勾配区間の添字。区間は始点順に並び、重複しない前提（#8の生成結果）。 */
+/**
+ * 距離を含む勾配区間の添字。区間は始点順に並び、重複しない前提（#8の生成結果）。
+ * 隣り合う区間は境界の距離を両方が含むため、先の区間を優先する。
+ */
 export function findSegmentIndex(segments: readonly RouteGradientSegment[], distanceM: number): number {
   let low = 0;
   let high = segments.length - 1;
+  let match = -1;
   while (low <= high) {
     const mid = Math.floor((low + high) / 2);
     const segment = segments[mid]!;
     if (distanceM < segment.fromM) high = mid - 1;
     else if (distanceM > segment.toM) low = mid + 1;
-    else return mid;
+    else {
+      match = mid;
+      high = mid - 1;
+    }
   }
-  return -1;
+  return match;
 }
 
 /** グラフの位置・地図の区間クリックを、経路座標・標高・勾配区間へまとめて対応付ける。 */

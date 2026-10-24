@@ -143,6 +143,12 @@ const ROAD_LAYERS = [ROAD_HALO_LINE, ROAD_HALO_CIRCLE, ROAD_FILL, ROAD_LINE, ROA
 const ROAD_HIT_LAYERS = [ROAD_FILL, ROAD_CIRCLE, ROAD_LINE, ROAD_LINE_UNVERIFIED, ROAD_LINE_STALE];
 const HIT_TOLERANCE_PX = 8;
 
+/** 地図のクリック判定と区間一覧で同じ文言を使う。#8の区間表示を1か所の整形に寄せる。 */
+function segmentText(properties: Record<string, unknown> | null | undefined): string | null {
+  const facts = segmentFacts(properties);
+  return facts ? formatSegmentText(facts) : null;
+}
+
 /** 地図のクリック判定と区間セレクターで同じ説明文を作れるよう、区間を地物の属性に落とす。 */
 function segmentProperties(routeId: string, segment: RouteGradientSegment, index: number): Record<string, unknown> {
   return {
@@ -236,7 +242,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
       placeholder.value = "";
       options.push(placeholder);
       segments.forEach((segment, index) => {
-        const option = el("option", { text: ((facts) => facts ? formatSegmentText(facts) : null)(segmentFacts(segmentProperties(gradientRouteId ?? "", segment, index))) ?? "" });
+        const option = el("option", { text: segmentText(segmentProperties(gradientRouteId ?? "", segment, index)) ?? "" });
         option.value = String(index);
         options.push(option);
       });
@@ -262,22 +268,6 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
     segmentSelect.value = "";
     syncGradientPanel();
   }
-
-  segmentSelect.addEventListener("change", () => {
-    const index = segmentSelect.value === "" ? null : Number(segmentSelect.value);
-    const segment = index === null ? undefined : gradientSegments?.[index];
-    if (index === null || !segment) {
-      clearGradientSelection();
-      return;
-    }
-    const text = segmentFacts(segmentProperties(gradientRouteId ?? "", segment, index));
-    if (text === null) {
-      clearGradientSelection();
-      return;
-    }
-    showGradientSelection(formatSegmentText(text), index);
-    handlers.onSelectRouteSegment?.((segment.fromM + segment.toM) / 2);
-  });
 
   function selectionKey(): string {
     return `${gradientRouteId ?? ""}:${routeSelection?.segmentIndex ?? -1}:${routeSelection?.windowFromM ?? ""}:${routeSelection?.windowToM ?? ""}`;
@@ -319,13 +309,47 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
   /** グラフで選んだ位置をマーカーで示す。区間ハイライトは applyRouteSelectionFilter が担当する。 */
   function applyRouteSelection(): void {
     applyRouteSelectionFilter();
-    if (!routeSelection) {
+    syncGradientSelection();
+    // ルート非表示の間はルート上の選択も出さない（パネルと同じくレイヤー表示に合わせる）。
+    if (!routeSelection || !visible.routes) {
       routeCursor?.remove();
       return;
     }
     routeCursor ??= new maplibregl.Marker({ element: createRouteCursor(), anchor: "center" });
     routeCursor.setLngLat(routeSelection.lngLat);
     if (map && !routeCursor.getElement().isConnected) routeCursor.addTo(map);
+  }
+
+  /**
+   * #8の区間一覧（キーボード操作）も#9の距離ベースの選択へ流す。
+   * 選択状態は link.ts の distanceM 1つに集約し、一覧とグラフが別々の選択を持たないようにする。
+   */
+  segmentSelect.addEventListener("change", () => {
+    const index = segmentSelect.value === "" ? null : Number(segmentSelect.value);
+    const segment = index === null ? undefined : gradientSegments?.[index];
+    const text = index === null || !segment ? null : segmentText(segmentProperties(gradientRouteId ?? "", segment, index));
+    if (!segment || text === null) {
+      clearGradientSelection();
+      return;
+    }
+    // 区間の中央を選び、グラフのスライダー・数値表示も同じ位置へ動かす（#9）。
+    if (handlers.onSelectRouteSegment) handlers.onSelectRouteSegment((segment.fromM + segment.toM) / 2);
+    else showGradientSelection(text, index);
+  });
+
+  /** 共有の選択位置（距離）から区間の文言と一覧の値を導く。グラフ側の選択にも表示だけを追従させる。 */
+  function syncGradientSelection(): void {
+    const index = visible.routes ? routeSelection?.segmentIndex : null;
+    const segment = typeof index === "number" && index >= 0 ? gradientSegments?.[index] : undefined;
+    const text = !segment || typeof index !== "number" || index < 0
+      ? null
+      : segmentText(segmentProperties(gradientRouteId ?? "", segment, index));
+    if (typeof index !== "number" || index < 0 || text === null) {
+      if (selectedSegmentIndex !== null || !gradientSelection.hidden) clearGradientSelection();
+      return;
+    }
+    if (text === gradientSelection.textContent && selectedSegmentIndex === index && !gradientSelection.hidden) return;
+    showGradientSelection(text, index);
   }
 
   function syncVisibility(): void {
@@ -725,6 +749,8 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
     setLayerVisible(id, on) {
       visible[id] = on;
       syncVisibility();
+      // ルートの再表示では選択マーカーと区間表示を今の選択へ戻す。
+      applyRouteSelection();
       notify();
     },
     isLayerVisible: (id) => visible[id],

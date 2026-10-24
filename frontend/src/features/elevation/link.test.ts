@@ -92,6 +92,24 @@ describe("route link", () => {
     expect(chartCalls.at(-1)![0]!.distanceM).toBeCloseTo(180, 6);
   });
 
+  it("restores the selected distance after the same route's analysis is reloaded", () => {
+    const { link, selectionTargets, chartCalls } = setup();
+    const route = makeRoute();
+    const analysis = makeAnalysis((distance) => 10 + distance * 0.02);
+    link.setRoute(route, analysis, buildRouteGradientSegments(ROUTE, analysis));
+    link.select(180);
+
+    // 再解析中は解析がないため表示は解除するが、距離は保持する。
+    link.setRoute(route, null, null);
+    expect(selectionTargets.at(-1)).toBeNull();
+    expect(chartCalls.at(-1)![0]).toBeNull();
+
+    const reloaded = makeAnalysis((distance) => 10 + distance * 0.02);
+    link.setRoute(route, reloaded, buildRouteGradientSegments(ROUTE, reloaded));
+    expect(selectionTargets.at(-1)).not.toBeNull();
+    expect(chartCalls.at(-1)![0]!.distanceM).toBeCloseTo(180, 6);
+  });
+
   it("keeps a position inside a DEM gap linked, without inventing an elevation or grade", () => {
     const { link, chartCalls } = setup();
     const analysis = makeAnalysis((distance) => (distance >= 130 && distance <= 240 ? null : 10 + distance * 0.02));

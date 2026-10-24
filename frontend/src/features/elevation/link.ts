@@ -16,7 +16,7 @@ export interface RouteSelectionSink {
 export interface RouteLink {
   /**
    * 表示中ルートと標高解析・勾配区間を差し替える。
-   * 同じルートの再描画では選択位置を維持し、別ルートになったら解除する。
+   * 同じルートの再描画・再解析では選択位置を維持し、別ルートになったら解除する。
    */
   setRoute(route: Route | null, analysis: RouteAnalysis | null, segments: readonly RouteGradientSegment[] | null): void;
   /** グラフ・地図のどちらからでも呼ぶ。経路に沿った距離(m)で選択する。 */
@@ -37,6 +37,8 @@ export function createRouteLink(surface: RouteSelectionSurface): RouteLink {
   let analysis: RouteAnalysis | null = null;
   let segments: readonly RouteGradientSegment[] = EMPTY_SEGMENTS;
   let selection: RouteSelection | null = null;
+  /** 解析の再取得中も保持する選択距離。同じルートで解析が戻ったら同じ位置へ戻す。 */
+  let selectedDistanceM: number | null = null;
   let chart: RouteSelectionSink | null = null;
 
   function segmentOf(value: RouteSelection | null): RouteGradientSegment | null {
@@ -59,8 +61,9 @@ export function createRouteLink(surface: RouteSelectionSurface): RouteLink {
 
   /** 解析・区間が変わったとき、同じ距離のまま座標と勾配区間を対応付け直す。 */
   function recompute(): void {
-    if (!selection || !analysis) return;
-    selection = findRouteSelection(analysis.points, segments, selection.distanceM);
+    selection = analysis && selectedDistanceM !== null
+      ? findRouteSelection(analysis.points, segments, selectedDistanceM)
+      : null;
   }
 
   return {
@@ -71,13 +74,19 @@ export function createRouteLink(surface: RouteSelectionSurface): RouteLink {
       route = nextRoute;
       analysis = nextAnalysis;
       segments = nextList;
-      // 別ルート・解析解除（再取得中など）では前の位置を引き継がない。
-      if (routeChanged || !analysis) selection = null;
-      else recompute();
+      if (routeChanged) {
+        // 別ルートでは前の位置を引き継がない。
+        selectedDistanceM = null;
+        selection = null;
+      } else {
+        // 同じルートの再解析（取得中→完了）では距離を残し、解析が戻ったら同じ位置へ戻す。
+        recompute();
+      }
       publish();
     },
     select(distanceM) {
       if (!analysis || !Number.isFinite(distanceM)) return;
+      selectedDistanceM = distanceM;
       selection = findRouteSelection(analysis.points, segments, distanceM);
       publish();
     },

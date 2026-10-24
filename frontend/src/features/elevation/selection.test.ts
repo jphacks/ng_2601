@@ -138,6 +138,18 @@ describe("segment lookup", () => {
     const segments = [makeSegment({ fromM: 0, toM: 100 }), makeSegment({ fromM: 150, toM: 250 })];
     expect(findSegmentIndex(segments, 120)).toBe(-1);
   });
+
+  it("returns the first interval when adjacent intervals share a boundary", () => {
+    const segments = [
+      makeSegment({ fromM: 0, toM: 100 }),
+      makeSegment({ fromM: 100, toM: 200 }),
+      makeSegment({ fromM: 200, toM: 300 }),
+    ];
+    // 境界(100m, 200m)は両側の区間に含まれるため、先の区間の勾配・計測窓を選ぶ。
+    expect(findSegmentIndex(segments, 100)).toBe(0);
+    expect(findSegmentIndex(segments, 200)).toBe(1);
+    expect(findSegmentIndex(segments, 250)).toBe(2);
+  });
 });
 
 describe("selection readout", () => {
