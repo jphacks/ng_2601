@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -215,10 +216,11 @@ def _segments_intersect(a: list[float], b: list[float], c: list[float], d: list[
 def _point_near_segment(point: list[float], a: list[float], b: list[float]) -> bool:
     if len(point) < 2:
         return False
-    # 20 m tolerance in degrees is sufficient for an alert point matched to a route line.
-    tolerance = 0.0002
-    return (
-        min(a[0], b[0]) - tolerance <= point[0] <= max(a[0], b[0]) + tolerance
-        and min(a[1], b[1]) - tolerance <= point[1] <= max(a[1], b[1]) + tolerance
-        and abs(_orientation(a, b, point)) <= tolerance
-    )
+    scale_x = 111_000 * math.cos(math.radians((a[1] + b[1]) / 2))
+    scale_y = 111_000
+    px, py = point[0] * scale_x, point[1] * scale_y
+    ax, ay = a[0] * scale_x, a[1] * scale_y
+    bx, by = b[0] * scale_x, b[1] * scale_y
+    dx, dy = bx - ax, by - ay
+    t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy or 1)))
+    return math.hypot(px - (ax + t * dx), py - (ay + t * dy)) <= 20.0

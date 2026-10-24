@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from datetime import datetime
 from typing import Literal
+from uuid import UUID
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -10,6 +11,7 @@ import psycopg
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
+from starlette.concurrency import run_in_threadpool
 
 from .auth import AuthService, ModeratorTokenVerifier, build_auth_router
 from .catalog import CatalogError, RoutingCatalog
@@ -23,7 +25,7 @@ BROUTER_URL = os.getenv("BROUTER_URL", "http://127.0.0.1:17777").rstrip("/")
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 auth_service = AuthService(
     DATABASE_URL,
-    session_secret=os.getenv("SESSION_SECRET", "local-only-change-me"),
+    session_secret=os.getenv("SESSION_SECRET", ""),
     frontend_origin=os.getenv("FRONTEND_ORIGIN", "http://localhost:5173"),
 )
 user_preference_store = PostgresUserPreferenceStore(DATABASE_URL) if DATABASE_URL else NoUserPreferenceStore()
@@ -47,6 +49,12 @@ app.add_middleware(
 app.include_router(build_auth_router(auth_service))
 
 
+@app.on_event("startup")
+async def validate_security_configuration() -> None:
+    if len(auth_service.session_secret) < 32:
+        raise RuntimeError("SESSION_SECRET must be configured with at least 32 characters")
+
+
 class Coordinate(BaseModel):
     lat: float = Field(ge=-90, le=90)
     lon: float = Field(ge=-180, le=180)
@@ -56,7 +64,6 @@ class RouteRequest(BaseModel):
     start: Coordinate
     end: Coordinate
     bike_type: str | None = None
-    user_id: str | None = Field(default=None, max_length=128)
     preferences: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("bike_type")
@@ -99,14 +106,10 @@ async def route(
     request: RouteRequest,
     authorization: str | None = Header(default=None),
 ) -> dict[str, object]:
-    authenticated_user_id = request.user_id
-    if authenticated_user_id is None and authorization:
+    authenticated_user_id = None
+    if authorization:
         authenticated_user_id = auth_service.user_id_from_header(authorization)
-    profile = (
-        user_preference_store.profile_for(authenticated_user_id)
-        if authenticated_user_id
-        else {}
-    )
+    profile = await run_in_threadpool(user_preference_store.profile_for, authenticated_user_id) if authenticated_user_id else {}
     bike_type = request.bike_type or profile.get("bike_type", "city")
     saved_preferences = {
         key: value
@@ -183,7 +186,7 @@ async def route(
 
 @app.patch("/v1/moderation/observations/{observation_id}")
 async def moderate_observation(
-    observation_id: str,
+    observation_id: UUID,
     request: ObservationModerationUpdate,
     authorization: str | None = Header(default=None),
 ) -> dict[str, object]:
@@ -194,11 +197,15 @@ async def moderate_observation(
         raise HTTPException(status_code=422, detail="At least one moderation field is required")
     assignments = ", ".join(f"{key} = %s" for key in changes)
     try:
-        with psycopg.connect(DATABASE_URL) as connection:
-            row = connection.execute(
-                f"UPDATE observations SET {assignments}, updated_at = now() WHERE id = %s RETURNING id, status, verification_state, updated_at",
-                (*changes.values(), observation_id),
-            ).fetchone()
+        def update_observation() -> object:
+            with psycopg.connect(DATABASE_URL) as connection:
+                return connection.execute(
+                    f"UPDATE observations SET {assignments}, updated_at = now() WHERE id = %s RETURNING id, status, verification_state, updated_at",
+                    (*changes.values(), observation_id),
+                ).fetchone()
+        row = await run_in_threadpool(update_observation)
+    except psycopg.DataError as error:
+        raise HTTPException(status_code=422, detail="Invalid observation ID") from error
     except psycopg.Error as error:
         raise HTTPException(status_code=503, detail="Database is unavailable") from error
     if not row:

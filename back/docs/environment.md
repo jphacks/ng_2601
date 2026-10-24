@@ -13,7 +13,7 @@ Keep at least 1 GB free for the Japan RD5 data; the current set is about 501 MB.
 - Python 3
 - BRouter
 
-## Prerequesties
+## Prerequisites
 ```bash
 cd back
 ./scripts/setup.sh

@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: cyclerhub-back
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cyclerhub-back-local-dev}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - cyclerhub-back-postgres:/var/lib/postgresql/data
       - ./backend/migrations:/docker-entrypoint-initdb.d:ro
@@ -46,13 +46,6 @@ services:
       NPA_ACCIDENTS_PATH: /data/context/npa_accidents.geojson
       TRAFFIC_VOLUME_PATH: /data/context/mlit_jartic_traffic.geojson
       DATABASE_URL: postgresql://cyclerhub-back:${POSTGRES_PASSWORD:-cyclerhub-back-local-dev}@db:5432/cyclerhub-back
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-dummy-google-client-id}
-      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-http://localhost:8080/v1/auth/google/callback}
-      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5173}
-      SMTP_HOST: ${SMTP_HOST:-smtp-relay.gmail.com}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_SENDER: ${SMTP_SENDER:-depurou@gmail.com}
-      SMTP_USERNAME: ${SMTP_USERNAME:-lost.of.milk1@gmail.com}
     env_file:
       - ./backend/.env
     volumes:
