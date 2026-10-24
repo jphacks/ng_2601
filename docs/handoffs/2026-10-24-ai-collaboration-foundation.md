@@ -4,7 +4,7 @@
 
 - Updated: 2026-10-24
 - Issue: この導入に対応するIssueなし。FE-01の[#3](https://github.com/jphacks/ng_2601/issues/3)は参照のみで、完了対象ではない
-- PR: [本ブランチのPR](https://github.com/jphacks/ng_2601/pulls?q=is%3Apr%20head%3Anorinori1%2Fai-collab-knowledge-base)
+- PR: [#17](https://github.com/jphacks/ng_2601/pull/17)
 - Branch: `norinori1/ai-collab-knowledge-base`（作業用に用意済みの専用ブランチを使用）
 - Base / Saved Commit: mainの`c5e8aec728c92abbb6792770eb057dd44e21a423`を基準。保存済みコミットはこのファイルを含むPRのheadを参照
 - Working Tree: 開始時クリーン。変更はこのPRの文書だけを保存する
