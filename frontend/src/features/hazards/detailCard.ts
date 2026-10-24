@@ -1,10 +1,9 @@
 import { el } from "../../ui/dom";
-import { icon, type IconName } from "../../ui/icon";
+import { icon } from "../../ui/icon";
 import { CATEGORY_LABEL, INFO_CLASS_LABEL } from "./catalog";
 import { evaluateItem, formatStamp, type Freshness } from "./freshness";
-import type { InfoClass, RoadInfoItem } from "./types";
+import type { RoadInfoItem } from "./types";
 
-const INFO_CLASS_ICON: Record<InfoClass, IconName> = { official: "shield", statistics: "chart", community: "person" };
 const DAY_LABELS = ["月", "火", "水", "木", "金", "土", "日"];
 
 export function scheduleText(schedule: NonNullable<RoadInfoItem["schedule"]>): string {
@@ -29,7 +28,7 @@ export function stateBadges(item: RoadInfoItem, freshness: Freshness): HTMLEleme
 
 function infoClassIcon(item: RoadInfoItem): HTMLElement {
   const label = `${CATEGORY_LABEL[item.category]} · ${INFO_CLASS_LABEL[item.infoClass]}`;
-  const wrap = el("span", { className: "hazard-detail__class" }, [icon(INFO_CLASS_ICON[item.infoClass])]);
+  const wrap = el("span", { className: "hazard-detail__class" }, [icon("person")]);
   wrap.setAttribute("role", "img");
   wrap.setAttribute("aria-label", label);
   wrap.title = label;
