@@ -164,7 +164,9 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}) {
   }
   const preferencesLink = textButton("経路の設定", "sliders");
   preferencesLink.addEventListener("click", () => openView("preferences", preferencesLink));
-  routeForm.append(preferencesLink, renderState({
+  routeForm.append(el("details", { className: "route-options" }, [
+    el("summary", { text: "経路設定" }), preferencesLink,
+  ]), renderState({
     kind: "empty", title: "ルート検索は準備中です", description: "目的地までのルートを、ここから探せるようになります。",
   }));
   contents.set("search", routeForm);
@@ -214,6 +216,24 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}) {
   let currentView: ViewId | null = null;
   let returnFocus: HTMLElement = searchButton;
   let expanded = false;
+  let searchMovement: Animation | undefined;
+
+  /** Reposition the same launcher with CSS; keep its DOM, listeners and state. */
+  function placeSearchBar(searchOpen: boolean) {
+    if (shell.dataset.searchOpen === String(searchOpen)) return;
+    const from = searchButton.getBoundingClientRect();
+    searchMovement?.cancel();
+    shell.dataset.searchOpen = String(searchOpen);
+    const to = searchButton.getBoundingClientRect();
+    if (from.width && to.width && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      searchMovement = searchButton.animate([
+        { transform: `translate(${from.left - to.left}px, ${from.top - to.top}px)` },
+        { transform: "none" },
+      ], { duration: 230, easing: "ease-out" });
+    }
+  }
+
+  const panelFocusTarget = () => currentView === "search" ? searchButton : panelTitle;
 
   function updateExpanded() {
     shell.dataset.expanded = String(expanded);
@@ -230,9 +250,10 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}) {
       expanded = false;
     }
     currentView = view;
-    shell.dataset.panelOpen = "true";
     panel.hidden = false;
     panelTitle.textContent = views[view].title;
+    placeSearchBar(view === "search");
+    shell.dataset.panelOpen = "true";
     panelBody.replaceChildren(contents.get(view)!);
     panelBody.scrollTop = 0;
     for (const [id, nav] of navButtons) {
@@ -242,14 +263,15 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}) {
     searchButton.setAttribute("aria-expanded", String(view === "search"));
     layersButton.setAttribute("aria-expanded", String(view === "layers"));
     updateExpanded();
-    panelTitle.focus({ preventScroll: true });
+    panelFocusTarget().focus({ preventScroll: true });
   }
 
   function closePanel() {
     if (!currentView) return;
     currentView = null;
-    panel.hidden = true;
     shell.dataset.panelOpen = "false";
+    placeSearchBar(false);
+    panel.hidden = true;
     searchButton.setAttribute("aria-expanded", "false");
     layersButton.setAttribute("aria-expanded", "false");
     if (returnFocus.isConnected && !panel.contains(returnFocus)) returnFocus.focus({ preventScroll: true });
@@ -294,9 +316,22 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}) {
 
   // Use the visible viewport so a virtual keyboard cannot cover sheet controls.
   const viewport = window.visualViewport;
+  let viewportFrame: number | undefined;
   const syncViewport = () => {
+    searchMovement?.cancel();
     shell.style.setProperty("--viewport-height", `${viewport?.height ?? window.innerHeight}px`);
     shell.style.setProperty("--viewport-top", `${viewport?.offsetTop ?? 0}px`);
+    if (viewportFrame !== undefined) cancelAnimationFrame(viewportFrame);
+    viewportFrame = undefined;
+    const focused = document.activeElement;
+    if (focused instanceof HTMLElement && panelBody.contains(focused)) {
+      viewportFrame = requestAnimationFrame(() => {
+        viewportFrame = undefined;
+        if (document.activeElement === focused && focused.isConnected) {
+          focused.scrollIntoView({ block: "nearest", inline: "nearest" });
+        }
+      });
+    }
   };
   viewport?.addEventListener("resize", syncViewport);
   viewport?.addEventListener("scroll", syncViewport);
@@ -322,7 +357,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}) {
       if (currentView === view) {
         const restoreFocus = panelBody.contains(document.activeElement);
         panelBody.replaceChildren(content);
-        if (restoreFocus) panelTitle.focus({ preventScroll: true });
+        if (restoreFocus) panelFocusTarget().focus({ preventScroll: true });
       }
     },
     destroy() {
@@ -331,6 +366,8 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}) {
       viewport?.removeEventListener("scroll", syncViewport);
       window.removeEventListener("resize", syncViewport);
       attributionObserver.disconnect();
+      searchMovement?.cancel();
+      if (viewportFrame !== undefined) cancelAnimationFrame(viewportFrame);
       shell.remove();
     },
   };

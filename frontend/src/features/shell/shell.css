@@ -42,6 +42,7 @@ button:active:not(:disabled) { background-color: var(--color-active); }
   --safe-right: env(safe-area-inset-right, 0px);
   --search-height: 70px;
   --attribution-space: 24px;
+  --search-panel-top: calc(var(--edge) + var(--safe-top) + var(--search-height) + 12px);
 }
 .map-surface, .map-host { position: absolute; inset: 0; }
 .map-surface { background: var(--color-background); }
@@ -78,6 +79,13 @@ button:active:not(:disabled) { background-color: var(--color-active); }
   font-size: 21px; font-weight: 600; letter-spacing: .05em;
 }
 .search-launcher span:last-child { color: var(--color-text-muted); }
+.app-shell[data-search-open="true"] > .search-launcher {
+  top: calc(var(--edge) + var(--safe-top)); bottom: auto; z-index: 2;
+}
+.app-shell[data-search-open="true"] .feature-panel { top: var(--search-panel-top); }
+.app-shell[data-search-open="true"] .floating-header {
+  top: var(--search-panel-top); left: auto; right: calc(var(--edge) + var(--safe-right));
+}
 .map-controls {
   position: absolute; right: calc(var(--edge) + var(--safe-right));
   bottom: calc(80px + var(--attribution-space) + var(--safe-bottom)); display: flex; flex-direction: column; gap: 10px;
@@ -122,7 +130,9 @@ button:active:not(:disabled) { background-color: var(--color-active); }
 }
 .navigation-button > span:nth-child(2) { flex: 1; }
 .navigation-button > .icon:last-child { width: 16px; height: 16px; flex-basis: 16px; color: var(--color-text-muted); }
-.route-fields > .navigation-button { background: var(--color-background); }
+.route-options { background: var(--color-background); border-radius: 14px; }
+.route-options > summary { padding: 14px; min-height: 48px; cursor: pointer; font-size: 14px; }
+.route-options > .navigation-button { background: var(--color-background); }
 .muted { font-size: 14px; color: var(--color-text-muted); line-height: 1.8; margin: 8px 0 0; }
 .view-state { padding: 30px 4px; text-align: center; }
 .view-state > .icon { width: 32px; height: 32px; color: var(--color-primary); }
@@ -153,6 +163,10 @@ button:active:not(:disabled) { background-color: var(--color-active); }
 .skip-link { position: absolute; top: 8px; left: 50%; transform: translate(-50%, -200%); padding: 12px; background: var(--color-surface); border-radius: 8px; z-index: 5; color: var(--color-primary); }
 .skip-link:focus { transform: translateX(-50%); }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes search-panel-in { from { transform: translateY(6px); } to { transform: none; } }
+@media (prefers-reduced-motion: no-preference) {
+  .app-shell[data-search-open="true"] .feature-panel { animation: search-panel-in 230ms ease-out; }
+}
 @media (prefers-reduced-motion: reduce) { .view-state--loading > .icon { animation: none; } }
 @media (max-width: 767px) {
   .app-shell { --edge: 16px; --search-height: 60px; }
@@ -167,7 +181,7 @@ button:active:not(:disabled) { background-color: var(--color-active); }
     border-radius: 24px 24px 16px 16px;
   }
   .app-shell[data-expanded="true"] .feature-panel { height: calc(100% - 80px - var(--attribution-space) - var(--safe-top) - var(--safe-bottom)); }
-  .app-shell[data-panel-open="true"] .search-launcher { display: none; }
+  .app-shell[data-panel-open="true"]:not([data-search-open="true"]) > .search-launcher { display: none; }
   .app-shell[data-panel-open="true"] .map-controls { top: calc(16px + var(--safe-top)); bottom: auto; flex-direction: row; gap: 6px; }
   .app-shell[data-panel-open="true"] .map-controls .icon-button { width: 44px; height: 44px; }
   .panel-header { padding: 10px 14px 6px 20px; }
@@ -175,6 +189,23 @@ button:active:not(:disabled) { background-color: var(--color-active); }
   .panel-header h2 { font-size: 18px; }
   .sheet-resize { display: inline-flex; }
   .panel-body { padding: 20px; }
+  .app-shell[data-search-open="true"] .feature-panel {
+    top: var(--search-panel-top); bottom: auto;
+    left: calc(var(--edge) + var(--safe-left));
+    width: calc(100% - 2 * var(--edge) - var(--safe-left) - var(--safe-right));
+    height: 65%;
+    max-height: calc(100% - var(--search-panel-top) - var(--attribution-space) - var(--safe-bottom) - 72px);
+  }
+  .app-shell[data-search-open="true"][data-expanded="true"] .feature-panel { height: 100%; }
+  .app-shell[data-search-open="true"] .floating-header {
+    top: auto; right: auto; left: calc(var(--edge) + var(--safe-left));
+    bottom: calc(var(--attribution-space) + var(--safe-bottom) + 16px);
+  }
+  .app-shell[data-search-open="true"] .floating-header .icon-button { width: 44px; height: 44px; }
+  .app-shell[data-search-open="true"] .map-controls {
+    top: auto; bottom: calc(var(--attribution-space) + var(--safe-bottom) + 16px);
+    flex-direction: row;
+  }
 }
 @media (max-height: 500px) {
   .app-shell { --edge: 12px; --search-height: 48px; }

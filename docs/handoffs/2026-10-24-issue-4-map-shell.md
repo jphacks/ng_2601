@@ -81,6 +81,15 @@ Issue本文に加え、追記の[Map First仕様](https://github.com/jphacks/ng_
 3. #6・#10・#11・#12担当は`setViewContent`へ機能画面／共通状態を渡す。APIの未合意事項は各Issueで調整する。
 4. #14は現在地操作、#15は実機safe-area・キーボード・地図結合を確認する。
 
+## 検索UI統合・上部全幅化（2026-10-24の追加指示）
+
+- 基準: `7f0127c`。依頼者の最新指示を優先し、検索バーはパネル内ではなく**上部全幅**へ配置。PCは直下の左パネル、スマホは直下の画面幅パネル・高さ65%を基本とし、キーボード相当の低い画面では上限を優先する。
+- 再利用: `render.ts`の既存`searchButton`を同じ親DOMのまま維持し、CSS属性セレクタで上下を切り替える。既存ハンドラを付け直したりバーを複製したりしない。`routeForm`・入力・設定ボタンも再利用し、`contents`に同じDOMを保持する。既存設定ボタンは折りたたみ内へ配置。
+- 移動230ms、軽いパネル展開アニメーション、reduced-motion対応。viewport変更では移動をキャンセルし、フォーカス中の入力を内部スクロールで見える位置へ戻す。検索候補・検索実行・設定保存は元々未接続のため、今回の再配置で新規実装したとは扱わない。
+- 主要変更: [render.ts](../../frontend/src/features/shell/render.ts)、[shell.css](../../frontend/src/features/shell/shell.css)、[shell.test.ts](../../frontend/tests/shell.test.ts)。依存・API・ルートREADMEの変更なし。
+- 検証: `frontend/`で`npm run typecheck`・`npm run build`成功。既存26件に統合8件を追加し、PC 1162×858、375×812、375×360、812×375で各**PASS (34)**。Lintスクリプトなし。既存設定導線・道路情報・口コミ切替、開閉後の入力保持も本番プレビューで確認。
+- 375×360へ縮小後、バーが上部・幅351pxで一重表示、フォーカス中の目的地欄が内部スクロール領域内に収まることを確認。実機・Safari・reduced-motion設定切替の実動作は未検証。結果・画像は[最新QA](../../design-qa.md)と[統合検証ディレクトリ](../verification/issue-4/search-integration/)を参照。
+
 ## References
 
 [Issue #4](https://github.com/jphacks/ng_2601/issues/4)、[FE Epic #2](https://github.com/jphacks/ng_2601/issues/2)、[マージ済みFE-01 #16](https://github.com/jphacks/ng_2601/pull/16)、[過去の文書基盤Handoff](2026-10-24-ai-collaboration-foundation.md)。

@@ -29,6 +29,10 @@ function connectedZoomsAreVisible(): boolean {
   });
 }
 
+function finishAnimations() {
+  for (const animation of root.getAnimations({ subtree: true })) animation.finish();
+}
+
 try {
   activeShell = renderShell(root);
   assert(find("#feature-panel").hidden, "初期表示ではパネルが閉じている");
@@ -56,16 +60,49 @@ try {
   for (const control of root.querySelectorAll<HTMLButtonElement>(".map-control")) control.click();
   assert(actions.join() === "north,locate,zoomIn,zoomOut", "接続した地図操作を対応するハンドラへ渡す");
   shell.attribution.textContent = "Test attribution";
-  find<HTMLButtonElement>(".search-launcher").click();
-  assert(!find("#feature-panel").hidden && document.activeElement?.id === "panel-title", "検索を開いて見出しへフォーカスする");
-  assert(getComputedStyle(find("#panel-title")).outlineStyle !== "none", "フォーカスした見出しに視覚的な表示がある");
+  const searchBar = find<HTMLButtonElement>(".search-launcher");
+  let launcherEvents = 0;
+  searchBar.addEventListener("click", () => launcherEvents++);
+  searchBar.click();
+  finishAnimations();
+  assert(!find("#feature-panel").hidden && document.activeElement === searchBar, "検索を開いて同じ検索バーへフォーカスする");
+  assert(getComputedStyle(searchBar).outlineStyle !== "none", "フォーカスした検索バーに視覚的な表示がある");
+  const barRect = searchBar.getBoundingClientRect();
+  const searchPanelRect = find("#feature-panel").getBoundingClientRect();
+  assert(searchBar.parentElement === find(".app-shell") && !find("#feature-panel").contains(searchBar)
+    && root.querySelectorAll(".search-launcher").length === 1 && barRect.width > innerWidth * .85
+    && barRect.bottom < searchPanelRect.top, "同じ検索バーだけをパネル外の上部全幅で表示する");
+  assert(innerWidth < 768
+    ? searchPanelRect.width > innerWidth * .85 && searchPanelRect.height <= innerHeight * .7
+    : searchPanelRect.width < innerWidth * .6 && searchPanelRect.left < innerWidth * .1,
+    "PCは左パネル、スマホは画面幅に合う高さ制限付きパネルを表示する");
+  const originInput = find<HTMLInputElement>("#origin");
+  const destinationInput = find<HTMLInputElement>("#destination");
+  destinationInput.value = "上野公園";
+  assert(root.querySelectorAll('input[type="text"]').length === 2, "新しい検索入力欄を増やさない");
+  const routeOptions = find<HTMLDetailsElement>(".route-options");
+  assert(!routeOptions.open, "経路設定は既存入力の後ろで折りたたむ");
+  routeOptions.open = true;
+  find<HTMLButtonElement>(".route-options .navigation-button").click();
+  const settingsOpened = find("#panel-title").textContent === "設定";
+  shell.openView("search");
+  assert(settingsOpened && find(".route-options") === routeOptions && routeOptions.open,
+    "既存設定への導線と折りたたみ状態をタブ切替後も維持する");
   assert(connectedZoomsAreVisible(), "接続したズーム操作がパネルを開いても表示領域内にある");
   find<HTMLInputElement>("#origin").value = "東京駅";
   shell.openView("reviews");
   shell.openView("search");
   assert(find<HTMLInputElement>("#origin").value === "東京駅", "ビュー切替で入力を保持する");
+  assert(find(".search-launcher") === searchBar && find("#origin") === originInput && find("#destination") === destinationInput
+    && destinationInput.value === "上野公園", "タブ切替でも検索バーと入力DOM・目的地を保持する");
   shell.closePanel();
   assert(document.activeElement?.classList.contains("search-launcher"), "閉じると起点の検索ボタンへ戻る");
+  assert(searchBar.parentElement?.classList.contains("app-shell") && !find("#feature-panel").contains(searchBar)
+    && root.querySelectorAll(".search-launcher").length === 1, "閉じると元の検索バーだけが下部へ戻る");
+  searchBar.click();
+  assert(launcherEvents === 2 && find("#origin") === originInput && originInput.value === "東京駅"
+    && find("#destination") === destinationInput && destinationInput.value === "上野公園", "再配置後も既存ハンドラと入力状態を維持する");
+  shell.closePanel();
   assert(shell.mapHost.firstElementChild === map && shell.attribution.textContent === "Test attribution", "切替後も同じ地図DOMと帰属表示を保持する");
   map.click();
   assert(mapClicks === 1, "パネル切替後も地図側のイベントを保持する");

@@ -16,7 +16,7 @@
 | --- | --- | --- |
 | フロントエンド | 地点・設定入力、地図と検索結果・標高・危険情報・口コミの表示 | [Epic #2](https://github.com/jphacks/ng_2601/issues/2)の計画。FE-01の一覧画面はマージ済み。実際の地図・検索・各機能は別Issue |
 | FE開発・通信基盤 | Vite + TypeScript、UIライブラリなし。ApiClient経由でモック／HTTPを切り替える | PR #16で導入済み。`frontend/src/features/`、`frontend/src/ui/`、`frontend/src/api/`、`frontend/src/types/`、`frontend/src/mocks/`に分離 |
-| 画面シェル（FE-02） | 全面の地図マウント領域、フローティング検索・メニュー、PCサイドパネル／スマホボトムシート、共通表示状態 | 今回の変更。[shell/render.ts](../frontend/src/features/shell/render.ts)。初期状態はパネル非表示。地図・API接続なし。接続口と制約は[frontend/README](../frontend/README.md)を参照 |
+| 画面シェル（FE-02） | 全面の地図マウント領域、同一検索バーの下部／上部全幅切替、PC左パネル／スマホ縦パネル・ボトムシート、共通表示状態 | PR #19の変更。[shell/render.ts](../frontend/src/features/shell/render.ts)。初期状態はパネル非表示。地図・API接続なし。最新の操作・接続口と制約は[frontend/README](../frontend/README.md)を参照 |
 | バックエンド | FEから経路探索を依頼し、Preferencesを取得・保存する連携を想定 | [#6](https://github.com/jphacks/ng_2601/issues/6)、[#10](https://github.com/jphacks/ng_2601/issues/10)の要件。基準mainにBE実装なし。PR #18は未マージで今回の検証対象外。BE構成・契約は接続担当が確認する |
 | 地図表示 | MapLibreで地点選択、ルート・危険情報・口コミのレイヤー表示、帰属表示 | [#5](https://github.com/jphacks/ng_2601/issues/5)の計画。PR #16はデータ確認用一覧画面であり、地図基盤の実装ではない。地図スタイル・タイル提供元は未合意 |
 | 経路探索 | FEは出発地・目的地・設定を送り、返却された経路を描画する | [#6](https://github.com/jphacks/ng_2601/issues/6)の計画。探索エンジン、道路グラフ、計算・保存基盤は未決定。PR #16はモックと暫定HTTP clientのみ |
