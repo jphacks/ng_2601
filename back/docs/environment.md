@@ -2,8 +2,8 @@
 Set the directory as follows:
 ```txt
 .
-├── brouter
 └── back
+    └── submodule/brouter
 ```
 Keep at least 1 GB free for the Japan RD5 data; the current set is about 501 MB. (updated weekly)
 
@@ -21,7 +21,7 @@ cd back
 
 `back/scripts/setup.sh`:
 - Validates the protected prerequisites
-- Verifies or clones the unmodified BRouter repository at `../brouter`
+- Verifies or clones the unmodified BRouter repository at `back/submodule/brouter`
 - Creates data directories
 - Downloads the current Japan RD5 set when no tile is present. set `DOWNLOAD_ROUTING_DATA=0` to validate without downloading.
 
@@ -29,7 +29,7 @@ cd back
 Repeat the download and conversion after each monthly JARTIC release.
 ```bash
 python3 scripts/data/download_jartic.py
-python3 scripts/parse/import_jartic.py data/jartic/raw/typeD_aichi.zip
+python3 scripts/parse/import_jartic.py data/raw/jartic/typeD_aichi.zip
 ```
 
 `python3 scripts/data/download_jartic.py`:
@@ -37,9 +37,9 @@ python3 scripts/parse/import_jartic.py data/jartic/raw/typeD_aichi.zip
 - The default is Aichi (`R23`)
 - Add a flag `--all` for all prefectures
 
-`python3 scripts/parse/import_jartic.py data/jartic/raw/typeD_aichi.zip`:
+`python3 scripts/parse/import_jartic.py data/raw/jartic/typeD_aichi.zip`:
 - Convert the downloaded archive
-- Write `data/restrictions/jartic.geojson` (read-only)
+- Write `data/normalized/restrictions/jartic.geojson` (read-only)
 
 
 ## Start services
@@ -87,14 +87,11 @@ docker image rm cyclerhub-back-backend cyclerhub-back-brouter:local
 
 find brouter_extension/segments -type f \( -name '*.rd5' -o -name '*.part' -o -name 'manifest.tsv' -o -name 'manifest.tsv.tmp' \) -delete
 
-find data/jartic/raw -mindepth 1 -maxdepth 1 -type f -delete
+find data/raw -type f -delete
 
-rm -f data/restrictions/jartic.geojson .cyclerhub-back-build-fingerprint
+rm -f data/normalized/restrictions/*.geojson data/normalized/context/*.geojson .cyclerhub-back-build-fingerprint
 
 rm -rf backend/.venv backend/.pytest_cache
 
 find backend scripts -type d -name __pycache__ -prune -exec rm -rf {} +
 ```
-
-
-
