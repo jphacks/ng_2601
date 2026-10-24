@@ -4,11 +4,11 @@
 
 - Updated: 2026-10-24
 - Issue: [#4](https://github.com/jphacks/ng_2601/issues/4) / FE-02
-- PR: 作成後に追記
+- PR: [#19](https://github.com/jphacks/ng_2601/pull/19)
 - Branch: `norinori1/issue-4-map-shell`
-- Base / Saved Commit: mainの`3c29233`を基準。保存済みコミットは関連PRのheadを参照
+- Base / Saved Commit: mainの`3c29233`を基準。実装コミット`7c8b532`。文書更新を含む最新の保存済みコミットは関連PRのheadを参照
 - Working Tree: 開始時クリーン。この変更のコード・テスト・文書・検証画像だけを保存
-- Status: 実装・検証済み、PR作成待ち（マージ済みを意味しない）
+- Status: レビュー待ち（マージ済みを意味しない）
 - Author / Agent: Codex
 
 ## Objective
@@ -49,7 +49,7 @@ Issue本文に加え、追記の[Map First仕様](https://github.com/jphacks/ng_
 - 本番ビルド: `npm run preview -- --host 127.0.0.1 --port 4174 --strictPort`で起動し、Edgeでアイコン、検索／メニューの切替、アプリ情報のライセンス原文表示を確認。
 - 発見・修正: メニュー先頭のShift+Tabがブラウザ側へ抜ける挙動を明示的な循環処理で修正。展開シートと上部メニューの重なりを解消し、375×812で12pxの間隔を確認。
 - 検証中の中断: HMRで画面が初期化された後の古いセレクタ操作と、ブラウザ接続切断で一度ずつ失敗。現在画面の取得／新しい検証タブで復旧し再確認した。画像正規化はPillowが未導入だったためWindowsのSystem.Drawingを使用した。
-- リポジトリルート: `git diff --check`成功。Python標準ライブラリで更新した5文書の46相対リンクの存在を確認。`git diff --exit-code HEAD -- README.md frontend/package.json frontend/package-lock.json frontend/src/api frontend/src/types`で変更なしを確認。
+- リポジトリルート: `git diff --check`成功。Python標準ライブラリで更新した5文書の相対リンクの存在を確認。`git diff --exit-code HEAD -- README.md frontend/package.json frontend/package-lock.json frontend/src/api frontend/src/types`で変更なしを確認（実装コミット前）。
 - 未実施: iOS／Android実機のノッチ・仮想キーボード、Safari、スクリーンリーダー読み上げ、WebGL／MapLibre・実タイル・GPS・BE結合。viewport検証を実機確認とは扱わない。
 
 ## Known Limitations
