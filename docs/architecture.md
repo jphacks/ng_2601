@@ -15,7 +15,7 @@
 | 領域 | 確認できた方針・責務 | 実装状態・根拠 |
 | --- | --- | --- |
 | フロントエンド | 地点・設定入力、地図と検索結果・標高・危険情報・口コミの表示、読み込み／空／失敗状態を扱う | mainに実装なし。[Epic #2](https://github.com/jphacks/ng_2601/issues/2)の要件 |
-| FE開発・通信基盤 | Vite + TypeScript、UIライブラリなし。画面はApiClient経由でモック／HTTPを切り替える | PR #16内の提案。`frontend/src/features/`、`src/ui/`、`src/api/`、`src/types/`、`src/mocks/`に分離。mainには未導入 |
+| FE開発・通信基盤 | Vite + TypeScript、UIライブラリなし。画面はApiClient経由でモック／HTTPを切り替える | PR #16内の提案。`frontend/src/features/`、`frontend/src/ui/`、`frontend/src/api/`、`frontend/src/types/`、`frontend/src/mocks/`に分離。mainには未導入 |
 | バックエンド | FEから経路探索を依頼し、Preferencesを取得・保存する連携を想定 | [#6](https://github.com/jphacks/ng_2601/issues/6)、[#10](https://github.com/jphacks/ng_2601/issues/10)の要件。mainおよび確認したPRにBE実装なし。言語・フレームワーク・DB・デプロイ構成は未確認／未決定 |
 | 地図表示 | MapLibreで地点選択、ルート・危険情報・口コミのレイヤー表示、帰属表示 | [#5](https://github.com/jphacks/ng_2601/issues/5)の計画。PR #16はデータ確認用一覧画面であり、地図基盤の実装ではない。地図スタイル・タイル提供元は未合意 |
 | 経路探索 | FEは出発地・目的地・設定を送り、返却された経路を描画する | [#6](https://github.com/jphacks/ng_2601/issues/6)の計画。探索エンジン、道路グラフ、計算・保存基盤は未決定。PR #16はモックと暫定HTTP clientのみ |
