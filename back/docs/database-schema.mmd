@@ -1,0 +1,97 @@
+erDiagram
+  users ||--o{ auth_identities : "has"
+  users ||--o{ auth_sessions : "has"
+  users ||--o{ observations : "submits"
+  observations ||--o{ observation_confirmations : "receives"
+  users ||--o{ observation_confirmations : "submits"
+  users ||--o{ saved_places : "owns"
+  users ||--o{ saved_routes : "owns"
+
+  users {
+    uuid id PK
+    text display_name
+    text bike_type "city | electric_assist | road | gravel | mamachari"
+    text hill_mode
+    text traffic_mode
+    text surface_mode
+    text walking_mode
+    timestamptz created_at
+    timestamptz deleted_at
+  }
+
+  auth_identities {
+    uuid id PK
+    uuid user_id FK
+    text provider "google | email_magic_link"
+    text provider_subject "Google sub or normalized email"
+    text email
+    timestamptz email_verified_at
+    timestamptz created_at
+    timestamptz revoked_at
+  }
+
+  auth_sessions {
+    uuid id PK
+    uuid user_id FK
+    text refresh_token_hash
+    timestamptz expires_at
+    timestamptz created_at
+    timestamptz revoked_at
+  }
+
+  email_login_tokens {
+    uuid id PK
+    text email
+    text token_hash
+    timestamptz expires_at
+    timestamptz consumed_at
+    timestamptz created_at
+  }
+
+  observations {
+    uuid id PK
+    uuid author_user_id FK
+    text category
+    geography location "Point, SRID 4326"
+    text temporal_kind "permanent | time_of_day | date_range | temporary | trend"
+    timestamptz observed_at
+    timestamptz starts_at
+    timestamptz ends_at
+    timestamptz expires_at
+    text status "active | resolved | withdrawn | expired"
+    text verification_state "unverified | corroborated | moderated"
+    text description
+    timestamptz created_at
+    timestamptz updated_at
+  }
+
+  observation_confirmations {
+    uuid id PK
+    uuid observation_id FK
+    uuid user_id FK
+    text state "still_present | cleared | inaccurate | duplicate"
+    timestamptz created_at
+  }
+
+  saved_places {
+    uuid id PK
+    uuid user_id FK
+    text label
+    geography location "Point, SRID 4326"
+    timestamptz created_at
+    timestamptz updated_at
+  }
+
+  saved_routes {
+    uuid id PK
+    uuid user_id FK
+    text label
+    text bike_type "snapshot of selected/default profile"
+    geography start_location "Point, SRID 4326"
+    geography end_location "Point, SRID 4326"
+    jsonb preferences
+    jsonb last_route_geojson
+    timestamptz last_routed_at
+    timestamptz created_at
+    timestamptz updated_at
+  }

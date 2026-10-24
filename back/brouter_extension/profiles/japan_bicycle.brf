@@ -1,0 +1,204 @@
+# Parameterized Japan bicycle routing profile for the CyclerHub backend.
+# This profile belongs to CyclerHub and is loaded through BRouter's supported
+# custom-profile directory. The BRouter upstream repository stays unmodified.
+#
+# The JSON catalog describes public bicycle types. This file is the single
+# BRouter implementation selected by the catalog's `brouter_profile` field;
+# the backend supplies bicycle-specific physical parameters at request time.
+
+---context:global
+
+assign validForBikes = true
+assign considerTurnRestrictions = true
+assign turnInstructionMode = 1
+assign processUnusedTags = false
+
+# User-facing parameters. The backend maps bounded English enum values to these.
+assign hill_mode = 1       # %hill_mode% | 0=avoid, 1=balanced, 2=accept | number
+assign traffic_mode = 1    # %traffic_mode% | 0=avoid, 1=balanced, 2=direct | number
+assign surface_mode = 1    # %surface_mode% | 0=paved, 1=comfortable, 2=rough_ok | number
+assign walking_mode = 1    # %walking_mode% | 0=never, 1=short, 2=long | number
+
+# Bicycle-type parameters come from the resolved backend mobility profile.
+# Defaults preserve city-bike routing when BRouter is called directly.
+assign vehicle_mass = 90 # %vehicle_mass% | 60..180 | number
+assign biker_power = 100 # %biker_power% | 50..250 | number
+assign rolling_resistance = 0.010 # %rolling_resistance% | 0.003..0.030 | number
+assign rough_surface_tolerance = 1.0 # %rough_surface_tolerance% | 0.1..2.0 | number
+assign totalMass = vehicle_mass
+assign maxSpeed = 35
+assign S_C_x = 0.45
+assign C_r = rolling_resistance
+assign bikerPower = biker_power
+
+assign uphillcost
+  switch equal hill_mode 0 100
+  switch equal hill_mode 1 55
+  15
+assign downhillcost
+  switch equal hill_mode 0 80
+  switch equal hill_mode 1 40
+  10
+assign uphillcutoff
+  switch equal hill_mode 0 1.0
+  switch equal hill_mode 1 2.0
+  3.5
+assign downhillcutoff = uphillcutoff
+
+---context:way
+
+assign has_cycleway = not
+  and ( or cycleway= cycleway=no|none ) and ( or cycleway:left= cycleway:left=no ) and ( or cycleway:right= cycleway:right=no ) ( or cycleway:both= cycleway:both=no )
+
+assign cycle_access = or bicycle_road=yes or cyclestreet=yes or bicycle=yes|permissive|designated has_cycleway
+assign paved = or surface=paved|asphalt|concrete|paving_stones|sett smoothness=excellent|good
+assign rough = or surface=gravel|ground|dirt|earth|sand|grass|mud smoothness=bad|very_bad|horrible|very_horrible|impassable
+
+assign default_access =
+  if access= then not motorroad=yes
+  else not access=private|no
+
+# Cycling access and pedestrian access are deliberately separate. A way that
+# permits walking but not riding may be selected only when walking_mode permits.
+assign bike_access =
+  if bicycle= then
+    if highway=footway|pedestrian then cycle_access
+    else if vehicle= then default_access
+    else not vehicle=private|no
+  else not bicycle=private|no|dismount|use_sidepath
+
+assign foot_access =
+  if foot= then default_access
+  else not foot=private|no|use_sidepath
+
+assign walk_required = and not bike_access foot_access
+assign can_walk_bike = and foot_access not equal walking_mode 0
+assign access_cost =
+  if bike_access then 0
+  else if can_walk_bike then 0
+  else 10000
+
+assign bad_oneway =
+  if reversedirection=yes then
+    if oneway:bicycle=yes then true
+    else if oneway= then junction=roundabout
+    else oneway=yes|true|1
+  else oneway=-1
+
+assign oneway_cost =
+  if and bad_oneway bike_access then
+    if oneway:bicycle=no then 0
+    else if cycleway=opposite|opposite_lane|opposite_track then 0
+    else if cycleway:left=opposite|opposite_lane|opposite_track then 0
+    else if cycleway:right=opposite|opposite_lane|opposite_track then 0
+    else 10000
+  else 0
+
+assign traffic_penalty =
+  switch equal traffic_mode 0
+    switch estimated_traffic_class=1|2 0.5
+    switch estimated_traffic_class=3|4 1.5
+    switch estimated_traffic_class=5|6 3.0
+    0
+  switch equal traffic_mode 1
+    switch estimated_traffic_class=1|2 0.2
+    switch estimated_traffic_class=3|4 0.7
+    switch estimated_traffic_class=5|6 1.5
+    0
+  0
+
+assign surface_penalty =
+  if paved then 0
+  else if rough then
+    switch equal surface_mode 0 10000
+    switch equal surface_mode 1 multiply 3.0 rough_surface_tolerance
+    multiply 1.0 rough_surface_tolerance
+  else
+    switch equal surface_mode 0 1.5
+    switch equal surface_mode 1 multiply 0.5 rough_surface_tolerance
+    0
+
+assign walk_cost
+  switch equal walking_mode 1 12
+  switch equal walking_mode 2 5
+  10000
+
+assign main_road_penalty =
+  switch equal traffic_mode 0
+    if cycle_access then 0
+    else 4
+  switch equal traffic_mode 1
+    if cycle_access then 0
+    else 2
+  0
+
+assign turncost =
+  if highway=cycleway then 25
+  else if highway=residential|living_street|service then 45
+  else 90
+
+assign costfactor
+  if highway= then 10000
+  else if highway=motorway|motorway_link|trunk|trunk_link|construction|proposed|abandoned then 10000
+  else if route=ferry then 10000
+  else min 9999
+    add access_cost
+    add oneway_cost
+    add traffic_penalty
+    add surface_penalty
+    if walk_required then walk_cost
+    else if highway=cycleway then 1.0
+    else if highway=residential|living_street then 1.05
+    else if highway=service then 1.2
+    else if highway=unclassified then 1.15
+    else if highway=tertiary|tertiary_link then add 1.5 main_road_penalty
+    else if highway=secondary|secondary_link then add 2.5 main_road_penalty
+    else if highway=primary|primary_link then add 5.0 main_road_penalty
+    else if highway=footway|pedestrian then
+      if bike_access then 1.2 else walk_cost
+    else if highway=path|track then
+      switch equal surface_mode 0 4.0
+      switch equal surface_mode 1 2.0
+      1.4
+    else 2.0
+
+assign priorityclassifier =
+  if highway=motorway then 30
+  else if highway=trunk then 28
+  else if highway=primary then 26
+  else if highway=secondary then 24
+  else if highway=tertiary then 22
+  else if highway=unclassified then 20
+  else if highway=residential|living_street|service|cycleway then 6
+  else if highway=steps|pedestrian then 2
+  else 4
+
+assign isroundabout = junction=roundabout
+assign islinktype = highway=motorway_link|trunk_link|primary_link|secondary_link|tertiary_link
+assign isgoodforcars = highway=residential|living_street|service|unclassified|tertiary
+assign classifiermask add multiply isroundabout 4
+                      add multiply islinktype 8
+                          multiply isgoodforcars 16
+
+# Retain the data needed to classify ride vs. push-bike sections later.
+assign dummyUsage = bicycle=
+
+---context:node
+
+assign default_access =
+  if access= then true
+  else not access=private|no
+
+assign bike_access =
+  if bicycle= then default_access
+  else not bicycle=private|no|dismount
+
+assign foot_access =
+  if foot= then default_access
+  else not foot=private|no
+
+assign initialcost =
+  if highway=traffic_signals|crossing then 20
+  else if bike_access then 0
+  else if and foot_access not equal walking_mode 0 then 100
+  else 1000000

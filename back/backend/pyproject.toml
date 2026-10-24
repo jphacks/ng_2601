@@ -1,0 +1,18 @@
+[project]
+name = "cyclerhub-back-routing-backend"
+version = "0.1.0"
+description = "Backend API for CyclerHub-back routes backed by BRouter"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "fastapi>=0.115,<1.0",
+  "httpx>=0.27,<1.0",
+  "psycopg[binary]>=3.2,<4.0",
+  "PyJWT[crypto]>=2.9,<3.0",
+  "uvicorn[standard]>=0.30,<1.0"
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

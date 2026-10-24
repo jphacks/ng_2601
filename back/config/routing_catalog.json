@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "preferences": {
+    "hill_mode": {"values": ["avoid", "balanced", "accept"], "brouter_values": {"avoid": "0", "balanced": "1", "accept": "2"}},
+    "traffic_mode": {"values": ["avoid", "balanced", "direct"], "brouter_values": {"avoid": "0", "balanced": "1", "direct": "2"}},
+    "surface_mode": {"values": ["paved", "comfortable", "rough_ok"], "brouter_values": {"paved": "0", "comfortable": "1", "rough_ok": "2"}},
+    "walking_mode": {"values": ["never", "short", "long"], "brouter_values": {"never": "0", "short": "1", "long": "2"}}
+  },
+  "rulesets": {
+    "japan_ordinary_bicycle_v1": {
+      "vehicle_class": "ordinary_bicycle",
+      "enforced_by_profile": ["osm_bicycle_access", "osm_foot_access_for_push_bike", "oneway_and_bicycle_exceptions", "turn_restrictions", "motorway_and_trunk_exclusion"],
+      "external_restriction_provider": "jartic_traffic_regulations_v1"
+    }
+  },
+  "bike_types": {
+    "city": {
+      "brouter_profile": "japan_bicycle",
+      "ruleset": "japan_ordinary_bicycle_v1",
+      "defaults": {"hill_mode": "balanced", "traffic_mode": "balanced", "surface_mode": "comfortable", "walking_mode": "short"},
+      "brouter_parameters": {"vehicle_mass": "90", "biker_power": "100", "rolling_resistance": "0.010", "rough_surface_tolerance": "1.0"},
+      "capabilities": {"can_push_bike": true, "can_use_steps_when_pushing": true}
+    },
+    "electric_assist": {
+      "brouter_profile": "japan_bicycle",
+      "ruleset": "japan_ordinary_bicycle_v1",
+      "defaults": {"hill_mode": "balanced", "traffic_mode": "balanced", "surface_mode": "comfortable", "walking_mode": "short"},
+      "brouter_parameters": {"vehicle_mass": "112", "biker_power": "160", "rolling_resistance": "0.011", "rough_surface_tolerance": "0.8"},
+      "capabilities": {"can_push_bike": true, "can_use_steps_when_pushing": false}
+    },
+    "road": {
+      "brouter_profile": "japan_bicycle",
+      "ruleset": "japan_ordinary_bicycle_v1",
+      "defaults": {"hill_mode": "accept", "traffic_mode": "balanced", "surface_mode": "paved", "walking_mode": "never"},
+      "brouter_parameters": {"vehicle_mass": "82", "biker_power": "150", "rolling_resistance": "0.006", "rough_surface_tolerance": "0.3"},
+      "capabilities": {"can_push_bike": true, "can_use_steps_when_pushing": false}
+    },
+    "gravel": {
+      "brouter_profile": "japan_bicycle",
+      "ruleset": "japan_ordinary_bicycle_v1",
+      "defaults": {"hill_mode": "balanced", "traffic_mode": "balanced", "surface_mode": "rough_ok", "walking_mode": "short"},
+      "brouter_parameters": {"vehicle_mass": "88", "biker_power": "125", "rolling_resistance": "0.009", "rough_surface_tolerance": "1.5"},
+      "capabilities": {"can_push_bike": true, "can_use_steps_when_pushing": true}
+    },
+    "mamachari": {
+      "brouter_profile": "japan_bicycle",
+      "ruleset": "japan_ordinary_bicycle_v1",
+      "defaults": {"hill_mode": "avoid", "traffic_mode": "avoid", "surface_mode": "comfortable", "walking_mode": "short"},
+      "brouter_parameters": {"vehicle_mass": "120", "biker_power": "85", "rolling_resistance": "0.014", "rough_surface_tolerance": "0.6"},
+      "capabilities": {"can_push_bike": true, "can_use_steps_when_pushing": false}
+    }
+  }
+}
