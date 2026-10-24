@@ -33,6 +33,9 @@ class RestrictionProvider:
     def status(self) -> dict[str, Any]:
         return {"enabled": False, "feature_count": 0}
 
+    def features_in_bbox(self, bbox: tuple[float, float, float, float], evaluated_at: datetime | None = None) -> list[dict[str, Any]]:
+        return []
+
 
 class CompositeRestrictionProvider(RestrictionProvider):
     """Combines independent source files without erasing their provenance."""
@@ -57,6 +60,12 @@ class CompositeRestrictionProvider(RestrictionProvider):
             "feature_count": sum(source["feature_count"] for source in sources.values()),
             "sources": sources,
         }
+
+    def features_in_bbox(self, bbox: tuple[float, float, float, float], evaluated_at: datetime | None = None) -> list[dict[str, Any]]:
+        features: list[dict[str, Any]] = []
+        for provider in self._providers.values():
+            features.extend(provider.features_in_bbox(bbox, evaluated_at))
+        return features
 
 
 class GeoJsonRestrictionProvider(RestrictionProvider):
@@ -119,6 +128,29 @@ class GeoJsonRestrictionProvider(RestrictionProvider):
             "metadata": self._metadata,
             "source_id": self._source_id,
         }
+
+    def features_in_bbox(self, bbox: tuple[float, float, float, float], evaluated_at: datetime | None = None) -> list[dict[str, Any]]:
+        features: list[dict[str, Any]] = []
+        for feature, feature_bbox in self._features:
+            geometry = feature.get("geometry") or {}
+            if feature_bbox is None or not _geometry_intersects_bbox(geometry, bbox):
+                continue
+            properties = dict(feature.get("properties") or {})
+            if evaluated_at is not None and not _active_now(properties, evaluated_at):
+                continue
+            properties.update(
+                {
+                    "source_id": self._source_id,
+                    "authority": self._source_metadata.get("authority", properties.get("authority")),
+                    "source": self._source_metadata.get("source", properties.get("source")),
+                    "source_kind": self._source_metadata.get("source_kind", properties.get("source_kind")),
+                    "confidence": self._source_metadata.get("confidence", properties.get("confidence")),
+                    "dataset_version": self._source_metadata.get("dataset_version", properties.get("dataset_version")),
+                    "retrieved_at": self._source_metadata.get("retrieved_at", properties.get("retrieved_at")),
+                }
+            )
+            features.append({"type": "Feature", "geometry": feature.get("geometry"), "properties": properties})
+        return features
 
 
 def _active_now(properties: dict[str, Any], evaluated_at: datetime) -> bool:
@@ -201,6 +233,102 @@ def _bboxes_overlap(
     left: tuple[float, float, float, float], right: tuple[float, float, float, float]
 ) -> bool:
     return left[0] <= right[2] and left[2] >= right[0] and left[1] <= right[3] and left[3] >= right[1]
+
+
+def _point_in_bbox(point: list[float], bbox: tuple[float, float, float, float]) -> bool:
+    return len(point) >= 2 and bbox[0] <= point[0] <= bbox[2] and bbox[1] <= point[1] <= bbox[3]
+
+
+def _segment_intersects_bbox(
+    start: list[float], end: list[float], bbox: tuple[float, float, float, float]
+) -> bool:
+    """Return whether a segment intersects an axis-aligned WGS84 bbox."""
+    if len(start) < 2 or len(end) < 2:
+        return False
+    if _point_in_bbox(start, bbox) or _point_in_bbox(end, bbox):
+        return True
+    # Liang-Barsky clipping avoids treating a segment's coordinate envelope as
+    # the segment itself.
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    constraints = (
+        (-dx, start[0] - bbox[0]),
+        (dx, bbox[2] - start[0]),
+        (-dy, start[1] - bbox[1]),
+        (dy, bbox[3] - start[1]),
+    )
+    lower, upper = 0.0, 1.0
+    for coefficient, value in constraints:
+        if coefficient == 0:
+            if value < 0:
+                return False
+            continue
+        ratio = value / coefficient
+        if coefficient < 0:
+            lower = max(lower, ratio)
+        else:
+            upper = min(upper, ratio)
+        if lower > upper:
+            return False
+    return True
+
+
+def _point_in_ring(point: list[float], ring: list[list[float]]) -> bool:
+    """Return whether a point is inside or on the boundary of a ring."""
+    if len(point) < 2 or len(ring) < 3:
+        return False
+    inside = False
+    for start, end in zip(ring, ring[1:] + ring[:1]):
+        if _segment_intersects_bbox(start, end, (point[0], point[1], point[0], point[1])):
+            return True
+        if (start[1] > point[1]) != (end[1] > point[1]):
+            crossing_lon = (end[0] - start[0]) * (point[1] - start[1]) / (end[1] - start[1]) + start[0]
+            if point[0] < crossing_lon:
+                inside = not inside
+    return inside
+
+
+def _point_in_polygon(point: list[float], rings: list[list[list[float]]]) -> bool:
+    if not rings or not _point_in_ring(point, rings[0]):
+        return False
+    return not any(_point_in_ring(point, hole) for hole in rings[1:])
+
+
+def _bbox_corners(bbox: tuple[float, float, float, float]) -> tuple[list[float], ...]:
+    return (
+        [bbox[0], bbox[1]],
+        [bbox[0], bbox[3]],
+        [bbox[2], bbox[1]],
+        [bbox[2], bbox[3]],
+    )
+
+
+def _geometry_intersects_bbox(
+    geometry: dict[str, Any], bbox: tuple[float, float, float, float]
+) -> bool:
+    """Return true only when the actual GeoJSON geometry touches the bbox."""
+    geometry_type = geometry.get("type")
+    if geometry_type == "GeometryCollection":
+        return any(_geometry_intersects_bbox(item, bbox) for item in geometry.get("geometries", []))
+    feature_bbox = _bbox_from_geometry(geometry)
+    if feature_bbox is None or not _bboxes_overlap(feature_bbox, bbox):
+        return False
+    coordinates = geometry.get("coordinates", [])
+    if geometry_type == "Point":
+        return _point_in_bbox(coordinates, bbox)
+    if geometry_type == "MultiPoint":
+        return any(_point_in_bbox(point, bbox) for point in coordinates)
+    if geometry_type in {"LineString", "MultiLineString", "Polygon", "MultiPolygon"}:
+        if any(_segment_intersects_bbox(start, end, bbox) for start, end in _segments_from_geometry(geometry)):
+            return True
+    if geometry_type == "Polygon":
+        return any(_point_in_polygon(corner, coordinates) for corner in _bbox_corners(bbox))
+    if geometry_type == "MultiPolygon":
+        return any(
+            _point_in_polygon(corner, polygon)
+            for polygon in coordinates
+            for corner in _bbox_corners(bbox)
+        )
+    return False
 
 
 def _orientation(a: list[float], b: list[float], c: list[float]) -> float:

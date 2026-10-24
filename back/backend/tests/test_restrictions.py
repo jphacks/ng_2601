@@ -44,3 +44,19 @@ def test_composite_status_and_hits_preserve_source_identity(tmp_path):
     assert hits[0].source_id == "mlit"
     assert hits[0].authority == "MLIT"
     assert provider.status()["sources"]["mlit"]["feature_count"] == 1
+
+
+def test_features_in_bbox_checks_geometry_not_only_feature_envelope(tmp_path):
+    source = tmp_path / "restrictions.geojson"
+    source.write_text(
+        """{"type":"FeatureCollection","features":[
+        {"type":"Feature","geometry":{"type":"LineString","coordinates":[[0.0,0.0],[1.0,1.0]]},"properties":{"id":"miss"}},
+        {"type":"Feature","geometry":{"type":"LineString","coordinates":[[0.0,0.0],[1.0,1.0]]},"properties":{"id":"hit"}}
+        ]}"""
+    )
+    provider = GeoJsonRestrictionProvider.from_path(source)
+
+    # The first query's rectangle overlaps the line's coordinate envelope but
+    # the diagonal itself never enters it. The second rectangle is crossed.
+    assert [feature["properties"]["id"] for feature in provider.features_in_bbox((0.2, 0.7, 0.3, 0.8))] == []
+    assert [feature["properties"]["id"] for feature in provider.features_in_bbox((0.2, 0.2, 0.3, 0.3))] == ["miss", "hit"]

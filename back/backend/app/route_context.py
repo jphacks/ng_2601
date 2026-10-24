@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from .restrictions import _bbox_from_geometry, _bbox_from_segments, _route_segments
+from .restrictions import _geometry_intersects_bbox, _route_segments
 
 
 def _distance_m(point: list[float], a: list[float], b: list[float]) -> float:
@@ -61,6 +61,28 @@ class GeoJsonRouteContext:
             "metadata": self.metadata,
         }
 
+    def features_in_bbox(self, bbox: tuple[float, float, float, float]) -> list[dict[str, Any]]:
+        """Return map features with source metadata attached and no local paths."""
+        results: list[dict[str, Any]] = []
+        for feature in self.collection.get("features", []):
+            geometry = feature.get("geometry") or {}
+            if not _geometry_intersects_bbox(geometry, bbox):
+                continue
+            properties = dict(feature.get("properties") or {})
+            properties.update(
+                {
+                    "source_id": self.source_id,
+                    "authority": self.metadata.get("authority", properties.get("authority")),
+                    "source": self.metadata.get("source", properties.get("source")),
+                    "source_kind": self.metadata.get("source_kind", properties.get("source_kind")),
+                    "confidence": self.metadata.get("confidence", properties.get("confidence")),
+                    "dataset_version": self.metadata.get("dataset_version", properties.get("dataset_version")),
+                    "retrieved_at": self.metadata.get("retrieved_at", properties.get("retrieved_at")),
+                }
+            )
+            results.append({"type": "Feature", "geometry": geometry, "properties": properties})
+        return results
+
 
 class AccidentHistoryProvider(GeoJsonRouteContext):
     def aggregate(self, route: dict[str, Any], evaluated_at: datetime) -> dict[str, Any]:
@@ -75,7 +97,7 @@ class AccidentHistoryProvider(GeoJsonRouteContext):
                 hits.append(feature.get("properties") or {})
         window = self.metadata.get("window")
         return {
-            "status": "available" if hits else "available",
+            "status": "available" if hits else "partial",
             "source_id": self.source_id,
             "authority": self.metadata.get("authority", "National Police Agency"),
             "source": self.metadata.get("source", "NPA traffic-accident open data"),
