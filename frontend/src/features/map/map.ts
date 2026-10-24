@@ -49,6 +49,13 @@ export interface Endpoints {
   destination: LngLat | null;
 }
 
+/** ブラウザーから取得した現在地。画面表示だけに使い、保存・送信しない。 */
+export interface CurrentLocation {
+  lngLat: LngLat;
+  /** 水平方向の誤差 (m)。 */
+  accuracyM: number;
+}
+
 export interface MapController {
   setRoutes(routes: Route[]): void;
   setEndpoints(endpoints: Endpoints): void;
@@ -56,6 +63,8 @@ export interface MapController {
   setPicking(on: boolean): void;
   /** 経路全体が見えるよう表示範囲を合わせる。パネルに隠れない余白を取る。 */
   fitToRoute(route: Route): void;
+  /** 現在地マーカーを置く（null で消す）。recenter が true なら現在地へ地図を移動する。 */
+  setCurrentLocation(location: CurrentLocation | null, recenter?: boolean): void;
   setHazards(hazards: Hazard[]): void;
   setReviews(pins: ReviewPin[]): void;
   setLayerVisible(id: LayerId, visible: boolean): void;
@@ -92,6 +101,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
   let pickMarker: maplibregl.Marker | null = null;
   let endpointMarkers: maplibregl.Marker[] = [];
   let endpoints: Endpoints = { origin: null, destination: null };
+  let currentMarker: maplibregl.Marker | null = null;
   const visible: Record<LayerId, boolean> = { basemap: true, routes: true, hazards: true, reviews: true };
   const listeners: Array<() => void> = [];
 
@@ -140,6 +150,11 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
     for (const m of endpointMarkers) if (!m.getElement().isConnected) showMarker(m, map);
   }
 
+  /** 現在地マーカーも地図の作り直し後に載せ直す。 */
+  function syncCurrentLocation(): void {
+    if (map && currentMarker && !currentMarker.getElement().isConnected) showMarker(currentMarker, map);
+  }
+
   function replaceMarkers(old: maplibregl.Marker[], specs: MarkerSpec[]): maplibregl.Marker[] {
     for (const m of old) hideMarker(m);
     return specs.map(createMarker);
@@ -183,6 +198,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
         });
         syncVisibility();
         syncEndpoints();
+        syncCurrentLocation();
       });
 
       m.on("click", (e) => {
@@ -271,6 +287,26 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
           ? { top: 64, bottom: 64, left: 464, right: 96 }
           : { top: Math.min(Math.round(h * 0.65) + 80, h - 200), bottom: 48, left: 32, right: 32 };
       map.fitBounds(bounds, { padding, maxZoom: 16 });
+    },
+    setCurrentLocation(location, recenter = false) {
+      if (currentMarker) hideMarker(currentMarker);
+      currentMarker = null;
+      if (!location) return;
+      currentMarker = createMarker({
+        id: "current-location",
+        lngLat: location.lngLat,
+        glyph: "",
+        label: "現在地",
+        title: "現在地",
+        description: `精度 約${Math.round(location.accuracyM)} m`,
+        kind: "current",
+      });
+      syncCurrentLocation();
+      if (recenter && map) {
+        // 精度が粗いとき（IPベースなど）は寄り過ぎない。現在より引いた表示にはしない。
+        const zoom = Math.max(map.getZoom(), location.accuracyM > 500 ? 13 : 16);
+        map.flyTo({ center: location.lngLat, zoom });
+      }
     },
     setHazards(hazards) {
       hazardMarkers = replaceMarkers(
