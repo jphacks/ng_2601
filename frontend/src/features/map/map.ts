@@ -414,13 +414,14 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
         (b, c) => b.extend(c),
         new maplibregl.LngLatBounds(route.coordinates[0], route.coordinates[0]),
       );
-      // 検索パネルは広い画面で左側、狭い画面で上側を覆う。覆われない範囲に収める。
+      // 検索パネルは広い画面で左側を、狭い画面では経路結果シートが下側を覆う。覆われない範囲に収める。
+      // 狭い画面のシートは下から高さ約65%（shell.cssの.search-card--route-results）を占める。
       const w = container.clientWidth;
       const h = container.clientHeight;
       const padding =
         w >= 768
           ? { top: 64, bottom: 64, left: 464, right: 96 }
-          : { top: Math.min(Math.round(h * 0.65) + 80, h - 200), bottom: 48, left: 32, right: 32 };
+          : { top: 48, bottom: Math.min(Math.round(h * 0.65) + 80, h - 200), left: 32, right: 32 };
       map.fitBounds(bounds, { padding, maxZoom: 16 });
     },
     setRoadInfo(items, now = new Date()) {

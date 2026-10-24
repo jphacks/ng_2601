@@ -172,6 +172,7 @@ button { cursor: pointer; }
 }
 .search-card--route-results.is-open .panel {
   --avail: calc(var(--vvh) - var(--top-offset) - var(--gutter));
+
   height: min(calc(var(--vvh) * 0.65), var(--avail));
   padding: var(--space-3) var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom));
   opacity: 1;
