@@ -418,10 +418,12 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
       // 狭い画面のシートは下から高さ約65%（shell.cssの.search-card--route-results）を占める。
       const w = container.clientWidth;
       const h = container.clientHeight;
+      // 画面が低いとh-200の上限がシートの高さを下回り、経路の下端がシートに隠れる。シートの高さは必ず確保する。
+      const sheet = Math.round(h * 0.65);
       const padding =
         w >= 768
           ? { top: 64, bottom: 64, left: 464, right: 96 }
-          : { top: 48, bottom: Math.min(Math.round(h * 0.65) + 80, h - 200), left: 32, right: 32 };
+          : { top: 48, bottom: Math.max(Math.min(sheet + 80, h - 200), sheet), left: 32, right: 32 };
       map.fitBounds(bounds, { padding, maxZoom: 16 });
     },
     setRoadInfo(items, now = new Date()) {
