@@ -12,6 +12,7 @@ function isApiErrorBody(v: unknown): v is ApiErrorBody {
 
 /** 経路探索は BE 側のタイムアウト(30秒)より少し長く待つ。 */
 const ROUTE_TIMEOUT_MS = 40_000;
+const MAP_DATA_TIMEOUT_MS = 15_000;
 
 /** `POST /v1/routes` のエラー（FastAPIの`{detail}`）をFEのエラー形式へ。BEの英語detailは`details`に残す。 */
 function routeError(status: number, parsed: unknown): ApiErrorBody {
@@ -32,6 +33,7 @@ export function createHttpClient(baseUrl: string): ApiClient {
     body?: unknown,
     opts: {
       timeoutMs?: number;
+      timeoutMessage?: string;
       toError?: (status: number, parsed: unknown) => ApiErrorBody;
       /** 呼び出し側が中断できる信号。中断は AbortError として投げ、通信エラー扱いにしない。 */
       signal?: AbortSignal;
@@ -47,7 +49,7 @@ export function createHttpClient(baseUrl: string): ApiClient {
     const timeoutError = () =>
       opts.signal?.aborted
         ? new DOMException("aborted", "AbortError")
-        : new ApiError(0, { code: "timeout", message: "ルート探索に時間がかかっています。時間をおいて再試行してください。" });
+        : new ApiError(0, { code: "timeout", message: opts.timeoutMessage ?? "ルート探索に時間がかかっています。時間をおいて再試行してください。" });
     try {
       let res: Response;
       try {
@@ -109,7 +111,7 @@ export function createHttpClient(baseUrl: string): ApiClient {
           limit: limit === undefined ? undefined : String(limit),
         })}`,
         undefined,
-        { signal },
+        { signal, timeoutMs: MAP_DATA_TIMEOUT_MS, timeoutMessage: "道路情報の取得に時間がかかっています。時間をおいて再試行してください。" },
       ).then(assertMapData),
     getRoute: (id) => request("GET", `/routes/${encodeURIComponent(id)}`),
     listHazards: (routeId) => request("GET", `/hazards${qs({ routeId })}`),

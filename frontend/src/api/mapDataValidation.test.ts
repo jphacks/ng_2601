@@ -20,6 +20,13 @@ describe("assertMapData", () => {
     }
   });
 
+  it("source_status.sources に null の提供元がある応答は不正として拒否する", () => {
+    const data = buildMockMapData();
+    const status = data.route_context.accidents.source_status as unknown as Record<string, unknown>;
+    status.sources = { npa: null };
+    expect(() => assertMapData(data)).toThrowError(/source_status\.sources/);
+  });
+
   it("地物が無ければ source_status が無くても拒否しない（提供状況は別途表示）", () => {
     const data = buildMockMapData();
     delete (data.route_context.traffic as unknown as Record<string, unknown>).source_status;

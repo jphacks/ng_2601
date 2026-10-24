@@ -28,6 +28,10 @@ export function assertMapData(data: unknown): MapDataResponse {
     if ((collection.features as unknown[]).length > 0 && !isObject(collection.source_status)) {
       throw invalid(`道路情報の応答が不正です（${key} に source_status がありません）。`);
     }
+    const sources = isObject(collection.source_status) ? collection.source_status.sources : undefined;
+    if (isObject(sources) && !Object.values(sources).every(isObject)) {
+      throw invalid(`道路情報の応答が不正です（${key} の source_status.sources に不正な提供元があります）。`);
+    }
   }
   return data as unknown as MapDataResponse;
 }

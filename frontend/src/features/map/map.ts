@@ -98,7 +98,7 @@ const ROAD_HALO_CIRCLE = "road-info-halo-circle";
 /** 「道路・危険情報」レイヤーのON/OFFで切り替える描画レイヤー。 */
 const ROAD_LAYERS = [ROAD_HALO_LINE, ROAD_HALO_CIRCLE, ROAD_FILL, ROAD_LINE, ROAD_LINE_UNVERIFIED, ROAD_LINE_STALE, ROAD_CIRCLE];
 /** クリック判定に使う図形。面は外周線のみ（面の内側は地点選択に使えるようにする）。 */
-const ROAD_HIT_LAYERS = [ROAD_CIRCLE, ROAD_LINE, ROAD_LINE_UNVERIFIED, ROAD_LINE_STALE];
+const ROAD_HIT_LAYERS = [ROAD_FILL, ROAD_CIRCLE, ROAD_LINE, ROAD_LINE_UNVERIFIED, ROAD_LINE_STALE];
 const HIT_TOLERANCE_PX = 8;
 
 /**
@@ -321,7 +321,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
             )
           : [];
       m.on("mousemove", (e) => {
-        m.getCanvas().style.cursor = hitAt(e.point).length > 0 ? "pointer" : "";
+        m.getCanvas().style.cursor = !picking && hitAt(e.point).length > 0 ? "pointer" : "";
       });
 
       m.on("click", (e) => {
@@ -404,6 +404,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
     setPicking(on) {
       picking = on;
       canvas.classList.toggle("map__canvas--picking", on);
+      if (map) map.getCanvas().style.cursor = "";
     },
     fitToRoute(route) {
       if (!map || route.coordinates.length === 0) return;
