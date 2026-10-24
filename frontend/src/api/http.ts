@@ -3,7 +3,10 @@ import { ApiError } from "./errors";
 import { assertMapData } from "./mapDataValidation";
 import { fromBackendMe, fromBackendOptions, toBackendPreferences } from "./preferencesAdapter";
 import { fromBackendResponse, toBackendRequest } from "./routeAdapter";
-import type { ApiErrorBody } from "../types/api";
+import { observationsToReviews } from "./reviewAdapter";
+import type { ApiErrorBody, BBox } from "../types/api";
+
+const WORLD: BBox = [-180, -90, 180, 90];
 
 function isApiErrorBody(v: unknown): v is ApiErrorBody {
   if (typeof v !== "object" || v === null) return false;
@@ -131,7 +134,21 @@ export function createHttpClient(baseUrl: string, getAccessToken?: () => string 
       ).then(assertMapData),
     getRoute: (id) => request("GET", `/routes/${encodeURIComponent(id)}`),
     listHazards: (routeId) => request("GET", `/hazards${qs({ routeId })}`),
-    listReviews: (params = {}) => request("GET", `/reviews${qs(params)}`),
+    // 口コミは main に取り込み済みの observations（bbox必須）。未指定なら全域。
+    listReviews: async ({ bbox: [minLon, minLat, maxLon, maxLat] = WORLD } = {}) => {
+      const query = new URLSearchParams({
+        min_lon: String(minLon),
+        min_lat: String(minLat),
+        max_lon: String(maxLon),
+        max_lat: String(maxLat),
+      });
+      try {
+        return observationsToReviews(await request<unknown>("GET", `/v1/observations?${query}`));
+      } catch (e) {
+        if (e instanceof ApiError) throw e;
+        throw new ApiError(502, { code: "invalid_response", message: "口コミの応答形式が不正です" });
+      }
+    },
     async getRoutingOptions() {
       return fromBackendOptions(await request<unknown>("GET", "/v1/routing-options"));
     },

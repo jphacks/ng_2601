@@ -119,10 +119,15 @@ export function createMockClient(): ApiClient {
         },
       };
     },
-    async listReviews({ routeId, hazardId } = {}) {
-      await delay();
+    async listReviews({ bbox } = {}) {
+      // 受入条件（0件・取得失敗・読込中）を手元で確認するため、URLの ?mock=empty|error|slow で再現する。
+      const scenario = new URLSearchParams(globalThis.location?.search).get("mock");
+      await delay(scenario === "slow" ? 2500 : 150);
+      if (scenario === "error") throw new ApiError(503, { code: "unavailable", message: "mock: 口コミを取得できません" });
+      if (scenario === "empty") return [];
       return mockReviews.filter(
-        (r) => (!routeId || r.routeId === routeId) && (!hazardId || r.hazardId === hazardId),
+        ({ location: [lng, lat] }) =>
+          !bbox || (lng >= bbox[0] && lng <= bbox[2] && lat >= bbox[1] && lat <= bbox[3]),
       );
     },
     async getRoutingOptions() {

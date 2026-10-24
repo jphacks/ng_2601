@@ -12,6 +12,8 @@ export interface MarkerSpec {
   description: string;
   /** CSSクラスに使う種別（hazard / review / pick）。 */
   kind: string;
+  /** 指定するとポップアップの代わりに呼ばれる（一覧シートを開く用途）。 */
+  onSelect?: () => void;
 }
 
 /** フォーカス可能なDOMマーカー。説明文はHTMLとして解釈させない（textContent + setDOMContent）。 */
@@ -22,6 +24,17 @@ export function createMarker(spec: MarkerSpec): maplibregl.Marker {
   element.className = `map-marker map-marker--${spec.kind}`;
   element.textContent = spec.glyph;
   element.setAttribute("aria-label", `${spec.label}の詳細を開く`);
+
+  const { onSelect } = spec;
+  if (onSelect) {
+    element.addEventListener("click", onSelect);
+    element.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      onSelect();
+    });
+    return new maplibregl.Marker({ element }).setLngLat(spec.lngLat);
+  }
 
   const content = document.createElement("div");
   content.className = "map-popup";

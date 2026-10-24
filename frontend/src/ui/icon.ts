@@ -14,6 +14,9 @@ const PATHS = {
   ban: ["M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z", "M5.6 5.6l12.8 12.8"],
   warning: ["M12 3l10 18H2L12 3z", "M12 10v4", "M12 17.5v.01"],
   person: ["M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8z", "M4 21c0-4 4-6 8-6s8 2 8 6"],
+  back: ["M15 6l-6 6 6 6"],
+  user: ["M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8z", "M4 20c0-4 3.6-6 8-6s8 2 8 6"],
+  shield: ["M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V6l8-3z", "M9 12l2 2 4-4"],
 } as const;
 
 export type IconName = keyof typeof PATHS;
