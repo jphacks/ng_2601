@@ -96,6 +96,26 @@ try {
   assert(document.activeElement === map && find("#panel-title").textContent === "道路情報", "非表示ビューの更新で表示とフォーカスを変えない");
   shell.closePanel();
 
+  const attributionLink = document.createElement("a");
+  attributionLink.href = "https://example.com/";
+  attributionLink.textContent = "Test map attribution. ".repeat(100) + "x".repeat(400);
+  shell.attribution.replaceChildren(attributionLink);
+  const waitForLayout = () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  await waitForLayout();
+  const attributionRect = shell.attribution.getBoundingClientRect();
+  assert(attributionRect.width <= innerWidth && attributionRect.height > 24 && attributionRect.height <= 65
+    && shell.attribution.scrollHeight > shell.attribution.clientHeight, "長い帰属表示を折り返し、上限を超えた内容はスクロールできる");
+  shell.attribution.focus();
+  assert(document.activeElement === shell.attribution, "長い帰属表示のスクロール領域へキーボードでフォーカスできる");
+  assert(find(".search-launcher").getBoundingClientRect().bottom <= attributionRect.top
+    && find(".map-controls").getBoundingClientRect().bottom <= attributionRect.top, "折り返した帰属表示と検索・地図操作が重ならない");
+  shell.openView("search");
+  assert(find("#feature-panel").getBoundingClientRect().bottom <= attributionRect.top, "折り返した帰属表示とパネルが重ならない");
+  shell.closePanel();
+  shell.attribution.replaceChildren();
+  await waitForLayout();
+  assert(getComputedStyle(find(".app-shell")).getPropertyValue("--attribution-space").trim() === "24px", "帰属表示を空にすると元の余白へ戻る");
+
   find<HTMLButtonElement>(".floating-header button").click();
   const drawer = find<HTMLDialogElement>("#app-menu");
   const drawerButtons = drawer.querySelectorAll<HTMLButtonElement>("button");

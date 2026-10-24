@@ -68,6 +68,12 @@ Issue本文に加え、追記の[Map First仕様](https://github.com/jphacks/ng_
 - 本番プレビューで11組のコントラストを測定し、文字4.5:1／対象UI3:1の基準以上を確認。PC／375px通常パネルの主要5領域は変更前と寸法が一致。測定・試験結果は[検証ディレクトリ](../verification/issue-4/nature-ride/)に保存。
 - 実機・Safari・実地図の未検証事項は従来どおり。勾配色・閾値・API・依存関係の変更なし。
 
+### 再レビューの帰属表示指摘への対応
+
+[追加指摘](https://github.com/jphacks/ng_2601/pull/19#discussion_r4366445479)を確認し、折り返す帰属欄の高さに応じて検索・パネル・下部操作群の共通余白を確保するよう修正。最低24pxは維持し、長文・長いURLは折り返す。表示上限を超える部分はキーボードでもスクロールできる。空に戻すと元の配置へ復帰し、破棄時にResizeObserverを解除する。
+
+`frontend/`で`npm run typecheck`・`npm run build`を再実行して成功。帰属欄の回帰5件を追加し、4つの同じviewportすべてで現在は**PASS (26)**。[結果JSON](../verification/issue-4/nature-ride/browser-tests.json)を更新した。ブラウザ接続切断後は新しい検証タブで4サイズを再確認した。
+
 ## Next Actions
 
 1. レビュー担当は`frontend/`で`npm ci`・`npm run dev`を実行し、`/`と`/tests/shell.html`を確認する。

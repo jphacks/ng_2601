@@ -56,6 +56,9 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}) {
   // The map feature owns attribution content; this slot stays clear of floating UI.
   const attribution = el("div", { className: "map-attribution" });
   attribution.id = "map-attribution";
+  attribution.tabIndex = 0;
+  attribution.setAttribute("role", "region");
+  attribution.setAttribute("aria-label", "地図の帰属表示");
   map.append(mapHost, attribution);
 
   const skip = el("a", { className: "skip-link", text: "地図へ移動" });
@@ -299,6 +302,12 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}) {
   viewport?.addEventListener("scroll", syncViewport);
   window.addEventListener("resize", syncViewport);
   syncViewport();
+  // Keep a wrapped attribution footer below every lower floating control.
+  const attributionObserver = new ResizeObserver(() => {
+    const space = Math.max(24, Math.ceil(attribution.getBoundingClientRect().height) + 8);
+    shell.style.setProperty("--attribution-space", `${space}px`);
+  });
+  attributionObserver.observe(attribution);
   shell.append(skip, map, header, controls, searchButton, panel, drawer);
   root.replaceChildren(shell);
 
@@ -321,6 +330,7 @@ export function renderShell(root: HTMLElement, options: ShellOptions = {}) {
       viewport?.removeEventListener("resize", syncViewport);
       viewport?.removeEventListener("scroll", syncViewport);
       window.removeEventListener("resize", syncViewport);
+      attributionObserver.disconnect();
       shell.remove();
     },
   };
