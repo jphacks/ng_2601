@@ -1,5 +1,6 @@
 import "./route.css";
-import type { LngLat, Route } from "../../types/api";
+import type { LngLat } from "../../types/api";
+import { renderAnalysis } from "../elevation/render";
 import { el } from "../../ui/dom";
 import { renderState } from "../../ui/state";
 import { MODE_META, bikeTypeLabel, modeLabel } from "../preferences/labels";
@@ -26,15 +27,6 @@ export function formatPoint(p: LngLat | null, empty = "未指定"): string {
   return p ? `緯度 ${p[1].toFixed(5)} / 経度 ${p[0].toFixed(5)}` : empty;
 }
 
-function formatDistance(m: number): string {
-  return m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`;
-}
-
-function formatDuration(sec: number): string {
-  const minutes = Math.max(1, Math.round(sec / 60));
-  return minutes < 60 ? `${minutes} 分` : `${Math.floor(minutes / 60)} 時間 ${minutes % 60} 分`;
-}
-
 function textButton(label: string, className = "route__button"): HTMLButtonElement {
   const b = el("button", { className, text: label });
   b.type = "button";
@@ -59,6 +51,7 @@ export function renderPickBanner(store: RouteStore): HTMLElement {
 /** 「経路」ビュー本体。検索条件とルート結果の2つのサブタブ。 */
 export function renderRouteView(store: RouteStore, prefs: PreferencesStore): HTMLElement {
   let tab: SubTab = "result";
+  let detailsOpen = false;
 
   // --- sub tabs ---------------------------------------------------------
   const tablist = el("div", { className: "route__tabs" });
@@ -174,19 +167,6 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore): HTM
     return details;
   }
 
-  function summary(route: Route): HTMLElement {
-    const items: Array<[string, string]> = [
-      ["距離", formatDistance(route.distanceM)],
-      ["所要時間", formatDuration(route.durationSec)],
-      ["獲得標高", "準備中"],
-    ];
-    const list = el("dl", { className: "route__summary" });
-    for (const [k, v] of items) {
-      list.append(el("div", { className: "route__stat" }, [el("dt", { text: k }), el("dd", { text: v })]));
-    }
-    return list;
-  }
-
   function endpoints(applied: AppliedSearch): HTMLElement {
     const rows = ([
       ["出発地", applied.origin],
@@ -202,43 +182,9 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore): HTM
     return section;
   }
 
-  /** #7 の解析・グラフを後から接続するための、データ未取得時の表示領域。 */
-  function elevationProfileSlot(): HTMLElement {
-    const placeholder = el("div", {
-      className: "route__elevation-placeholder",
-      text: "標高データを準備中です。",
-    });
-    placeholder.setAttribute("role", "status");
-    const section = el("section", { className: "route__section route__elevation" }, [
-      el("h3", { className: "route__heading", text: "標高プロファイル" }),
-      placeholder,
-    ]);
-    section.setAttribute("data-elevation-slot", "profile");
-    return section;
-  }
-
-  /** #7 の解析値を表示する場所だけ確保する。標高データはここでは計算しない。 */
-  function routeDetails(): HTMLElement {
-    const detailRows: Array<[string, string]> = [
-      ["平均勾配", "準備中"],
-      ["最高標高", "準備中"],
-      ["最低標高", "準備中"],
-      ["獲得標高", "準備中"],
-    ];
-    const list = el("dl", { className: "route__detail-list" });
-    for (const [label, value] of detailRows) {
-      list.append(el("dt", { text: label }), el("dd", { text: value }));
-    }
-    const details = el("details", { className: "route__details" }, [
-      el("summary", { text: "ルート詳細" }),
-      el("p", { className: "route__details-note", text: "標高解析の統合後に表示します。" }),
-      list,
-    ]);
-    details.setAttribute("data-elevation-slot", "details");
-    return details;
-  }
-
   function renderResult(state: RouteSearchState): void {
+    const active = document.activeElement instanceof HTMLElement && resultPane.contains(document.activeElement)
+      ? document.activeElement.dataset.resultControl : undefined;
     const { status } = state;
     if (status.kind === "idle") {
       resultPane.replaceChildren(
@@ -256,9 +202,7 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore): HTM
       parts.push(
         endpoints(status.applied),
         el("h3", { className: "route__result-heading", text: "検索されたルート" }),
-        summary(status.route),
-        elevationProfileSlot(),
-        routeDetails(),
+        renderAnalysis(status.route, state.elevation, () => store.retryElevation(), detailsOpen, (open) => { detailsOpen = open; }),
       );
     } else if (status.kind === "empty") {
       parts.push(
@@ -281,6 +225,10 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore): HTM
     }
     parts.push(appliedList(status.applied));
     resultPane.replaceChildren(...parts);
+    if (active) {
+      const target = resultPane.querySelector<HTMLElement>(`[data-result-control="${active}"]`) ?? resultPane;
+      target.focus({ preventScroll: true });
+    }
   }
 
   function syncConditions(state: RouteSearchState): void {
