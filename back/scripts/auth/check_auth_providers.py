@@ -16,6 +16,7 @@ import json
 import os
 import smtplib
 import socket
+import ssl
 import sys
 import urllib.error
 import urllib.parse
@@ -157,17 +158,20 @@ def try_smtp() -> None:
         raise RuntimeError("SMTP_AUTH_MODE must be required, auto, or none")
     if security == "auto" and port == 465:
         security = "ssl"
+    tls_context = ssl.create_default_context()
 
     def send_once(mode: str, target_port: int) -> None:
         if mode == "ssl":
-            with smtplib.SMTP_SSL(host, target_port, timeout=20, local_hostname=helo_name) as smtp:
+            with smtplib.SMTP_SSL(
+                host, target_port, timeout=20, local_hostname=helo_name, context=tls_context
+            ) as smtp:
                 smtp_ehlo(smtp)
                 smtp_authenticate(smtp)
                 smtp.send_message(message)
             return
         with smtplib.SMTP(host, target_port, timeout=20, local_hostname=helo_name) as smtp:
             smtp_ehlo(smtp)
-            smtp.starttls()
+            smtp.starttls(context=tls_context)
             smtp_ehlo(smtp)
             smtp_authenticate(smtp)
             smtp.send_message(message)
@@ -202,7 +206,7 @@ def try_smtp() -> None:
             except (OSError, smtplib.SMTPException) as error:
                 raise RuntimeError(f"SMTP relay test failed on both STARTTLS and implicit TLS: {error}") from error
         else:
-            raise RuntimeError("SMTP server does not support the configured secure transport")
+            raise RuntimeError(f"SMTP relay test failed: {error}") from error
     except (OSError, smtplib.SMTPException) as error:
         raise RuntimeError(f"SMTP relay test failed: {error}") from error
     print(f"SMTP relay accepted a test message for {receiver}.")

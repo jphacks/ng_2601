@@ -61,7 +61,9 @@ class GeoJsonRouteContext:
             "metadata": self.metadata,
         }
 
-    def features_in_bbox(self, bbox: tuple[float, float, float, float]) -> list[dict[str, Any]]:
+    def features_in_bbox(
+        self, bbox: tuple[float, float, float, float], limit: int | None = None
+    ) -> list[dict[str, Any]]:
         """Return map features with source metadata attached and no local paths."""
         results: list[dict[str, Any]] = []
         for feature in self.collection.get("features", []):
@@ -81,6 +83,8 @@ class GeoJsonRouteContext:
                 }
             )
             results.append({"type": "Feature", "geometry": geometry, "properties": properties})
+            if limit is not None and len(results) >= limit:
+                break
         return results
 
 
@@ -97,7 +101,11 @@ class AccidentHistoryProvider(GeoJsonRouteContext):
                 hits.append(feature.get("properties") or {})
         window = self.metadata.get("window")
         return {
-            "status": "available" if hits else "partial",
+            # A loaded dataset with zero nearby records is a complete query
+            # result.  ``coverage`` describes the dataset's completeness;
+            # zero hits must not make an otherwise available source look
+            # degraded.
+            "status": "available",
             "source_id": self.source_id,
             "authority": self.metadata.get("authority", "National Police Agency"),
             "source": self.metadata.get("source", "NPA traffic-accident open data"),

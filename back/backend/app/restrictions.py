@@ -33,7 +33,12 @@ class RestrictionProvider:
     def status(self) -> dict[str, Any]:
         return {"enabled": False, "feature_count": 0}
 
-    def features_in_bbox(self, bbox: tuple[float, float, float, float], evaluated_at: datetime | None = None) -> list[dict[str, Any]]:
+    def features_in_bbox(
+        self,
+        bbox: tuple[float, float, float, float],
+        evaluated_at: datetime | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
         return []
 
 
@@ -61,10 +66,18 @@ class CompositeRestrictionProvider(RestrictionProvider):
             "sources": sources,
         }
 
-    def features_in_bbox(self, bbox: tuple[float, float, float, float], evaluated_at: datetime | None = None) -> list[dict[str, Any]]:
+    def features_in_bbox(
+        self,
+        bbox: tuple[float, float, float, float],
+        evaluated_at: datetime | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
         features: list[dict[str, Any]] = []
         for provider in self._providers.values():
-            features.extend(provider.features_in_bbox(bbox, evaluated_at))
+            remaining = None if limit is None else max(limit - len(features), 0)
+            if remaining == 0:
+                break
+            features.extend(provider.features_in_bbox(bbox, evaluated_at, remaining))
         return features
 
 
@@ -129,7 +142,12 @@ class GeoJsonRestrictionProvider(RestrictionProvider):
             "source_id": self._source_id,
         }
 
-    def features_in_bbox(self, bbox: tuple[float, float, float, float], evaluated_at: datetime | None = None) -> list[dict[str, Any]]:
+    def features_in_bbox(
+        self,
+        bbox: tuple[float, float, float, float],
+        evaluated_at: datetime | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
         features: list[dict[str, Any]] = []
         for feature, feature_bbox in self._features:
             geometry = feature.get("geometry") or {}
@@ -150,6 +168,8 @@ class GeoJsonRestrictionProvider(RestrictionProvider):
                 }
             )
             features.append({"type": "Feature", "geometry": feature.get("geometry"), "properties": properties})
+            if limit is not None and len(features) >= limit:
+                break
         return features
 
 

@@ -14,8 +14,22 @@ def test_accident_context_aggregates_with_provenance(tmp_path):
     context = AccidentHistoryProvider(path, "npa_accident_history").aggregate(ROUTE, datetime(2026, 10, 24, tzinfo=timezone.utc))
 
     assert context["source_id"] == "npa_accident_history"
+    assert context["status"] == "available"
     assert context["total_accidents"] == 1
     assert context["bicycle_involved_accidents"] == 1
+
+
+def test_accident_context_with_no_nearby_records_is_available(tmp_path):
+    path = tmp_path / "accidents.geojson"
+    path.write_text(
+        '{"type":"FeatureCollection","metadata":{"coverage":"nationwide"},"features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[137.0,35.0]},"properties":{}}]}'
+    )
+    context = AccidentHistoryProvider(path, "npa_accident_history").aggregate(
+        ROUTE, datetime(2026, 10, 24, tzinfo=timezone.utc)
+    )
+
+    assert context["status"] == "available"
+    assert context["total_accidents"] == 0
 
 
 def test_traffic_context_reports_partial_coverage_and_source(tmp_path):

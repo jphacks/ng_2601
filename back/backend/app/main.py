@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -10,7 +10,7 @@ import httpx
 import psycopg
 from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, StringConstraints, field_validator
 from psycopg.types.json import Jsonb
 from starlette.concurrency import run_in_threadpool
 
@@ -21,6 +21,12 @@ from .route_context import AccidentHistoryProvider, TrafficProvider
 from .restrictions import CompositeRestrictionProvider
 
 JAPAN_TIMEZONE = ZoneInfo("Asia/Tokyo")
+try:
+    MAX_MAP_BBOX_AREA_DEG2 = float(os.getenv("MAX_MAP_BBOX_AREA_DEG2", "25"))
+except ValueError as error:
+    raise RuntimeError("MAX_MAP_BBOX_AREA_DEG2 must be a positive number") from error
+if MAX_MAP_BBOX_AREA_DEG2 <= 0:
+    raise RuntimeError("MAX_MAP_BBOX_AREA_DEG2 must be a positive number")
 catalog = RoutingCatalog.from_path(os.getenv("ROUTING_CATALOG_PATH", "/app/config/routing_catalog.json"))
 BROUTER_URL = os.getenv("BROUTER_URL", "http://127.0.0.1:17777").rstrip("/")
 DATABASE_URL = os.getenv("DATABASE_URL", "")
@@ -67,10 +73,10 @@ class RouteRequest(BaseModel):
     bike_type: str | None = None
     preferences: dict[str, str] = Field(default_factory=dict)
 
-    @field_validator("bike_type")
+    @field_validator("bike_type", mode="before")
     @classmethod
-    def normalize_bike_type(cls, value: str | None) -> str | None:
-        return value.strip().lower() if value else value
+    def normalize_bike_type(cls, value: object) -> object:
+        return value.strip().lower() if isinstance(value, str) else value
 
 
 class ObservationModerationUpdate(BaseModel):
@@ -88,50 +94,53 @@ class ObservationCreate(BaseModel):
     expires_at: datetime | None = None
     description: str | None = Field(default=None, max_length=2000)
 
-    @field_validator("category")
+    @field_validator("category", mode="before")
     @classmethod
-    def normalize_category(cls, value: str) -> str:
-        return value.strip().lower()
+    def normalize_category(cls, value: object) -> object:
+        return value.strip().lower() if isinstance(value, str) else value
 
 
 class ObservationConfirmationCreate(BaseModel):
     state: Literal["still_present", "cleared", "inaccurate", "duplicate"]
 
 
+Label = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+
+
 class SavedPlaceCreate(BaseModel):
-    label: str = Field(min_length=1, max_length=120)
+    label: Label
     location: Coordinate
 
 
 class SavedPlaceUpdate(BaseModel):
-    label: str | None = Field(default=None, min_length=1, max_length=120)
+    label: Label | None = None
     location: Coordinate | None = None
 
 
 class SavedRouteCreate(BaseModel):
-    label: str = Field(min_length=1, max_length=120)
+    label: Label
     start: Coordinate
     end: Coordinate
     bike_type: str = Field(default="city", min_length=1, max_length=64)
     preferences: dict[str, str] = Field(default_factory=dict)
 
-    @field_validator("bike_type")
+    @field_validator("bike_type", mode="before")
     @classmethod
-    def normalize_bike_type(cls, value: str) -> str:
-        return value.strip().lower()
+    def normalize_bike_type(cls, value: object) -> object:
+        return value.strip().lower() if isinstance(value, str) else value
 
 
 class SavedRouteUpdate(BaseModel):
-    label: str | None = Field(default=None, min_length=1, max_length=120)
+    label: Label | None = None
     start: Coordinate | None = None
     end: Coordinate | None = None
     bike_type: str | None = Field(default=None, min_length=1, max_length=64)
     preferences: dict[str, str] | None = None
 
-    @field_validator("bike_type")
+    @field_validator("bike_type", mode="before")
     @classmethod
-    def normalize_optional_bike_type(cls, value: str | None) -> str | None:
-        return value.strip().lower() if value else value
+    def normalize_optional_bike_type(cls, value: object) -> object:
+        return value.strip().lower() if isinstance(value, str) else value
 
 
 def _bbox(
@@ -142,6 +151,11 @@ def _bbox(
 ) -> tuple[float, float, float, float]:
     if min_lon > max_lon or min_lat > max_lat:
         raise HTTPException(status_code=422, detail="Minimum map coordinates must not exceed maximum coordinates")
+    if (max_lon - min_lon) * (max_lat - min_lat) > MAX_MAP_BBOX_AREA_DEG2:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Map bounding box is too large; maximum area is {MAX_MAP_BBOX_AREA_DEG2:g} square degrees",
+        )
     return min_lon, min_lat, max_lon, max_lat
 
 
@@ -166,7 +180,7 @@ def _observation_features(
     bbox: tuple[float, float, float, float],
     category: str | None,
     limit: int,
-) -> list[dict[str, object]]:
+) -> tuple[list[dict[str, object]], bool]:
     if not DATABASE_URL:
         raise HTTPException(status_code=503, detail="Observation database is not configured")
     min_lon, min_lat, max_lon, max_lat = bbox
@@ -181,7 +195,7 @@ def _observation_features(
     if category:
         filters.append("o.category = %s")
         parameters.append(category.strip().lower())
-    parameters.append(limit)
+    parameters.append(limit + 1)
     query = f"""
         SELECT o.id, o.category, ST_Y(o.location::geometry), ST_X(o.location::geometry),
                o.temporal_kind, o.observed_at, o.starts_at, o.ends_at, o.expires_at,
@@ -220,7 +234,7 @@ def _observation_features(
                 },
             }
         )
-    return features
+    return features[:limit], len(features) > limit
 
 
 
@@ -257,9 +271,12 @@ def observations(
     limit: int = Query(default=200, ge=1, le=500),
 ) -> dict[str, object]:
     """Return active community reports as a provenance-bearing map layer."""
+    bbox = _bbox(min_lon, min_lat, max_lon, max_lat)
+    features, truncated = _observation_features(bbox, category, limit)
     return {
         "type": "FeatureCollection",
-        "features": _observation_features(_bbox(min_lon, min_lat, max_lon, max_lat), category, limit),
+        "features": features,
+        "truncated": truncated,
         "source": {
             "source_id": "user_report",
             "authority": "community",
@@ -557,37 +574,37 @@ def update_saved_route(
     values = request.model_dump(exclude_unset=True, exclude_none=True)
     if not values:
         raise HTTPException(status_code=422, detail="At least one route field is required")
-    if "bike_type" in values:
-        try:
-            policy = catalog.resolve(values["bike_type"], values.get("preferences", {}))
-        except CatalogError as error:
-            raise HTTPException(status_code=422, detail=str(error)) from error
-        values["bike_type"] = policy.bike_type
-    elif "preferences" in values:
-        try:
-            catalog.resolve("city", values["preferences"])
-        except CatalogError as error:
-            raise HTTPException(status_code=422, detail=str(error)) from error
-        values["preferences"] = dict(values["preferences"])
     _require_database()
-    assignments: list[str] = []
-    parameters: list[object] = []
-    for key in ("label", "bike_type"):
-        if key in values:
-            assignments.append(f"{key} = %s")
-            parameters.append(str(values[key]).strip())
-    if "preferences" in values:
-        assignments.append("preferences = %s")
-        parameters.append(Jsonb(values["preferences"]))
-    for field, column in (("start", "start_location"), ("end", "end_location")):
-        if field in values:
-            coordinate = values[field]
-            assignments.append(f"{column} = ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography")
-            parameters.extend([coordinate["lon"], coordinate["lat"]])
-    assignments.append("updated_at = now()")
-    parameters.extend([route_id, user_id])
     try:
         with psycopg.connect(DATABASE_URL) as connection:
+            stored = connection.execute(
+                "SELECT bike_type, preferences FROM saved_routes WHERE id = %s AND user_id = %s FOR UPDATE",
+                (route_id, user_id),
+            ).fetchone()
+            if not stored:
+                raise HTTPException(status_code=404, detail="Saved route not found")
+
+            merged_bike_type = values.get("bike_type", stored[0])
+            merged_preferences = dict(stored[1] or {})
+            if "preferences" in values:
+                merged_preferences.update(values["preferences"])
+            try:
+                policy = catalog.resolve(merged_bike_type, merged_preferences)
+            except CatalogError as error:
+                raise HTTPException(status_code=422, detail=str(error)) from error
+
+            assignments: list[str] = ["bike_type = %s", "preferences = %s"]
+            parameters: list[object] = [policy.bike_type, Jsonb(policy.preferences)]
+            if "label" in values:
+                assignments.append("label = %s")
+                parameters.append(values["label"])
+            for field, column in (("start", "start_location"), ("end", "end_location")):
+                if field in values:
+                    coordinate = values[field]
+                    assignments.append(f"{column} = ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography")
+                    parameters.extend([coordinate["lon"], coordinate["lat"]])
+            assignments.append("updated_at = now()")
+            parameters.extend([route_id, user_id])
             row = connection.execute(
                 f"""
                 UPDATE saved_routes SET {', '.join(assignments)}
@@ -598,6 +615,8 @@ def update_saved_route(
                 """,
                 parameters,
             ).fetchone()
+    except HTTPException:
+        raise
     except psycopg.DataError as error:
         raise HTTPException(status_code=422, detail="Invalid saved-route ID") from error
     except psycopg.Error as error:
@@ -636,27 +655,36 @@ def map_data(
     """Return map layers while keeping restrictions, contexts, and reports separate."""
     bbox = _bbox(min_lon, min_lat, max_lon, max_lat)
     evaluated_at = datetime.now(JAPAN_TIMEZONE)
+    layer_limit = limit + 1
+    restriction_features = restriction_provider.features_in_bbox(bbox, evaluated_at, layer_limit)
+    accident_features = accident_provider.features_in_bbox(bbox, layer_limit)
+    traffic_features = traffic_provider.features_in_bbox(bbox, layer_limit)
+    observation_features, observations_truncated = _observation_features(bbox, None, limit)
     return {
         "restrictions": {
             "type": "FeatureCollection",
-            "features": restriction_provider.features_in_bbox(bbox, evaluated_at),
+            "features": restriction_features[:limit],
+            "truncated": len(restriction_features) > limit,
             "source_status": restriction_provider.status(),
         },
         "route_context": {
             "accidents": {
                 "type": "FeatureCollection",
-                "features": accident_provider.features_in_bbox(bbox),
+                "features": accident_features[:limit],
+                "truncated": len(accident_features) > limit,
                 "source_status": accident_provider.status(),
             },
             "traffic": {
                 "type": "FeatureCollection",
-                "features": traffic_provider.features_in_bbox(bbox),
+                "features": traffic_features[:limit],
+                "truncated": len(traffic_features) > limit,
                 "source_status": traffic_provider.status(),
             },
         },
         "observations": {
             "type": "FeatureCollection",
-            "features": _observation_features(bbox, None, limit),
+            "features": observation_features,
+            "truncated": observations_truncated,
             "source": {
                 "source_id": "user_report",
                 "authority": "community",

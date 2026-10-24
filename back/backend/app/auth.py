@@ -13,6 +13,7 @@ import os
 import secrets
 import smtplib
 import socket
+import ssl
 from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 from typing import Any, Literal
@@ -119,11 +120,12 @@ class AuthService:
         security = self.smtp_security
         if security == "auto" and self.smtp_port == 465:
             security = "ssl"
+        tls_context = ssl.create_default_context()
 
         def send_once(mode: str, host: str, port: int) -> None:
             if mode == "ssl":
                 with smtplib.SMTP_SSL(
-                    host, port, timeout=20, local_hostname=self.smtp_helo_name
+                    host, port, timeout=20, local_hostname=self.smtp_helo_name, context=tls_context
                 ) as smtp:
                     self._smtp_ehlo(smtp)
                     self._smtp_authenticate(smtp)
@@ -131,7 +133,7 @@ class AuthService:
                 return
             with smtplib.SMTP(host, port, timeout=20, local_hostname=self.smtp_helo_name) as smtp:
                 self._smtp_ehlo(smtp)
-                smtp.starttls()
+                smtp.starttls(context=tls_context)
                 self._smtp_ehlo(smtp)
                 self._smtp_authenticate(smtp)
                 smtp.send_message(message)

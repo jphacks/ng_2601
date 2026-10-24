@@ -50,6 +50,27 @@ def number(value: str) -> int:
     return int(value.strip() or "0")
 
 
+def coordinate_dms(value: str) -> float:
+    """Convert the NPA packed DMS coordinate to decimal degrees.
+
+    The main table stores coordinates as degrees, minutes, and seconds with
+    three decimal places of seconds packed into an integer.  For example,
+    ``430607590`` means 43°06'07.590".
+    """
+    digits = value.strip()
+    if not digits or not digits.isdigit() or len(digits) < 7:
+        raise ValueError("invalid packed DMS coordinate")
+    degrees = int(digits[:-7] or "0")
+    minutes = int(digits[-7:-5])
+    seconds = int(digits[-5:-3]) + int(digits[-3:]) / 1000
+    if minutes >= 60 or seconds >= 60:
+        raise ValueError("invalid packed DMS coordinate")
+    return degrees + minutes / 60 + seconds / 3600
+
+
+BICYCLE_PARTY_CODES = {"51", "52"}
+
+
 def normalize(raw_files: list[tuple[int, Path]], output: Path) -> None:
     features: list[dict[str, object]] = []
     retrieved_at = datetime.now(timezone.utc).isoformat()
@@ -58,8 +79,8 @@ def normalize(raw_files: list[tuple[int, Path]], output: Path) -> None:
             reader = csv.DictReader(source)
             for row_number, row in enumerate(reader, start=2):
                 try:
-                    latitude = number(row.get("地点　緯度（北緯）", "")) / 10_000_000
-                    longitude = number(row.get("地点　経度（東経）", "")) / 10_000_000
+                    latitude = coordinate_dms(row.get("地点　緯度（北緯）", ""))
+                    longitude = coordinate_dms(row.get("地点　経度（東経）", ""))
                     year_value = number(row.get("発生日時　　年", str(year)))
                     month = number(row.get("発生日時　　月", "1"))
                     day = number(row.get("発生日時　　日", "1"))
@@ -89,7 +110,8 @@ def normalize(raw_files: list[tuple[int, Path]], output: Path) -> None:
                             # injury crashes "serious".
                             "fatal_or_serious": fatalities > 0,
                             "injury_accident": injuries > 0,
-                            "bicycle_involved": party_a == "03" or party_b == "03",
+                            "bicycle_involved": party_a.strip() in BICYCLE_PARTY_CODES
+                            or party_b.strip() in BICYCLE_PARTY_CODES,
                             "accident_type": row.get("事故類型"),
                             "road_form": row.get("道路形状"),
                             "surface": row.get("路面状態"),

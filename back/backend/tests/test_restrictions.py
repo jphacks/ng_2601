@@ -60,3 +60,4 @@ def test_features_in_bbox_checks_geometry_not_only_feature_envelope(tmp_path):
     # the diagonal itself never enters it. The second rectangle is crossed.
     assert [feature["properties"]["id"] for feature in provider.features_in_bbox((0.2, 0.7, 0.3, 0.8))] == []
     assert [feature["properties"]["id"] for feature in provider.features_in_bbox((0.2, 0.2, 0.3, 0.3))] == ["miss", "hit"]
+    assert len(provider.features_in_bbox((0.2, 0.2, 0.3, 0.3), limit=1)) == 1
