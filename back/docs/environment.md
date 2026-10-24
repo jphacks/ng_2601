@@ -53,7 +53,7 @@ curl --fail http://localhost:8080/health # for confirmation
 
 ### Authentication configuration
 
-The backend reads secrets from `backend/.env` through Compose's `env_file`. The checked-in `backend/.env.example` is a template; do not commit `backend/.env`.
+The backend reads secrets from `backend/.env` through Compose's `env_file`. `setup.sh` creates that file from the checked-in `backend/.env.example` when it is missing. Replace its development placeholders before exposing the service, and do not commit `backend/.env`.
 
 For email sign-in, set `SMTP_HOST=smtp-relay.gmail.com`, `SMTP_PORT=587`, the Google Workspace `SMTP_USERNAME` allowed to use SMTP AUTH, its app-password in `SMTP_PASSWORD`, and the approved visible `SMTP_SENDER`. The sender may differ from the SMTP AUTH account when the Workspace relay policy allows it.
 

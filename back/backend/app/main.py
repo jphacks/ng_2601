@@ -144,7 +144,10 @@ async def route(
                     f"{BROUTER_URL}/brouter",
                     params={**base_parameters, "alternativeidx": str(alternative_index)},
                 )
-                response.raise_for_status()
+                if response.is_error:
+                    if alternative_index == 0:
+                        response.raise_for_status()
+                    break
                 candidate = response.json()
                 candidate_hits = restriction_provider.active_hits(
                     candidate, policy.vehicle_class, evaluated_at
@@ -185,7 +188,7 @@ async def route(
 
 
 @app.patch("/v1/moderation/observations/{observation_id}")
-async def moderate_observation(
+def moderate_observation(
     observation_id: UUID,
     request: ObservationModerationUpdate,
     authorization: str | None = Header(default=None),
@@ -197,13 +200,11 @@ async def moderate_observation(
         raise HTTPException(status_code=422, detail="At least one moderation field is required")
     assignments = ", ".join(f"{key} = %s" for key in changes)
     try:
-        def update_observation() -> object:
-            with psycopg.connect(DATABASE_URL) as connection:
-                return connection.execute(
-                    f"UPDATE observations SET {assignments}, updated_at = now() WHERE id = %s RETURNING id, status, verification_state, updated_at",
-                    (*changes.values(), observation_id),
-                ).fetchone()
-        row = await run_in_threadpool(update_observation)
+        with psycopg.connect(DATABASE_URL) as connection:
+            row = connection.execute(
+                f"UPDATE observations SET {assignments}, updated_at = now() WHERE id = %s RETURNING id, status, verification_state, updated_at",
+                (*changes.values(), observation_id),
+            ).fetchone()
     except psycopg.DataError as error:
         raise HTTPException(status_code=422, detail="Invalid observation ID") from error
     except psycopg.Error as error:

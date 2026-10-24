@@ -47,7 +47,8 @@ services:
       TRAFFIC_VOLUME_PATH: /data/context/mlit_jartic_traffic.geojson
       DATABASE_URL: postgresql://cyclerhub-back:${POSTGRES_PASSWORD:-cyclerhub-back-local-dev}@db:5432/cyclerhub-back
     env_file:
-      - ./backend/.env
+      - path: ./backend/.env
+        required: false
     volumes:
       - ./data:/data:ro
     depends_on:

@@ -105,7 +105,6 @@ class AuthService:
         self.smtp_username = os.getenv("SMTP_USERNAME", "")
         self.smtp_password = os.getenv("SMTP_PASSWORD", "")
         self._oauth_states: dict[str, datetime] = {}
-        self._oauth_bindings: dict[str, str] = {}
 
     def _connect(self) -> psycopg.Connection[Any]:
         return psycopg.connect(self.database_url)
@@ -149,6 +148,12 @@ class AuthService:
         normalized = email.strip().lower()
         raw_token = secrets.token_urlsafe(32)
         with self._connect() as connection:
+            recent = connection.execute(
+                "SELECT 1 FROM email_login_tokens WHERE email = %s AND consumed_at IS NULL AND expires_at > %s",
+                (normalized, _now() + MAGIC_LINK_TTL - timedelta(seconds=60)),
+            ).fetchone()
+            if recent:
+                return
             connection.execute(
                 "DELETE FROM email_login_tokens WHERE email = %s AND consumed_at IS NULL",
                 (normalized,),
@@ -309,7 +314,6 @@ class AuthService:
     def begin_google(self) -> str:
         now = _now()
         self._oauth_states = {key: expiry for key, expiry in self._oauth_states.items() if expiry > now}
-        self._oauth_bindings = {key: value for key, value in self._oauth_bindings.items() if key in self._oauth_states}
         state = secrets.token_urlsafe(24)
         self._oauth_states[state] = now + timedelta(minutes=10)
         query = urlencode(
@@ -325,10 +329,9 @@ class AuthService:
         )
         return f"https://accounts.google.com/o/oauth2/v2/auth?{query}"
 
-    def consume_oauth_state(self, state: str, browser_binding: str | None) -> None:
+    def consume_oauth_state(self, state: str, browser_state: str | None) -> None:
         expiry = self._oauth_states.pop(state, None)
-        expected = getattr(self, "_oauth_bindings", {}).pop(state, None)
-        if expiry is None or expiry <= _now() or not browser_binding or not expected or not hmac.compare_digest(browser_binding, expected):
+        if expiry is None or expiry <= _now() or not browser_state or not hmac.compare_digest(state, browser_state):
             raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
 
 
@@ -353,7 +356,7 @@ def build_auth_router(service: AuthService) -> APIRouter:
     magic_attempts: dict[str, list[datetime]] = {}
 
     @router.post("/magic-link/request")
-    async def request_magic_link(request: Request, body: MagicLinkRequest) -> dict[str, str]:
+    def request_magic_link(request: Request, body: MagicLinkRequest) -> dict[str, str]:
         key = request.client.host if request.client else "unknown"
         now = _now()
         recent = [timestamp for timestamp in magic_attempts.get(key, []) if timestamp > now - timedelta(minutes=15)]
@@ -361,46 +364,42 @@ def build_auth_router(service: AuthService) -> APIRouter:
             raise HTTPException(status_code=429, detail="Too many sign-in requests")
         recent.append(now)
         magic_attempts[key] = recent
-        await run_in_threadpool(service.request_magic_link, str(body.email))
+        service.request_magic_link(str(body.email))
         return {"status": "sent"}
 
     @router.post("/magic-link/consume", response_model=SessionResponse)
-    async def consume_magic_link(request: MagicLinkConsumeRequest) -> SessionResponse:
-        return await run_in_threadpool(service.consume_magic_link, request.token)
+    def consume_magic_link(request: MagicLinkConsumeRequest) -> SessionResponse:
+        return service.consume_magic_link(request.token)
 
     @router.get("/google")
     async def start_google(request: Request, response: Response) -> dict[str, str]:
-        binding = secrets.token_urlsafe(24)
         url = service.begin_google()
         state = url.split("state=", 1)[1].split("&", 1)[0]
-        service._oauth_bindings = getattr(service, "_oauth_bindings", {})
-        service._oauth_bindings[state] = binding
-        response.set_cookie("cyclerhub_oauth", binding, httponly=True, secure=False, samesite="lax", max_age=600)
+        response.set_cookie("cyclerhub_oauth", state, httponly=True, secure=service.google_callback_url.startswith("https://"), samesite="lax", max_age=600)
         return {"authorization_url": url}
 
     @router.get("/google/callback", response_model=GoogleCallbackResponse)
-    async def google_callback(request: Request, code: str = Query(min_length=1), state: str = Query(min_length=1)) -> GoogleCallbackResponse:
+    async def google_callback(request: Request, response: Response, code: str = Query(min_length=1), state: str = Query(min_length=1)) -> GoogleCallbackResponse:
         service.consume_oauth_state(state, request.cookies.get("cyclerhub_oauth"))
+        response.delete_cookie("cyclerhub_oauth")
         return GoogleCallbackResponse(session=await service.google_login(code))
 
     @router.post("/refresh", response_model=SessionResponse)
-    async def refresh(authorization: str | None = Header(default=None)) -> SessionResponse:
-        return await run_in_threadpool(service.refresh, _bearer(authorization))
+    def refresh(authorization: str | None = Header(default=None)) -> SessionResponse:
+        return service.refresh(_bearer(authorization))
 
     @router.post("/logout")
-    async def logout(authorization: str | None = Header(default=None)) -> dict[str, str]:
-        await run_in_threadpool(service.revoke, _bearer(authorization))
+    def logout(authorization: str | None = Header(default=None)) -> dict[str, str]:
+        service.revoke(_bearer(authorization))
         return {"status": "signed_out"}
 
     @router.get("/me")
-    async def me(user_id: str = Depends(current_user_id)) -> dict[str, object]:
-        def fetch_user() -> Any:
-            with service._connect() as connection:
-                return connection.execute(
-                    "SELECT id, display_name, bike_type, hill_mode, traffic_mode, surface_mode, walking_mode FROM users WHERE id = %s AND deleted_at IS NULL",
-                    (user_id,),
-                ).fetchone()
-        row = await run_in_threadpool(fetch_user)
+    def me(user_id: str = Depends(current_user_id)) -> dict[str, object]:
+        with service._connect() as connection:
+            row = connection.execute(
+                "SELECT id, display_name, bike_type, hill_mode, traffic_mode, surface_mode, walking_mode FROM users WHERE id = %s AND deleted_at IS NULL",
+                (user_id,),
+            ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="User not found")
         return {
@@ -416,7 +415,7 @@ def build_auth_router(service: AuthService) -> APIRouter:
         }
 
     @router.put("/me/preferences")
-    async def update_preferences(
+    def update_preferences(
         request: PreferenceUpdate,
         user_id: str = Depends(current_user_id),
     ) -> dict[str, str]:
@@ -424,13 +423,12 @@ def build_auth_router(service: AuthService) -> APIRouter:
         if not values:
             return {"status": "unchanged"}
         assignments = ", ".join(f"{key} = %s" for key in values)
-        def update_user() -> int:
-            with service._connect() as connection:
-                return connection.execute(
-                    f"UPDATE users SET {assignments} WHERE id = %s AND deleted_at IS NULL",
-                    (*values.values(), user_id),
-                ).rowcount
-        if await run_in_threadpool(update_user) != 1:
+        with service._connect() as connection:
+            result = connection.execute(
+                f"UPDATE users SET {assignments} WHERE id = %s AND deleted_at IS NULL",
+                (*values.values(), user_id),
+            )
+        if result.rowcount != 1:
             raise HTTPException(status_code=404, detail="User not found")
         return {"status": "updated"}
 
