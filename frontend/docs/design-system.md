@@ -1,6 +1,6 @@
 # デザインシステム（Nature Ride）
 
-画面シェル（[Issue #4](https://github.com/jphacks/ng_2601/issues/4)）で導入した共通テーマです。正本は[`frontend/src/styles/tokens.css`](../frontend/src/styles/tokens.css)で、色や寸法をコンポーネント側に直書きしません。
+画面シェル（[Issue #4](https://github.com/jphacks/ng_2601/issues/4)）で導入した共通テーマです。正本は[`frontend/src/styles/tokens.css`](../src/styles/tokens.css)で、色や寸法をコンポーネント側に直書きしません。
 
 | トークン | 値 | 用途 |
 | --- | --- | --- |

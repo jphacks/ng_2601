@@ -10,7 +10,8 @@ import type {
 
 /** モックと実APIが共通で実装するインターフェース。画面はこれだけに依存する。 */
 export interface ApiClient {
-  searchRoutes(req: RouteSearchRequest): Promise<Route[]>;
+  /** 単一ルートを返す。ルートが無い場合は code `no_route` の ApiError。 */
+  searchRoute(req: RouteSearchRequest): Promise<Route>;
   getRoute(id: string): Promise<Route>;
   listHazards(routeId?: string): Promise<Hazard[]>;
   /** 表示領域の道路・危険情報（GET /v1/map-data）。信号が中断されたら AbortError を投げる。 */

@@ -40,8 +40,11 @@ export interface ReviewPin {
 }
 
 export interface MapHandlers {
-  /** 地図クリック／タップで地点を選択したとき。 */
-  onPick?: (lngLat: LngLat) => void;
+  /**
+   * 地図クリック／タップで地点を選択したとき。
+   * true を返すと呼び出し側が地点を使ったとして、汎用の「選択した地点」マーカーを置かない。
+   */
+  onPick?: (lngLat: LngLat) => boolean | void;
   /** 道路・危険情報の図形をクリックしたとき（id）。何もない場所をクリックしたとき（null）。 */
   onSelectRoadInfo?: (id: string | null) => void;
 }
@@ -51,8 +54,19 @@ export interface Viewport {
   zoom: number;
 }
 
+/** 出発地・目的地。未指定は null。 */
+export interface Endpoints {
+  origin: LngLat | null;
+  destination: LngLat | null;
+}
+
 export interface MapController {
   setRoutes(routes: Route[]): void;
+  setEndpoints(endpoints: Endpoints): void;
+  /** 地点指定モードの間、カーソルを十字にして地図を指定待ちと分かるようにする。 */
+  setPicking(on: boolean): void;
+  /** 経路全体が見えるよう表示範囲を合わせる。パネルに隠れない余白を取る。 */
+  fitToRoute(route: Route): void;
   /** 道路・危険情報（FE-09）。フィルタ済みの項目を渡す。 */
   setRoadInfo(items: readonly RoadInfoItem[], now?: Date): void;
   setSelectedRoadInfo(id: string | null): void;
@@ -98,8 +112,11 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
   let roadItems: readonly RoadInfoItem[] = [];
   let roadNow = new Date();
   let selectedRoadId: string | null = null;
+  let picking = false;
   let reviewMarkers: maplibregl.Marker[] = [];
   let pickMarker: maplibregl.Marker | null = null;
+  let endpointMarkers: maplibregl.Marker[] = [];
+  let endpoints: Endpoints = { origin: null, destination: null };
   const visible: Record<LayerId, boolean> = { basemap: true, routes: true, hazards: true, reviews: true };
   const listeners: Array<() => void> = [];
   const viewportListeners: Array<(viewport: Viewport) => void> = [];
@@ -237,6 +254,12 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
     });
   }
 
+  /** 出発地・目的地は常に表示（レイヤー切替の対象外）。地図の作り直し後も再度載せる。 */
+  function syncEndpoints(): void {
+    if (!map) return;
+    for (const m of endpointMarkers) if (!m.getElement().isConnected) showMarker(m, map);
+  }
+
   function replaceMarkers(old: maplibregl.Marker[], specs: MarkerSpec[]): maplibregl.Marker[] {
     for (const m of old) hideMarker(m);
     return specs.map(createMarker);
@@ -281,6 +304,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
         addRoadInfoLayers(m);
         syncSelection();
         syncVisibility();
+        syncEndpoints();
         emitViewport();
       });
       m.on("moveend", emitViewport);
@@ -306,12 +330,14 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
         if (target instanceof Element && target.closest(".map-marker, .maplibregl-popup")) return;
         // 道路・危険情報の図形は詳細カードを開き、地点選択にはしない。
         const hitId: unknown = hitAt(e.point)[0]?.properties?.id;
-        if (typeof hitId === "string") {
+        // 地点指定モード中は、近くの道路情報ではなくタップした地点を優先する。
+        if (!picking && typeof hitId === "string") {
           handlers.onSelectRoadInfo?.(hitId);
           return;
         }
         handlers.onSelectRoadInfo?.(null);
         const lngLat: LngLat = [e.lngLat.lng, e.lngLat.lat];
+        if (handlers.onPick?.(lngLat) === true) return;
         if (pickMarker) hideMarker(pickMarker);
         pickMarker = createMarker({
           id: "pick",
@@ -324,7 +350,6 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
         });
         showMarker(pickMarker, m);
         pickMarker.togglePopup();
-        handlers.onPick?.(lngLat);
       });
 
       // 失敗したことを隠さない。失敗したタイルが読めるまで表示を残す。
@@ -356,6 +381,44 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
     setRoutes(next) {
       routes = next;
       syncRoutes();
+    },
+    setEndpoints({ origin, destination }) {
+      // 地点が変わっていなければマーカーを作り直さない（開いたポップアップとフォーカスを保つ）。
+      const same = (a: LngLat | null, b: LngLat | null) => (a === null || b === null ? a === b : a[0] === b[0] && a[1] === b[1]);
+      if (same(origin, endpoints.origin) && same(destination, endpoints.destination)) {
+        syncEndpoints();
+        return;
+      }
+      endpoints = { origin, destination };
+      const specs: MarkerSpec[] = [];
+      const coords = (p: LngLat) => `緯度 ${p[1].toFixed(5)} / 経度 ${p[0].toFixed(5)}`;
+      if (origin) {
+        specs.push({ id: "origin", lngLat: origin, glyph: "発", label: "出発地", title: "出発地", description: coords(origin), kind: "origin" });
+      }
+      if (destination) {
+        specs.push({ id: "destination", lngLat: destination, glyph: "着", label: "目的地", title: "目的地", description: coords(destination), kind: "destination" });
+      }
+      endpointMarkers = replaceMarkers(endpointMarkers, specs);
+      syncEndpoints();
+    },
+    setPicking(on) {
+      picking = on;
+      canvas.classList.toggle("map__canvas--picking", on);
+    },
+    fitToRoute(route) {
+      if (!map || route.coordinates.length === 0) return;
+      const bounds = route.coordinates.reduce(
+        (b, c) => b.extend(c),
+        new maplibregl.LngLatBounds(route.coordinates[0], route.coordinates[0]),
+      );
+      // 検索パネルは広い画面で左側、狭い画面で上側を覆う。覆われない範囲に収める。
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      const padding =
+        w >= 768
+          ? { top: 64, bottom: 64, left: 464, right: 96 }
+          : { top: Math.min(Math.round(h * 0.65) + 80, h - 200), bottom: 48, left: 32, right: 32 };
+      map.fitBounds(bounds, { padding, maxZoom: 16 });
     },
     setRoadInfo(items, now = new Date()) {
       roadItems = items;
