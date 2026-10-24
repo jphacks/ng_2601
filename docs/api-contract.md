@@ -2,19 +2,19 @@
 
 ## 状態と正本
 
-確認時点は[architecture.md](architecture.md)と同じです。mainにはAPI型定義、OpenAPI、サーバー実装がなく、正式に合意・実装されたAPIは確認できません。
+確認時点は[architecture.md](architecture.md)と同じです。PR #16の暫定API型・clientはmainへマージ済みです。正式に合意されたBE契約は未確認で、BEのPR #18は未マージです。FE-02の画面シェルはAPI契約を変更せず、通信も追加しません。
 
-[PR #16（未マージ）](https://github.com/jphacks/ng_2601/pull/16)には暫定型とHTTP clientがあります。以下はhead `b9de6e2`を参照する索引であり、正式なBE仕様ではありません。型の全フィールドやJSON例をこの文書に複製しません。
+[PR #16（マージ済み）](https://github.com/jphacks/ng_2601/pull/16)で導入した暫定型とHTTP clientを正本として参照します。正式なBE仕様ではありません。型の全フィールドやJSON例をこの文書に複製しません。
 
-| 確認する内容 | PR #16内の参照先（暫定） |
+| 確認する内容 | リポジトリ内の参照先（暫定） |
 | --- | --- |
-| リクエスト・レスポンスの構造、単位 | [frontend/src/types/api.ts](https://github.com/jphacks/ng_2601/blob/b9de6e2bc07f173f00ae6cb8491bf348974578ea/frontend/src/types/api.ts) |
-| UIから呼ぶ操作・戻り値 | [frontend/src/api/client.ts](https://github.com/jphacks/ng_2601/blob/b9de6e2bc07f173f00ae6cb8491bf348974578ea/frontend/src/api/client.ts) |
-| HTTPメソッド・パス・query・JSON body | [frontend/src/api/http.ts](https://github.com/jphacks/ng_2601/blob/b9de6e2bc07f173f00ae6cb8491bf348974578ea/frontend/src/api/http.ts) |
-| エラーの正規化 | [frontend/src/api/errors.ts](https://github.com/jphacks/ng_2601/blob/b9de6e2bc07f173f00ae6cb8491bf348974578ea/frontend/src/api/errors.ts) |
-| モックと接続設定・実行手順 | [frontend/README.md](https://github.com/jphacks/ng_2601/blob/b9de6e2bc07f173f00ae6cb8491bf348974578ea/frontend/README.md) |
+| リクエスト・レスポンスの構造、単位 | [frontend/src/types/api.ts](../frontend/src/types/api.ts) |
+| UIから呼ぶ操作・戻り値 | [frontend/src/api/client.ts](../frontend/src/api/client.ts) |
+| HTTPメソッド・パス・query・JSON body | [frontend/src/api/http.ts](../frontend/src/api/http.ts) |
+| エラーの正規化 | [frontend/src/api/errors.ts](../frontend/src/api/errors.ts) |
+| モックと接続設定・実行手順 | [frontend/README.md](../frontend/README.md) |
 
-マージ後は実際に取り込まれた型・clientを確認し、上の索引をリポジトリ内の相対リンクへ更新します。正式仕様をOpenAPI等で導入する場合は、構造の正本を一つ選び、型生成または整合確認方法を同じPRで定めます。暫定型を無条件に正式契約へ昇格させません。
+正式仕様をOpenAPI等で導入する場合は、構造の正本を一つ選び、型生成または整合確認方法を同じPRで定めます。暫定型を無条件に正式契約へ昇格させません。
 
 ## 操作一覧（すべて暫定・サーバー未確認）
 
