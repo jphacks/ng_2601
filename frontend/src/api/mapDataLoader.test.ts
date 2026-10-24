@@ -91,6 +91,27 @@ describe("createMapDataLoader", () => {
     expect(loader.getState().data).toBe(fresh);
   });
 
+  it("取得済みの範囲に戻ったら進行中の別領域の取得を無効化し、表示中のデータを上書きさせない", async () => {
+    const { client, calls } = fakeClient();
+    const loader = createMapDataLoader(client, { debounceMs: DEBOUNCE });
+    loader.request(VIEW, 15);
+    await tick();
+    const first = buildMockMapData();
+    calls[0].resolve(first);
+    await vi.advanceTimersByTimeAsync(0);
+
+    loader.request([139.9, 35.8, 139.92, 35.81], 15);
+    await tick();
+    expect(calls).toHaveLength(2);
+    loader.request(VIEW, 15); // 取得済みの範囲に戻る
+    await tick();
+    expect(calls[1].opts?.signal?.aborted).toBe(true);
+
+    calls[1].resolve(buildMockMapData());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(loader.getState()).toMatchObject({ status: "ok", data: first });
+  });
+
   it("最小ズーム未満では取得せず、保持していたデータを消す", async () => {
     const { client, calls } = fakeClient();
     const loader = createMapDataLoader(client, { debounceMs: DEBOUNCE, minZoom: 12 });

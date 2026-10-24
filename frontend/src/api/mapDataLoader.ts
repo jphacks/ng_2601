@@ -95,6 +95,8 @@ export function createMapDataLoader(client: ApiClient, options: MapDataLoaderOpt
       }
       // 取得済みの範囲に収まり、件数上限で欠けていなければ再取得しない。
       if (loaded && !loaded.truncated && bboxContains(loaded.box, bbox)) {
+        // 別の表示領域向けの取得が進行中なら無効化し、今の表示を覆うデータを上書きさせない。
+        cancel();
         if (state.status !== "ok") setState({ ...state, status: "ok", reason: undefined });
         return;
       }

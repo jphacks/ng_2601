@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Geometry } from "geojson";
 import type { BBox } from "../../types/api";
 import { bboxContains, bboxIntersects, padBBox } from "./bbox";
 import { geometryBBox, representativePoint } from "./geometry";
@@ -37,5 +38,15 @@ describe("geometry", () => {
     expect(representativePoint({ type: "LineString", coordinates: [[0, 0], [4, 2]] })).toEqual([2, 1]);
     expect(representativePoint({ type: "Point", coordinates: [3, 4] })).toEqual([3, 4]);
     expect(representativePoint({ type: "GeometryCollection", geometries: [] })).toBeNull();
+  });
+
+  it("不正な座標（空・非有限）は代表点にも外接矩形にも使わない", () => {
+    const bad = (coordinates: unknown) => ({ type: "Point", coordinates }) as unknown as Geometry;
+    expect(representativePoint(bad([]))).toBeNull();
+    expect(representativePoint(bad([NaN, 35]))).toBeNull();
+    expect(representativePoint(bad([139, Infinity]))).toBeNull();
+    expect(representativePoint(bad(null))).toBeNull();
+    expect(geometryBBox(bad([NaN, 35]))).toBeNull();
+    expect(geometryBBox({ type: "LineString", coordinates: [[0, 0], [NaN, 1], [2, 2]] })).toEqual([0, 0, 2, 2]);
   });
 });

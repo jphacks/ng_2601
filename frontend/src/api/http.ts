@@ -1,5 +1,6 @@
 import type { ApiClient } from "./client";
 import { ApiError } from "./errors";
+import { assertMapData } from "./mapDataValidation";
 import type { ApiErrorBody } from "../types/api";
 
 function isApiErrorBody(v: unknown): v is ApiErrorBody {
@@ -47,7 +48,7 @@ export function createHttpClient(baseUrl: string): ApiClient {
     getRoute: (id) => request("GET", `/routes/${encodeURIComponent(id)}`),
     listHazards: (routeId) => request("GET", `/hazards${qs({ routeId })}`),
     getMapData: ([minLon, minLat, maxLon, maxLat], { limit, signal } = {}) =>
-      request(
+      request<unknown>(
         "GET",
         `/v1/map-data${qs({
           min_lon: String(minLon),
@@ -58,7 +59,7 @@ export function createHttpClient(baseUrl: string): ApiClient {
         })}`,
         undefined,
         signal,
-      ),
+      ).then(assertMapData),
     listReviews: (params = {}) => request("GET", `/reviews${qs(params)}`),
     getPreferences: () => request("GET", "/preferences"),
     updatePreferences: (p) => request("PUT", "/preferences", p),
