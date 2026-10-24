@@ -21,6 +21,8 @@ export interface ReviewsFeatureOptions {
   getRoadInfo: () => readonly RoadInfoItem[];
   /** シートを開く直前（他のパネルを閉じるため）。 */
   onOpen?: () => void;
+  /** 口コミの投稿を始める。地点が分からない（一覧から）ときは null。 */
+  onPost?: (at: LngLat | null) => void;
 }
 
 export interface ReviewsFeature {
@@ -37,6 +39,8 @@ export interface ReviewsFeature {
   close(): void;
   /** 開いていれば閉じて true。 */
   handleEscape(): boolean;
+  /** 投稿された口コミを一覧・地図に加え、その詳細を開いて確認できるようにする。 */
+  showPosted(review: Review): void;
 }
 
 interface Selection {
@@ -60,6 +64,12 @@ function padded([west, south, east, north]: BBox): BBox {
   ];
 }
 
+function postButton(label: string): HTMLButtonElement {
+  const b = el("button", { className: "review-post-action", text: label });
+  b.type = "button";
+  return b;
+}
+
 function iconButton(label: string, className: string, name: "back" | "close"): HTMLButtonElement {
   const b = el("button", { className }, [icon(name)]);
   b.type = "button";
@@ -68,7 +78,7 @@ function iconButton(label: string, className: string, name: "back" | "close"): H
 }
 
 export function createReviewsFeature(options: ReviewsFeatureOptions): ReviewsFeature {
-  const { map, client, getRoadInfo, onOpen } = options;
+  const { map, client, getRoadInfo, onOpen, onPost } = options;
 
   let reviews: Review[] = [];
   let load: LoadState = "idle";
@@ -98,7 +108,14 @@ export function createReviewsFeature(options: ReviewsFeatureOptions): ReviewsFea
 
   const status = el("div", { className: "reviews-status" });
   status.hidden = true;
-  const listPanel = el("div", { className: "reviews-list" });
+  const listContent = el("div");
+  // 投稿ボタンは再描画で作り直さない（フォーカスを保つ）。
+  const listPost = postButton("口コミを投稿する");
+  listPost.addEventListener("click", () => onPost?.(null));
+  const listPanel = el("div", { className: "reviews-list" }, [
+    el("div", { className: "reviews-actions" }, [listPost]),
+    listContent,
+  ]);
 
   // --- data ------------------------------------------------------------
   function retry(): void {
@@ -233,7 +250,10 @@ export function createReviewsFeature(options: ReviewsFeatureOptions): ReviewsFea
     } else {
       title.textContent = "この地点の口コミ・道路情報";
       const hazards = hazardSection();
-      body.replaceChildren(userSection(), ...(hazards ? [hazards] : []));
+      const here = selection.center;
+      const post = postButton("この地点に口コミを投稿");
+      post.addEventListener("click", () => onPost?.(here));
+      body.replaceChildren(userSection(), ...(onPost ? [post] : []), ...(hazards ? [hazards] : []));
     }
     sheet.inert = false;
     sheet.classList.add("is-open");
@@ -256,7 +276,7 @@ export function createReviewsFeature(options: ReviewsFeatureOptions): ReviewsFea
 
   function renderList(): void {
     if (!loadedOnce) {
-      listPanel.replaceChildren(
+      listContent.replaceChildren(
         load === "error"
           ? renderState({ kind: "error", message: LOAD_ERROR_MESSAGE, onRetry: retry })
           : renderState({ kind: "loading", message: "口コミを読み込み中…" }),
@@ -264,10 +284,10 @@ export function createReviewsFeature(options: ReviewsFeatureOptions): ReviewsFea
       return;
     }
     if (reviews.length === 0) {
-      listPanel.replaceChildren(renderState({ kind: "empty", message: "表示中の範囲に口コミはありません。" }));
+      listContent.replaceChildren(renderState({ kind: "empty", message: "表示中の範囲に口コミはありません。" }));
       return;
     }
-    listPanel.replaceChildren(
+    listContent.replaceChildren(
       el("p", { className: "reviews-list__summary", text: `表示中の範囲の口コミ（${reviews.length}件）` }),
       el(
         "ul",
@@ -288,6 +308,18 @@ export function createReviewsFeature(options: ReviewsFeatureOptions): ReviewsFea
     if (place) open({ center: place.center, ids: place.reviews.map((r) => r.id), reviewId: id });
   }
 
+  function showPosted(review: Review): void {
+    reviews = sortNewestFirst([review, ...reviews.filter((r) => r.id !== review.id)]);
+    signature = JSON.stringify(reviews);
+    load = "ready";
+    loadedOnce = true;
+    map.setReviews(groupReviews(reviews), selectPlace);
+    renderAll();
+    openReview(review.id);
+    // サーバー側の状態（投稿日時など）に合わせるため取得し直す。失敗しても投稿済みの表示は残る。
+    retry();
+  }
+
   renderAll();
 
   return {
@@ -297,6 +329,7 @@ export function createReviewsFeature(options: ReviewsFeatureOptions): ReviewsFea
     openNear: (lngLat) => open({ center: lngLat }),
     openReview,
     close,
+    showPosted,
     handleEscape() {
       if (!selection) return false;
       close();

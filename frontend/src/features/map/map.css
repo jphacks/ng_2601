@@ -80,6 +80,7 @@
 .map-marker--hazard { background: var(--color-warning); }
 .map-marker--review { background: var(--color-primary); }
 .map-marker--pick { background: var(--color-route); width: 18px; height: 18px; }
+.map-marker--draft { background: var(--color-accent); color: var(--color-text); }
 .map-marker--origin { background: var(--color-primary); }
 .map-marker--destination { background: var(--color-accent); color: var(--color-text); }
 /* グラフの選択位置（#9）。操作対象ではないのでポインタを受け取らない。 */

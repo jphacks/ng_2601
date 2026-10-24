@@ -87,6 +87,8 @@ export interface MapController {
   onViewportChange(listener: (viewport: Viewport) => void): void;
   /** 口コミのピンを置き換える。ピンの選択（クリック／Enter）で onSelect を呼ぶ。 */
   setReviews(places: ReviewPlace[], onSelect: (place: ReviewPlace) => void): void;
+  /** 口コミの投稿地点を示すマーカー。null で消す。 */
+  setDraftPoint(point: LngLat | null): void;
   setLayerVisible(id: LayerId, visible: boolean): void;
   isLayerVisible(id: LayerId): boolean;
   onLayersChange(listener: () => void): void;
@@ -183,6 +185,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
   let reviewMarkers: maplibregl.Marker[] = [];
   let pickMarker: maplibregl.Marker | null = null;
   let endpointMarkers: maplibregl.Marker[] = [];
+  let draftMarker: maplibregl.Marker | null = null;
   let endpoints: Endpoints = { origin: null, destination: null };
   const visible: Record<LayerId, boolean> = { basemap: true, routes: true, hazards: true, reviews: true };
   const listeners: Array<() => void> = [];
@@ -485,6 +488,11 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
     for (const m of endpointMarkers) if (!m.getElement().isConnected) showMarker(m, map);
   }
 
+  /** 投稿地点も地図の作り直し後に載せ直す。 */
+  function syncDraft(): void {
+    if (map && draftMarker && !draftMarker.getElement().isConnected) showMarker(draftMarker, map);
+  }
+
   function replaceMarkers(old: maplibregl.Marker[], specs: MarkerSpec[]): maplibregl.Marker[] {
     for (const m of old) hideMarker(m);
     return specs.map(createMarker);
@@ -562,6 +570,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
         syncVisibility();
         syncEndpoints();
         applyRouteSelection();
+        syncDraft();
         emitViewport();
       });
       m.on("moveend", emitViewport);
@@ -754,6 +763,21 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
         }),
       );
       syncVisibility();
+    },
+    setDraftPoint(point) {
+      if (draftMarker) hideMarker(draftMarker);
+      draftMarker = point
+        ? createMarker({
+            id: "draft",
+            lngLat: point,
+            glyph: "投",
+            label: "口コミの投稿地点",
+            title: "口コミの投稿地点",
+            description: `緯度 ${point[1].toFixed(5)} / 経度 ${point[0].toFixed(5)}`,
+            kind: "draft",
+          })
+        : null;
+      syncDraft();
     },
     setLayerVisible(id, on) {
       visible[id] = on;

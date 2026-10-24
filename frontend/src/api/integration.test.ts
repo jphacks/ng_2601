@@ -123,4 +123,45 @@ describe("main の経路・道路情報と口コミのAPI統合", () => {
     const reviews = await createHttpClient("https://example.test").listReviews({ bbox: BOUNDS });
     expect(reviews.map((review) => review.id)).toEqual(["observation-1"]);
   });
+
+  it("投稿をmainのBE形式へ変換し、作成応答から一覧用の口コミを作る", async () => {
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ id: "created-1", verification_state: "unverified" }, { status: 201 }));
+    vi.stubGlobal("fetch", fetcher);
+    const draft = { location: [139.768, 35.6825] as [number, number], category: "surface" as const, comment: "段差あり" };
+    const review = await createHttpClient("https://example.test").createReview(draft);
+    expect(review).toMatchObject({ id: "created-1", ...draft, verification: "unverified" });
+    expect(fetcher.mock.calls[0][0]).toBe("https://example.test/v1/observations");
+    expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({
+      category: "surface", location: { lon: 139.768, lat: 35.6825 }, temporal_kind: "permanent", description: "段差あり",
+    });
+  });
+
+  it.each([[401, "unauthorized"], [429, "rate_limited"]])("投稿のHTTP %sを正規化する", async (status, code) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ detail: "backend message" }, { status: Number(status) })));
+    await expect(createHttpClient("https://example.test").createReview({
+      location: [139.768, 35.6825], category: "surface", comment: "段差あり",
+    })).rejects.toMatchObject({ status: Number(status), code, details: "backend message" });
+  });
+
+  it("投稿の不正な作成応答はinvalid_responseとして扱う", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ unexpected: true })));
+    await expect(createHttpClient("https://example.test").createReview({
+      location: [139.768, 35.6825], category: "surface", comment: "段差あり",
+    })).rejects.toMatchObject({ code: "invalid_response" });
+  });
+
+  it("モック投稿後も同じbboxで投稿済みの口コミを取得できる", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("location", { search: "" });
+    const client = createMockClient();
+    const creating = client.createReview({ location: [139.768, 35.6825], category: "surface", comment: "段差あり" });
+    await vi.runAllTimersAsync();
+    const created = await creating;
+    const listing = client.listReviews({ bbox: BOUNDS });
+    await vi.runAllTimersAsync();
+    expect(await listing).toContainEqual(created);
+    const outside = client.listReviews({ bbox: [140, 36, 141, 37] });
+    await vi.runAllTimersAsync();
+    expect(await outside).toEqual([]);
+  });
 });

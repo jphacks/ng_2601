@@ -1,4 +1,4 @@
-import type { LngLat, Review, ReviewCategory, VerificationState } from "../types/api";
+import type { LngLat, Review, ReviewCategory, ReviewDraft, VerificationState } from "../types/api";
 
 // BE PR #26 の GET /v1/observations（GeoJSON FeatureCollection）を Review に変換する。暫定。
 
@@ -60,4 +60,34 @@ export function observationsToReviews(collection: unknown): Review[] {
     const review = toReview(feature);
     return review ? [review] : [];
   });
+}
+
+/**
+ * 投稿をBEの `POST /v1/observations` の本文へ。暫定。
+ * categoryはBEが自由入力のため、FEの暫定カテゴリ名をそのまま送る（一覧取得時の normalizeCategory で同じ値に戻る）。
+ * temporal_kindの既定は "temporary" で expires_at が必須になるため、期限を持たない "permanent" を指定する。
+ */
+export function toObservationRequest(draft: ReviewDraft): Record<string, unknown> {
+  return {
+    category: draft.category,
+    location: { lat: draft.location[1], lon: draft.location[0] },
+    temporal_kind: "permanent",
+    description: draft.comment,
+  };
+}
+
+/** BEの作成応答（id等のみで投稿内容は返らない）と送信内容から、一覧に追加する Review を作る。 */
+export function reviewFromCreated(draft: ReviewDraft, response: unknown, createdAt: string): Review {
+  if (!isRecord(response) || typeof response.id !== "string" || response.id === "") {
+    throw new Error("unexpected observation response");
+  }
+  return {
+    id: response.id,
+    location: draft.location,
+    category: draft.category,
+    rawCategory: draft.category,
+    comment: draft.comment,
+    createdAt,
+    verification: VERIFICATION.find((v) => v === response.verification_state),
+  };
 }

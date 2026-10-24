@@ -3,7 +3,7 @@ import { ApiError } from "./errors";
 import { assertMapData } from "./mapDataValidation";
 import { fromBackendMe, fromBackendOptions, toBackendPreferences } from "./preferencesAdapter";
 import { fromBackendResponse, toBackendRequest } from "./routeAdapter";
-import { observationsToReviews } from "./reviewAdapter";
+import { observationsToReviews, reviewFromCreated, toObservationRequest } from "./reviewAdapter";
 import type { ApiErrorBody, BBox } from "../types/api";
 
 const WORLD: BBox = [-180, -90, 180, 90];
@@ -20,6 +20,18 @@ const MAP_DATA_TIMEOUT_MS = 15_000;
 
 /** 口コミ取得が止まったままにならないよう打ち切るまでの時間。 */
 const REVIEWS_TIMEOUT_MS = 15_000;
+
+/** 口コミ投稿は応答が返らないまま待ち続けないよう打ち切る。 */
+const POST_TIMEOUT_MS = 15_000;
+
+/** `POST /v1/observations` のエラー。BEの英語detailは`details`に残し、表示文はFEで決める。 */
+function postError(status: number, parsed: unknown): ApiErrorBody {
+  const details = typeof parsed === "object" && parsed !== null ? (parsed as { detail?: unknown }).detail : undefined;
+  if (status === 401 || status === 403) return { code: "unauthorized", message: "口コミの投稿にはログインが必要です。", details };
+  if (status === 422) return { code: "invalid_request", message: "入力内容が受け付けられませんでした。", details };
+  if (status === 429) return { code: "rate_limited", message: "短時間に投稿できる件数を超えました。", details };
+  return { code: "http_error", message: `口コミを投稿できませんでした（HTTP ${status}）。`, details };
+}
 
 /** `POST /v1/routes` のエラー（FastAPIの`{detail}`）をFEのエラー形式へ。BEの英語detailは`details`に残す。 */
 function routeError(status: number, parsed: unknown): ApiErrorBody {
@@ -154,6 +166,22 @@ export function createHttpClient(baseUrl: string, getAccessToken?: () => string 
       } catch (e) {
         if (e instanceof ApiError) throw e;
         throw new ApiError(502, { code: "invalid_response", message: "口コミの応答形式が不正です" });
+      }
+    },
+    // 投稿はBE PR #26 の POST /v1/observations（要Bearer認証。FEのログインは未実装のため実BEでは401になり得る）。
+    createReview: async (draft) => {
+      const body = await request<unknown>("POST", "/v1/observations", toObservationRequest(draft), {
+        timeoutMs: POST_TIMEOUT_MS,
+        timeoutMessage: "口コミの投稿に時間がかかっています。",
+        toError: postError,
+      }).catch((e: unknown) => {
+        if (e instanceof ApiError) throw e;
+        throw new ApiError(502, { code: "invalid_response", message: "投稿の応答形式が不正です" });
+      });
+      try {
+        return reviewFromCreated(draft, body, new Date().toISOString());
+      } catch {
+        throw new ApiError(502, { code: "invalid_response", message: "投稿の応答形式が不正です" });
       }
     },
     async getRoutingOptions() {

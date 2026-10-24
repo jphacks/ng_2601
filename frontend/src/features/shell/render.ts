@@ -7,6 +7,7 @@ import { createHazardsFeature, type HazardsFeature } from "../hazards/hazardsFea
 import { renderLayerPanel } from "../map/layerPanel";
 import { mountMap, type MapController } from "../map/map";
 import { ATTRIBUTION } from "../map/style";
+import { createReviewPostFeature, type ReviewPostFeature } from "../reviews/postForm";
 import { formatPoint, renderPickBanner, renderRouteView } from "../route/renderRoute";
 import { createPreferencesStore } from "../preferences/preferencesState";
 import { createRouteStore } from "../route/routeState";
@@ -64,16 +65,20 @@ export function renderShell(root: HTMLElement): void {
   // 道路・危険情報は FE-09 で実APIクライアント（モック切替可）に接続済み。詳細カードは地図クリックで開く。
   let hazards: HazardsFeature | undefined;
   let reviews: ReviewsFeature | undefined;
+  let reviewPost: ReviewPostFeature | undefined;
   // 地点指定モード中の地図タップだけを出発地／目的地として使う。
   // ルート区間のタップは標高グラフの選択位置へ送る（#9）。
   const mapController: MapController = mountMap(map, {
     onPick: (lngLat) => {
-      if (routeStore.pick(lngLat)) return true;
+      if (routeStore.pick(lngLat) || reviewPost?.pick(lngLat)) return true;
       reviews?.openNear(lngLat);
       return true;
     },
     onSelectRoadInfo: (id) => {
-      if (id) reviews?.close();
+      if (id) {
+        reviews?.close();
+        reviewPost?.hide();
+      }
       hazards?.select(id, "map");
     },
     onSelectRouteSegment: (distanceM) => link.select(distanceM),
@@ -88,6 +93,7 @@ export function renderShell(root: HTMLElement): void {
     // スマホでは一覧パネルが詳細カードを覆うため、一覧から選んだら閉じて地図と詳細を見せる。
     onSelect: (fromList) => {
       reviews?.close();
+      reviewPost?.hide();
       if (fromList && window.matchMedia("(max-width: 767px)").matches) closeSearch(false);
     },
   });
@@ -98,6 +104,19 @@ export function renderShell(root: HTMLElement): void {
     onOpen: () => {
       hazards?.closeDetail();
       closeSearch(false);
+      reviewPost?.hide();
+    },
+    onPost: (at) => reviewPost?.start(at),
+  });
+  reviewPost = createReviewPostFeature({
+    map: mapController,
+    client: api,
+    onPosted: (review) => reviews?.showPosted(review),
+    onOpen: () => {
+      if (routeStore.getState().pickMode) routeStore.cancelPick();
+      hazards?.closeDetail();
+      closeSearch(false);
+      reviews?.close();
     },
   });
   const attributionLink = el("a", { text: ATTRIBUTION.label });
@@ -275,6 +294,7 @@ export function renderShell(root: HTMLElement): void {
     searchOpen = true;
     // 検索カードと口コミシートは同時に開かない。
     reviews?.close();
+    reviewPost?.hide();
     card.classList.add("is-open");
     panel.inert = false;
     syncRoutePanel();
@@ -344,6 +364,7 @@ export function renderShell(root: HTMLElement): void {
   routeStore.subscribe((state) => {
     syncRoutePanel(state);
     const picking = state.pickMode !== null;
+    if (picking) reviewPost?.hide();
     mapController.setPicking(picking);
     mapController.setEndpoints({ origin: state.origin, destination: state.destination });
     origin.value = state.origin ? formatPoint(state.origin) : "";
@@ -381,6 +402,7 @@ export function renderShell(root: HTMLElement): void {
     if (e.key === "Escape") {
       if (menuOpen) setMenu(false);
       else if (routeStore.getState().pickMode) routeStore.cancelPick();
+      else if (reviewPost?.handleEscape()) return;
       else if (searchOpen) closeSearch(false);
       else if (!hazards?.closeDetail()) reviews?.handleEscape();
       return;
@@ -405,7 +427,22 @@ export function renderShell(root: HTMLElement): void {
   syncViewport();
   renderView();
 
-  root.replaceChildren(map, attribution, hazards.card, menuButton, controls, renderPickBanner(routeStore), reviews.status, reviews.sheet, card, scrim, drawer);
+  root.replaceChildren(
+    map,
+    attribution,
+    hazards.card,
+    menuButton,
+    controls,
+    reviews.status,
+    reviews.sheet,
+    reviewPost.sheet,
+    reviewPost.banner,
+    reviewPost.status,
+    renderPickBanner(routeStore),
+    card,
+    scrim,
+    drawer,
+  );
   // MapLibre initializes while the shell is being assembled off-DOM; size it after insertion.
   mapController.resize();
 }

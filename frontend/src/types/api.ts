@@ -71,6 +71,13 @@ export interface Review {
   verification?: VerificationState;
 }
 
+/** 口コミ投稿の入力（投稿地点・カテゴリ・本文）。 @provisional */
+export interface ReviewDraft {
+  location: LngLat;
+  category: ReviewCategory;
+  comment: string;
+}
+
 /** 車種。BEの`bike_type`（back/config/routing_catalog.json）に対応。 */
 export type BikeType = "city" | "electric_assist" | "road" | "gravel" | "mamachari";
 
