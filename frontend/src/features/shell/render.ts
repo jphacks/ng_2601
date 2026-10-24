@@ -11,6 +11,8 @@ import { formatPoint, renderPickBanner, renderRouteView } from "../route/renderR
 import { createPreferencesStore } from "../preferences/preferencesState";
 import { createRouteStore } from "../route/routeState";
 import { mockReviewLocations, mockReviews } from "../../mocks/data";
+import { buildRouteGradientSegments } from "../elevation/gradientSegments";
+import type { RouteAnalysis } from "../elevation/analyze";
 import type { Route } from "../../types/api";
 
 type ViewId = "route" | "settings" | "hazards" | "reviews" | "layers" | "help" | "about";
@@ -318,6 +320,7 @@ export function renderShell(root: HTMLElement): void {
   // --- route search state -> map / search card ------------------------------
   let wasPicking = false;
   let shownRoute: Route | null = null;
+  let shownAnalysis: RouteAnalysis | null | undefined;
   routeStore.subscribe((state) => {
     syncRoutePanel(state);
     const picking = state.pickMode !== null;
@@ -332,6 +335,14 @@ export function renderShell(root: HTMLElement): void {
       mapController.setRoutes(route ? [route] : []);
       if (route) mapController.fitToRoute(route);
       shownRoute = route;
+      shownAnalysis = undefined;
+    }
+    const analysis = route && state.elevation.kind === "ready" ? state.elevation.analysis : null;
+    if (analysis !== shownAnalysis) {
+      if (route) {
+        mapController.setRouteGradientSegments(route.id, analysis ? buildRouteGradientSegments(route.coordinates, analysis) : null);
+      }
+      shownAnalysis = analysis;
     }
 
     // 指定中は地図を見せるためカードを閉じ、指定が終わったら経路ビューに戻す。

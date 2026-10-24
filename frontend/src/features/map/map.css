@@ -17,6 +17,33 @@
   font-size: 13px;
   box-shadow: var(--shadow-floating);
 }
+.map__gradient-selection {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  bottom: calc(var(--bottom-offset, var(--space-3)) + var(--row-height) + var(--space-2));
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 2 * var(--gutter));
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-floating);
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+:root {
+  --route-gradient-uphill: #c2410c;
+  --route-gradient-flat: #334155;
+  --route-gradient-downhill: #1d4ed8;
+  --route-gradient-unknown: #64748b;
+}
 
 /* マーカー（DOM）。 */
 .map-marker {
@@ -56,6 +83,17 @@
 .legend__swatch { flex: none; display: inline-block; }
 .legend__swatch--area { width: 24px; height: 14px; background: #e9eee8; border: 1px solid var(--color-border); }
 .legend__swatch--line { width: 24px; height: 5px; border-radius: 3px; background: var(--color-route); }
+.legend__swatch--gradient-uphill { background: var(--route-gradient-uphill); }
+.legend__swatch--gradient-flat { background: var(--route-gradient-flat); }
+.legend__swatch--gradient-downhill { background: var(--route-gradient-downhill); }
+.legend__swatch--gradient-unknown {
+  background: repeating-linear-gradient(90deg, var(--route-gradient-unknown) 0 5px, transparent 5px 9px);
+}
+.legend__item--grade-width { flex-wrap: wrap; }
+.legend__width-key { display: inline-block; flex: none; width: 24px; background: var(--route-gradient-flat); }
+.legend__width-key--thin { height: 2px; }
+.legend__width-key--thick { height: 7px; }
+.legend__note { align-items: flex-start; line-height: 1.4; }
 .legend__swatch--dot { width: 14px; height: 14px; border-radius: 50%; }
 .legend__swatch--hazard { background: var(--color-warning); }
 .legend__swatch--review { background: var(--color-primary); }

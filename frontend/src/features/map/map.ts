@@ -8,6 +8,8 @@ import { CATEGORY_DEFS } from "../hazards/catalog";
 import { geometryBBox } from "../hazards/geometry";
 import { buildRoadInfoCollection } from "../hazards/mapCollection";
 import type { RoadInfoItem } from "../hazards/types";
+import { formatDistance, formatGrade } from "../elevation/format";
+import type { RouteGradientSegment } from "../elevation/gradientSegments";
 import { el } from "../../ui/dom";
 import { renderState } from "../../ui/state";
 import { createMarker, hideMarker, showMarker, type MarkerSpec } from "./markers";
@@ -62,6 +64,7 @@ export interface Endpoints {
 
 export interface MapController {
   setRoutes(routes: Route[]): void;
+  setRouteGradientSegments(routeId: string, segments: readonly RouteGradientSegment[] | null): void;
   setEndpoints(endpoints: Endpoints): void;
   /** 地点指定モードの間、カーソルを十字にして地図を指定待ちと分かるようにする。 */
   setPicking(on: boolean): void;
@@ -88,6 +91,27 @@ export interface MapController {
 
 const ROUTE_SOURCE = "routes";
 const ROUTE_LAYER = "routes";
+const ROUTE_UNKNOWN_LAYER = "routes-unknown";
+
+function selectedSegmentText(properties: Record<string, unknown> | null | undefined): string | null {
+  const fromM = properties?.startDistanceM;
+  const toM = properties?.endDistanceM;
+  if (typeof fromM !== "number" || !Number.isFinite(fromM) || typeof toM !== "number" || !Number.isFinite(toM)) return null;
+
+  const interval = `${formatDistance(fromM)}〜${formatDistance(toM)}`;
+  const grade = properties?.gradePercent;
+  if (typeof grade !== "number" || !Number.isFinite(grade)) {
+    return `選択区間 ${interval}：勾配不明（欠測または連続した100mの勾配データなし）`;
+  }
+
+  const direction = grade > 0 ? "上り" : grade < 0 ? "下り" : "平坦";
+  const windowFromM = properties?.windowFromM;
+  const windowToM = properties?.windowToM;
+  const window = typeof windowFromM === "number" && typeof windowToM === "number"
+    ? `、計測窓 ${formatDistance(windowFromM)}〜${formatDistance(windowToM)} の100m平均`
+    : "、100m平均";
+  return `選択区間 ${interval}：${direction} ${formatGrade(grade)}${window}`;
+}
 
 const ROAD_SOURCE = "road-info";
 const ROAD_FILL = "road-info-fill";
@@ -115,6 +139,8 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
   let roadNow = new Date();
   let selectedRoadId: string | null = null;
   let picking = false;
+  let gradientRouteId: string | null = null;
+  let gradientSegments: readonly RouteGradientSegment[] | null = null;
   let reviewMarkers: maplibregl.Marker[] = [];
   let pickMarker: maplibregl.Marker | null = null;
   let endpointMarkers: maplibregl.Marker[] = [];
@@ -125,17 +151,47 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
 
   const canvas = el("div", { className: "map__canvas" });
   const notice = el("p", { className: "map__notice" });
+  const gradientSelection = el("p", { className: "map__gradient-selection" });
   notice.setAttribute("role", "status");
+  gradientSelection.setAttribute("role", "status");
+  gradientSelection.setAttribute("aria-live", "polite");
   notice.hidden = true;
-  container.append(canvas, notice);
+  gradientSelection.hidden = true;
+  container.append(canvas, notice, gradientSelection);
 
   function routeCollection(): FeatureCollection<LineString> {
-    const features: Array<Feature<LineString>> = routes.map((r) => ({
-      type: "Feature",
-      properties: { id: r.id, name: r.name },
-      geometry: { type: "LineString", coordinates: r.coordinates },
-    }));
+    const features: Array<Feature<LineString>> = [];
+    for (const route of routes) {
+      const segments = route.id === gradientRouteId ? gradientSegments : null;
+      if (segments?.length) {
+        segments.forEach((segment, index) => features.push({
+          type: "Feature",
+          id: `${route.id}:${index}`,
+          properties: {
+            routeId: route.id,
+            direction: segment.direction,
+            startDistanceM: segment.fromM,
+            endDistanceM: segment.toM,
+            gradePercent: segment.gradePercent,
+            windowFromM: segment.windowFromM,
+            windowToM: segment.windowToM,
+          },
+          geometry: { type: "LineString", coordinates: segment.coordinates },
+        }));
+        continue;
+      }
+      features.push({
+        type: "Feature",
+        properties: { id: route.id, name: route.name, direction: "unknown" },
+        geometry: { type: "LineString", coordinates: route.coordinates },
+      });
+    }
     return { type: "FeatureCollection", features };
+  }
+
+  function clearGradientSelection(): void {
+    gradientSelection.textContent = "";
+    gradientSelection.hidden = true;
   }
 
   function syncVisibility(): void {
@@ -145,6 +201,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
     map.setLayoutProperty(ROUTE_LAYER, "visibility", vis(visible.routes));
     for (const id of ROAD_LAYERS) map.setLayoutProperty(id, "visibility", vis(visible.hazards));
     const groups: Array<[boolean, maplibregl.Marker[]]> = [[visible.reviews, reviewMarkers]];
+    map.setLayoutProperty(ROUTE_UNKNOWN_LAYER, "visibility", vis(visible.routes));
     for (const [on, markers] of groups) {
       for (const m of markers) {
         // 既に表示中のマーカーは触らない（開いたポップアップとフォーカスを保つ）。
@@ -281,7 +338,13 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
     notice.hidden = true;
     loaded = false;
     try {
-      const routeColor = getComputedStyle(document.documentElement).getPropertyValue("--color-route").trim();
+      const rootStyles = getComputedStyle(document.documentElement);
+      const routeColor = rootStyles.getPropertyValue("--color-route").trim();
+      const gradeColor = (name: string, fallback: string) => rootStyles.getPropertyValue(`--route-gradient-${name}`).trim() || fallback;
+      const uphillColor = gradeColor("uphill", "#c2410c");
+      const flatColor = gradeColor("flat", "#334155");
+      const downhillColor = gradeColor("downhill", "#1d4ed8");
+      const unknownColor = gradeColor("unknown", "#64748b");
       const m = new maplibregl.Map({
         container: canvas,
         style: createStyle(),
@@ -300,8 +363,21 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
           id: ROUTE_LAYER,
           type: "line",
           source: ROUTE_SOURCE,
+          filter: ["!=", ["get", "direction"], "unknown"],
           layout: { "line-join": "round", "line-cap": "round" },
-          paint: { "line-color": routeColor || "#2563eb", "line-width": 5, "line-opacity": 0.85 },
+          paint: {
+            "line-color": ["match", ["get", "direction"], "uphill", uphillColor, "downhill", downhillColor, "flat", flatColor, routeColor || "#2563eb"],
+            "line-width": ["interpolate", ["linear"], ["min", ["abs", ["get", "gradePercent"]], 10], 0, 4, 10, 8],
+            "line-opacity": 0.95,
+          },
+        });
+        m.addLayer({
+          id: ROUTE_UNKNOWN_LAYER,
+          type: "line",
+          source: ROUTE_SOURCE,
+          filter: ["==", ["get", "direction"], "unknown"],
+          layout: { "line-join": "round", "line-cap": "round" },
+          paint: { "line-color": unknownColor, "line-width": 4, "line-dasharray": [1.5, 1.5], "line-opacity": 0.95 },
         });
         addRoadInfoLayers(m);
         syncSelection();
@@ -340,6 +416,13 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
         handlers.onSelectRoadInfo?.(null);
         const lngLat: LngLat = [e.lngLat.lng, e.lngLat.lat];
         if (handlers.onPick?.(lngLat) === true) return;
+        const routeFeature = m.queryRenderedFeatures(e.point, { layers: [ROUTE_LAYER, ROUTE_UNKNOWN_LAYER] })[0];
+        const segmentText = selectedSegmentText(routeFeature?.properties);
+        if (segmentText) {
+          gradientSelection.textContent = segmentText;
+          gradientSelection.hidden = false;
+          return;
+        }
         if (pickMarker) hideMarker(pickMarker);
         pickMarker = createMarker({
           id: "pick",
@@ -382,6 +465,15 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
   return {
     setRoutes(next) {
       routes = next;
+      gradientRouteId = null;
+      gradientSegments = null;
+      clearGradientSelection();
+      syncRoutes();
+    },
+    setRouteGradientSegments(routeId, next) {
+      gradientRouteId = routeId;
+      gradientSegments = next;
+      clearGradientSelection();
       syncRoutes();
     },
     setEndpoints({ origin, destination }) {

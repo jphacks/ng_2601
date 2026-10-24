@@ -37,12 +37,16 @@ function isLngLat(value: unknown): value is LngLat {
     && Math.abs(value[0]) <= 180 && Math.abs(value[1]) <= 90;
 }
 
-/** 線に沿って等間隔(最大 MAX_POINTS 点)に点を取る。頂点だけを拾うのではなく、終点は必ず含める。 */
-export function sampleRoutePoints(coordinates: unknown, spacingM = DEFAULT_SPACING_M): RoutePoint[] {
-  if (!Array.isArray(coordinates)) return [];
-  if (!coordinates.every(isLngLat)) return [];
-  const line = coordinates;
-  if (line.length < 2 || !(spacingM > 0) || !Number.isFinite(spacingM)) return [];
+interface RouteMetrics {
+  line: LngLat[];
+  lengths: number[];
+  total: number;
+}
+
+function measureRoute(coordinates: unknown): RouteMetrics | null {
+  if (!Array.isArray(coordinates) || !coordinates.every(isLngLat)) return null;
+  const line = coordinates as LngLat[];
+  if (line.length < 2) return null;
 
   const lengths: number[] = [];
   let total = 0;
@@ -51,7 +55,14 @@ export function sampleRoutePoints(coordinates: unknown, spacingM = DEFAULT_SPACI
     lengths.push(length);
     total += length;
   }
-  if (total <= 0) return [];
+  return total > 0 ? { line, lengths, total } : null;
+}
+
+/** 線に沿って等間隔(最大 MAX_POINTS 点)に点を取る。頂点だけを拾うのではなく、終点は必ず含める。 */
+export function sampleRoutePoints(coordinates: unknown, spacingM = DEFAULT_SPACING_M): RoutePoint[] {
+  const route = measureRoute(coordinates);
+  if (!route || !(spacingM > 0) || !Number.isFinite(spacingM)) return [];
+  const { line, lengths, total } = route;
 
   const step = Math.max(spacingM, total / (MAX_POINTS - 1));
   const points: RoutePoint[] = [{ distance: 0, lng: line[0]![0], lat: line[0]![1] }];
@@ -73,6 +84,55 @@ export function sampleRoutePoints(coordinates: unknown, spacingM = DEFAULT_SPACI
 }
 
 /** 起点からの変化が threshold 以上になった分だけを上昇量・下降量に加える(ヒステリシス)。 */
+/** Returns exact route geometry for intervals measured by this profile. */
+export function createRouteGeometrySlicer(coordinates: unknown): ((from: number, to: number) => LngLat[]) | null {
+  const route = measureRoute(coordinates);
+  if (!route) return null;
+  const { line, lengths, total } = route;
+  const cumulative = [0];
+  for (const length of lengths) cumulative.push(cumulative.at(-1)! + length);
+
+  function pointAt(distance: number): LngLat {
+    if (distance <= 0) return line[0]!;
+    if (distance >= total) return line.at(-1)!;
+
+    let low = 1;
+    let high = cumulative.length - 1;
+    while (low < high) {
+      const mid = Math.floor((low + high) / 2);
+      if (cumulative[mid]! < distance) low = mid + 1;
+      else high = mid;
+    }
+    while (low < lengths.length && lengths[low - 1]! === 0) low++;
+    if (low >= cumulative.length) return line.at(-1)!;
+    const segmentStart = cumulative[low - 1]!;
+    const length = lengths[low - 1]!;
+    const t = Math.max(0, Math.min(1, (distance - segmentStart) / length));
+    return interpolate(line[low - 1]!, line[low]!, t);
+  }
+
+  return (from, to) => {
+    if (!Number.isFinite(from) || !Number.isFinite(to)) return [];
+    const start = Math.max(0, Math.min(total, from));
+    const end = Math.max(0, Math.min(total, to));
+    if (end - start <= 1e-6) return [];
+
+    const result: LngLat[] = [pointAt(start)];
+    let low = 1;
+    let high = cumulative.length;
+    while (low < high) {
+      const mid = Math.floor((low + high) / 2);
+      if (cumulative[mid]! <= start + 1e-6) low = mid + 1;
+      else high = mid;
+    }
+    for (let i = low; i < cumulative.length && cumulative[i]! < end - 1e-6; i++) {
+      result.push(line[i]!);
+    }
+    result.push(pointAt(end));
+    return result;
+  };
+}
+
 export function cumulativeAscentDescent(elevations: readonly number[], threshold = MIN_RISE_M): { ascent: number; descent: number } {
   if (elevations.length === 0) return { ascent: 0, descent: 0 };
   let anchor = elevations[0]!;
