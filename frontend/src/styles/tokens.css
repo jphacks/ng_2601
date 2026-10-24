@@ -1,0 +1,45 @@
+/* Nature Ride: shared palette and layout tokens.
+ * All floating UI (search bar, panel, menu, map buttons) uses these tokens so they look like one family.
+ * Usage and contrast notes: docs/design-system.md.
+ */
+:root {
+  --color-primary: #386641;
+  --color-accent: #dda15e;
+  --color-route: #2563eb;
+  --color-background: #f7f7f2;
+  --color-surface: #ffffff;
+  --color-text: #283326;
+  --color-warning: #c2410c;
+
+  --color-text-muted: color-mix(in srgb, var(--color-text) 75%, var(--color-background));
+  --color-border: color-mix(in srgb, var(--color-primary) 20%, var(--color-surface));
+  --color-input-border: color-mix(in srgb, var(--color-primary) 75%, var(--color-surface));
+  --color-hover: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+  --color-selected: var(--color-accent);
+  --color-focus: var(--color-primary);
+  --color-surface-floating: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  --color-overlay: color-mix(in srgb, var(--color-text) 25%, transparent);
+  --color-map-placeholder: color-mix(in srgb, var(--color-primary) 10%, var(--color-background));
+
+  --shadow-floating: 0 2px 10px color-mix(in srgb, var(--color-text) 12%, transparent);
+
+  /* Shape and spacing shared by every floating surface. */
+  --radius-bar: 999px;
+  --radius-panel: 20px;
+  --radius-row: 999px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --gutter: 16px;
+  --row-height: 48px;
+  --button-size: 44px;
+  --motion-duration: 230ms;
+  --motion-ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --gutter: 24px;
+  }
+}
