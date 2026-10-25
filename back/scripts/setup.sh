@@ -8,7 +8,7 @@ set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 app_dir=$(CDPATH= cd -- "$script_dir/.." && pwd)
-upstream_dir="${BROUTER_DIR:-$app_dir/../brouter}"
+upstream_dir="${BROUTER_DIR:-$app_dir/submodule/brouter}"
 upstream_url="https://github.com/abrensch/brouter.git"
 
 if ! command -v python3 >/dev/null 2>&1; then
@@ -49,7 +49,14 @@ else
   fi
 fi
 
-mkdir -p "$app_dir/brouter_extension/segments" "$app_dir/data/jartic/raw" "$app_dir/data/restrictions"
+mkdir -p \
+  "$app_dir/brouter_extension/segments" \
+  "$app_dir/data/raw/jartic" \
+  "$app_dir/data/raw/mlit" \
+  "$app_dir/data/raw/npa" \
+  "$app_dir/data/raw/traffic" \
+  "$app_dir/data/normalized/restrictions" \
+  "$app_dir/data/normalized/context"
 
 if [ ! -f "$app_dir/backend/.env" ]; then
   ( umask 077 && cp "$app_dir/backend/.env.example" "$app_dir/backend/.env" )

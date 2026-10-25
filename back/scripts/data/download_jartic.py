@@ -46,7 +46,7 @@ def main() -> None:
         metavar="RXX",
         help="JARTIC prefecture ID, repeatable; R23 is Aichi",
     )
-    parser.add_argument("--output", type=Path, default=Path("data/jartic/raw"))
+    parser.add_argument("--output", type=Path, default=Path("data/raw/jartic"))
     parser.add_argument("--refresh", action="store_true")
     args = parser.parse_args()
 
