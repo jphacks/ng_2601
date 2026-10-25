@@ -49,12 +49,7 @@
 }
 .pref__note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--color-text-muted); }
 
-/* 詳細パラメータ：グループ見出し > 条件名 > 問いかけ > 3択 の順に階層を付ける。 */
-.pref__group { gap: var(--space-4); }
-.pref .pref__group > legend { margin-bottom: var(--space-3); }
-.pref__group-title { padding: 0; font-size: 14px; font-weight: 700; }
-.pref .pref__choice > legend { margin-bottom: var(--space-1); }
-.pref__question { margin: 0 0 var(--space-2); font-size: 12px; line-height: 1.5; color: var(--color-text-muted); }
+.pref .pref__choice > legend { margin-bottom: var(--space-2); }
 /* 3つを同じ幅で横に並べる。選んだ項目は色に加えてチェック記号でも示す（記号は読み上げない）。 */
 .pref__choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 /* ラベルは語の途中で折り返さない（「できればさけ／る」を防ぐ）。収まらない幅では下の指定で縦に積む。 */
