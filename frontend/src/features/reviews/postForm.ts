@@ -40,8 +40,6 @@ const CATEGORIES = Object.keys(CATEGORY_LABEL) as ReviewCategory[];
 const STATUS_VISIBLE_MS = 6000;
 const RETAINED = "入力した内容は残っています。";
 
-const formatLocation = ([lng, lat]: LngLat) => `緯度 ${lat.toFixed(5)} / 経度 ${lng.toFixed(5)}`;
-
 function submitErrorMessage(error: ApiError): string {
   switch (error.code) {
     case "unauthorized":
@@ -87,15 +85,15 @@ export function createReviewPostFeature(options: ReviewPostOptions): ReviewPostF
   closeButton.setAttribute("aria-label", "投稿を閉じる");
 
   // 地点
-  const locationValue = el("p", { className: "post-form__value" });
-  locationValue.id = "review-post-location";
-  const changeLocation = textButton("地図で地点を変更", "post-form__secondary");
+  const changeLocation = textButton("地点を変更", "post-form__secondary");
   const locationError = el("p", { className: "post-form__error" });
   locationError.id = "review-post-location-error";
   locationError.hidden = true;
   const locationField = el("div", { className: "post-form__field" }, [
-    el("span", { className: "post-form__label", text: "投稿地点（必須）" }),
-    el("div", { className: "post-form__location" }, [locationValue, changeLocation]),
+    el("div", { className: "post-form__location" }, [
+      el("span", { className: "post-form__label", text: "地点" }),
+      changeLocation,
+    ]),
     locationError,
   ]);
 
@@ -118,19 +116,19 @@ export function createReviewPostFeature(options: ReviewPostOptions): ReviewPostF
     chips.append(el("label", { className: "post-chip" }, [input, el("span", { text: CATEGORY_LABEL[value] })]));
   }
   const categoryField = el("fieldset", { className: "post-form__field" }, [
-    el("legend", { className: "post-form__label", text: "カテゴリ（必須）" }),
+    el("legend", { className: "post-form__label", text: "カテゴリ" }),
     chips,
     categoryError,
   ]);
   categoryField.setAttribute("aria-describedby", categoryError.id);
 
   // コメント
-  const commentLabel = el("label", { className: "post-form__label", text: "コメント（必須）" });
+  const commentLabel = el("label", { className: "post-form__label", text: "コメント" });
   commentLabel.htmlFor = "review-post-comment";
   const comment = el("textarea", { className: "post-form__textarea" });
   comment.id = "review-post-comment";
   comment.rows = 5;
-  comment.placeholder = "例: 段差が多く、自転車では速度を落とす必要がある";
+  comment.placeholder = "例: 段差が多い";
   comment.autocomplete = "off";
   const counter = el("p", { className: "post-form__counter" });
   counter.id = "review-post-counter";
@@ -142,7 +140,7 @@ export function createReviewPostFeature(options: ReviewPostOptions): ReviewPostF
 
   const notice = el("p", {
     className: "post-form__notice",
-    text: "投稿した口コミは、投稿地点の位置とともに他の利用者にも公開されます。氏名・連絡先・自宅の位置など、個人が特定される情報は書かないでください。",
+    text: "位置とともに公開されます。個人情報は書かないでください。",
   });
 
   const submitError = el("p", { className: "post-form__submit-error" });
@@ -175,7 +173,7 @@ export function createReviewPostFeature(options: ReviewPostOptions): ReviewPostF
   sheet.inert = true;
 
   // 地点指定中の案内。見た目は経路の地点指定と同じ（route.css の .pick-banner）。
-  const bannerText = el("span", { text: "地図をタップして口コミの投稿地点を指定" });
+  const bannerText = el("span", { text: "地図をタップして地点を指定" });
   const bannerCancel = textButton("キャンセル", "pick-banner__cancel");
   const banner = el("div", { className: "pick-banner" }, [bannerText, bannerCancel]);
   banner.setAttribute("role", "status");
@@ -200,7 +198,7 @@ export function createReviewPostFeature(options: ReviewPostOptions): ReviewPostF
   /** 送信を試みた後は、入力のたびに誤りの表示を更新する。 */
   function refreshErrors(): void {
     const length = countChars(comment.value.trim());
-    counter.textContent = `${length} / ${COMMENT_MAX_LENGTH}文字`;
+    counter.textContent = `${length}/${COMMENT_MAX_LENGTH}`;
     counter.classList.toggle("is-over", length > COMMENT_MAX_LENGTH);
     const errors = showErrors ? currentErrors() : {};
     setError(locationError, null, errors.location);
@@ -210,7 +208,6 @@ export function createReviewPostFeature(options: ReviewPostOptions): ReviewPostF
   }
 
   function renderLocation(): void {
-    locationValue.textContent = location ? formatLocation(location) : "未指定";
     map.setDraftPoint(mode === "closed" ? null : location);
   }
 
