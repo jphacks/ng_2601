@@ -153,7 +153,7 @@
 .hazard-detail__cautions { margin: 0; padding-left: var(--space-4); font-size: 12px; color: var(--color-warning); }
 .hazard-detail__notes { margin: 0; padding-left: var(--space-4); font-size: 12px; color: var(--color-text-muted); }
 
-/* 地図上のカテゴリチップ。メニューボタンの右に1行で並べ、入りきらない幅では横にスクロールする。 */
+/* 地図上のカテゴリチップ。狭い画面では余白を詰め、メニューボタンの右に全カテゴリを1行で表示する。 */
 .hazard-chips {
   position: absolute;
   z-index: 10;
@@ -161,12 +161,9 @@
   left: calc(var(--left-offset) + var(--button-size) + var(--space-2));
   right: var(--right-offset);
   display: flex;
-  gap: var(--space-2);
-  overflow-x: auto;
-  scrollbar-width: none;
+  gap: var(--space-3);
   pointer-events: none;
 }
-.hazard-chips::-webkit-scrollbar { display: none; }
 .hazard-chip {
   flex: none;
   display: inline-flex;
@@ -174,18 +171,34 @@
   gap: var(--space-1);
   min-height: var(--button-size);
   padding: 0 var(--space-3);
-  border: 1px solid var(--color-border);
+  border: 0;
   border-radius: var(--radius-bar);
-  background: var(--color-surface-floating);
-  backdrop-filter: blur(6px);
+  background: var(--color-surface);
   box-shadow: var(--shadow-floating);
   font-size: 14px;
+  white-space: nowrap;
   cursor: pointer;
   pointer-events: auto;
 }
 .hazard-chip input { position: absolute; opacity: 0; pointer-events: none; }
 .hazard-chip:has(input:focus-visible) { outline: 3px solid var(--color-focus); outline-offset: 2px; }
-.hazard-chip:has(input:checked) { background: var(--color-selected); border-color: var(--color-selected); font-weight: 600; }
+.hazard-chip:has(input:checked) { font-weight: 600; }
 .hazard-chip:not(:has(input:checked)) .hazard-swatch { opacity: 0.35; }
 .hazard-chips.is-layer-off .hazard-chip { color: var(--color-text-muted); }
 
+@media (max-width: 480px) {
+  .hazard-chip { padding-inline: var(--space-2); }
+}
+
+@media (max-width: 395px) {
+  .hazard-chip { font-size: 12px; }
+  .hazard-chip .hazard-swatch { width: 12px; height: 12px; }
+}
+
+@media (max-width: 367px) {
+  .hazard-chip { padding-inline: var(--space-1); }
+}
+
+@media (max-width: 335px) {
+  .hazard-chip { padding-inline: calc(var(--space-1) / 2); }
+}
