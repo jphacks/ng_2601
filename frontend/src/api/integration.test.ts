@@ -6,6 +6,7 @@ import { createHttpClient } from "./http";
 import { createMockClient } from "./mock";
 
 const BOUNDS: BBox = [139.767, 35.682, 139.769, 35.683];
+const MOCK_BOUNDS: BBox = [136.8815, 35.1717, 136.8835, 35.1727];
 const observation = {
   type: "Feature",
   id: "observation-1",
@@ -82,7 +83,7 @@ describe("main の経路・道路情報と口コミのAPI統合", () => {
     vi.useFakeTimers();
     vi.stubGlobal("location", { search: "" });
     const client = createMockClient();
-    const pending = Promise.all([client.listReviews({ bbox: BOUNDS }), client.getMapData(BOUNDS)]);
+    const pending = Promise.all([client.listReviews({ bbox: MOCK_BOUNDS }), client.getMapData(MOCK_BOUNDS)]);
     await vi.runAllTimersAsync();
     const [reviews, mapData] = await pending;
     expect(reviews.map((review) => review.id)).toEqual(mockReviews.slice(0, 3).map((review) => review.id));

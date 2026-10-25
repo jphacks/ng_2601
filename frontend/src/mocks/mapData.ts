@@ -34,9 +34,9 @@ export function buildMockMapData(now: Date = new Date()): MapDataResponse {
       {
         type: "LineString",
         coordinates: [
-          [139.7648, 35.6838],
-          [139.7668, 35.6836],
-          [139.7689, 35.6834],
+          [136.8793, 35.1735],
+          [136.8813, 35.1733],
+          [136.8834, 35.1731],
         ],
       },
       {
@@ -59,11 +59,11 @@ export function buildMockMapData(now: Date = new Date()): MapDataResponse {
         type: "Polygon",
         coordinates: [
           [
-            [139.7705, 35.6812],
-            [139.7722, 35.6812],
-            [139.7722, 35.6824],
-            [139.7705, 35.6824],
-            [139.7705, 35.6812],
+            [136.8850, 35.1709],
+            [136.8867, 35.1709],
+            [136.8867, 35.1721],
+            [136.8850, 35.1721],
+            [136.8850, 35.1709],
           ],
         ],
       },
@@ -84,9 +84,9 @@ export function buildMockMapData(now: Date = new Date()): MapDataResponse {
       {
         type: "LineString",
         coordinates: [
-          [139.7671, 35.6812],
-          [139.7679, 35.6821],
-          [139.7686, 35.6829],
+          [136.8816, 35.1709],
+          [136.8824, 35.1718],
+          [136.8831, 35.1726],
         ],
       },
       {
@@ -103,13 +103,13 @@ export function buildMockMapData(now: Date = new Date()): MapDataResponse {
   ];
 
   const accidents: Array<Feature<Geometry, AccidentProps>> = [
-    feature(point(139.7661, 35.6819), { bicycle_involved: true, fatal_or_serious: true }),
-    feature(point(139.7694, 35.6841), { bicycle_involved: true, fatal_or_serious: false }),
-    feature(point(139.7712, 35.683), { bicycle_involved: false, fatal_or_serious: false }),
+    feature(point(136.8806, 35.1716), { bicycle_involved: true, fatal_or_serious: true }),
+    feature(point(136.8839, 35.1738), { bicycle_involved: true, fatal_or_serious: false }),
+    feature(point(136.8857, 35.1727), { bicycle_involved: false, fatal_or_serious: false }),
   ];
 
   const observations: Array<Feature<Point, ObservationProps>> = [
-    observation("mock-o1", point(139.7679, 35.6821), {
+    observation("mock-o1", point(136.8824, 35.1718), {
       category: "construction",
       temporal_kind: "temporary",
       observed_at: at(-2),
@@ -120,7 +120,7 @@ export function buildMockMapData(now: Date = new Date()): MapDataResponse {
       description: "歩道の一部が工事中。車道側に迂回が必要です。",
     }),
     // 期限切れ＋未確認。
-    observation("mock-o2", point(139.769, 35.6828), {
+    observation("mock-o2", point(136.8835, 35.1725), {
       category: "debris_glass",
       temporal_kind: "temporary",
       observed_at: at(-24 * 6),
@@ -131,7 +131,7 @@ export function buildMockMapData(now: Date = new Date()): MapDataResponse {
       description: "ガラス片が散乱していたとの報告。",
     }),
     // 更新日時が不明（null）。
-    observation("mock-o3", point(139.7655, 35.6828), {
+    observation("mock-o3", point(136.8800, 35.1725), {
       category: "steep_slope",
       temporal_kind: "permanent",
       observed_at: null,
@@ -142,7 +142,7 @@ export function buildMockMapData(now: Date = new Date()): MapDataResponse {
       description: "急な上り坂（約8%）。",
     }),
     // 更新日時のキーがない（欠測）。
-    observation("mock-o4", point(139.7701, 35.6845), {
+    observation("mock-o4", point(136.8846, 35.1742), {
       category: "bike_lane",
       temporal_kind: "permanent",
       status: "active",
@@ -150,7 +150,7 @@ export function buildMockMapData(now: Date = new Date()): MapDataResponse {
       description: "車道左側に自転車レーンあり。",
     }),
     // 解消済み。
-    observation("mock-o5", point(139.7674, 35.6805), {
+    observation("mock-o5", point(136.8819, 35.1702), {
       category: "dangerous_intersection",
       temporal_kind: "permanent",
       observed_at: at(-24 * 20),
@@ -159,7 +159,7 @@ export function buildMockMapData(now: Date = new Date()): MapDataResponse {
       verification_state: "corroborated",
       description: "見通しの悪い交差点。信号の設置工事が完了したとの報告。",
     }),
-    observation("mock-o6", point(139.7717, 35.6838), {
+    observation("mock-o6", point(136.8862, 35.1735), {
       category: "bike_parking",
       temporal_kind: "permanent",
       observed_at: at(-24 * 30),
@@ -168,7 +168,7 @@ export function buildMockMapData(now: Date = new Date()): MapDataResponse {
       verification_state: "corroborated",
       description: "約30台分の駐輪場。",
     }),
-    observation("mock-o7", point(139.7636, 35.6812), {
+    observation("mock-o7", point(136.8781, 35.1709), {
       category: "traffic_regulation",
       temporal_kind: "date_range",
       observed_at: at(-24),

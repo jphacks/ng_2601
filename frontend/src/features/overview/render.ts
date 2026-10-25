@@ -7,8 +7,8 @@ export async function renderOverview(root: HTMLElement): Promise<void> {
   try {
     const [route, hazards, reviews, prefs] = await Promise.all([
       api.searchRoute({
-        origin: [139.7671, 35.6812],
-        destination: [139.7702, 35.6838],
+        origin: [136.8816, 35.1709],
+        destination: [136.8847, 35.1735],
         bikeType: "city",
         hillMode: "balanced",
         trafficMode: "balanced",

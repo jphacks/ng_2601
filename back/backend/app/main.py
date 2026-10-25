@@ -10,6 +10,7 @@ import httpx
 import psycopg
 from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, StringConstraints, field_validator
 from psycopg.types.json import Jsonb
 from starlette.concurrency import run_in_threadpool
@@ -17,6 +18,7 @@ from starlette.concurrency import run_in_threadpool
 from .auth import AuthService, ModeratorTokenVerifier, build_auth_router
 from .catalog import CatalogError, RoutingCatalog
 from .context import NoUserPreferenceStore, PostgresUserPreferenceStore
+from .device_events import build_device_router, surface_features_in_bbox
 from .route_context import AccidentHistoryProvider, TrafficProvider
 from .restrictions import CompositeRestrictionProvider
 
@@ -50,10 +52,16 @@ app = FastAPI(title="CyclerHub-back routing backend", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("CORS_ALLOW_ORIGINS", os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")).split(","),
-    allow_methods=["GET", "POST", "PUT", "PATCH", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 app.include_router(build_auth_router(auth_service))
+app.include_router(build_device_router(DATABASE_URL, os.getenv("DEVICE_INGEST_TOKEN", "")))
+
+
+@app.exception_handler(psycopg.Error)
+async def database_unavailable(_request, _error) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": "Application database is unavailable"})
 
 
 @app.on_event("startup")
@@ -659,6 +667,7 @@ def map_data(
     restriction_features = restriction_provider.features_in_bbox(bbox, evaluated_at, layer_limit)
     accident_features = accident_provider.features_in_bbox(bbox, layer_limit)
     traffic_features = traffic_provider.features_in_bbox(bbox, layer_limit)
+    surface_features, surface_truncated = surface_features_in_bbox(DATABASE_URL, bbox, limit)
     observation_features, observations_truncated = _observation_features(bbox, None, limit)
     return {
         "restrictions": {
@@ -679,6 +688,17 @@ def map_data(
                 "features": traffic_features[:limit],
                 "truncated": len(traffic_features) > limit,
                 "source_status": traffic_provider.status(),
+            },
+            "surface": {
+                "type": "FeatureCollection",
+                "features": surface_features,
+                "truncated": surface_truncated,
+                "source_status": {
+                    "enabled": bool(DATABASE_URL),
+                    "source_id": "cores3_surface_v1",
+                    "authority": "device_measurement",
+                    "experimental": True,
+                },
             },
         },
         "observations": {
@@ -724,6 +744,7 @@ async def route(
     }
     route_geojson: dict[str, object] | None = None
     hits = []
+    fallback_candidate: tuple[dict[str, object], list[object], dict[str, object]] | None = None
     selected_traffic_context: dict[str, object] = {"status": "unavailable", "source_id": traffic_provider.source_id}
     selected_traffic_penalty: float | None = None
     evaluated_at = datetime.now(JAPAN_TIMEZONE)
@@ -748,7 +769,15 @@ async def route(
                 if not any(hit.enforcement == "block" for hit in candidate_hits):
                     traffic_context = traffic_provider.assess(candidate, policy.preferences["traffic_mode"], evaluated_at)
                     candidate_penalty = float(traffic_context.get("routing_penalty", 0))
-                    if selected_traffic_penalty is None or candidate_penalty < selected_traffic_penalty:
+                    # Always retain the first legal candidate.  A partial or
+                    # unavailable traffic snapshot has no score, so its zero
+                    # fallback must not outrank a candidate with measured
+                    # traffic coverage.
+                    if fallback_candidate is None:
+                        fallback_candidate = (candidate, candidate_hits, traffic_context)
+                    if policy.preferences["traffic_mode"] != "direct" and traffic_context.get("status") == "available" and (
+                        selected_traffic_penalty is None or candidate_penalty < selected_traffic_penalty
+                    ):
                         route_geojson = candidate
                         hits = candidate_hits
                         selected_traffic_context = traffic_context
@@ -757,6 +786,9 @@ async def route(
         raise HTTPException(status_code=503, detail="Routing engine is unavailable") from error
     except ValueError as error:
         raise HTTPException(status_code=502, detail="Routing engine returned invalid JSON") from error
+
+    if route_geojson is None and fallback_candidate is not None:
+        route_geojson, hits, selected_traffic_context = fallback_candidate
 
     if route_geojson is None:
         raise HTTPException(status_code=409, detail="No route passed active legal restrictions")

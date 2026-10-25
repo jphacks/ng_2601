@@ -129,6 +129,28 @@ describe("origin defaults", () => {
     await s.search();
     expect(s.getState()).toMatchObject({ preparing: false, validationError: expect.stringContaining("近すぎ") });
   });
+  it("a search started while another is loading supersedes it", async () => {
+    const pending: Array<ReturnType<typeof deferred<typeof mockRoutes[0]>>> = [];
+    const searchRoute = vi.fn(() => {
+      const d = deferred<typeof mockRoutes[0]>();
+      pending.push(d);
+      return d.promise;
+    });
+    const s = createRouteStore({ searchRoute } as unknown as ApiClient, vi.fn(() => new Promise<RouteAnalysis | null>(() => {})));
+    s.setPoint("origin", [139.76, 35.68], "current");
+    s.setPoint("destination", [139.77, 35.69]);
+    const first = s.search();
+    s.setPoint("destination", [139.78, 35.70]);
+    const second = s.search();
+    expect(searchRoute).toHaveBeenCalledTimes(2);
+    pending[1].resolve(mockRoutes[1] ?? mockRoutes[0]);
+    await second;
+    pending[0].resolve(mockRoutes[0]);
+    await first;
+    const status = s.getState().status;
+    expect(status.kind).toBe("success");
+    if (status.kind === "success") expect(status.applied.destination).toEqual([139.78, 35.70]);
+  });
   it("asks for the destination first when nothing is set", async () => {
     const s = store();
     await s.search();

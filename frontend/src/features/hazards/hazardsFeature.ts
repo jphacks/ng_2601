@@ -164,7 +164,10 @@ export function createHazardsFeature({ map, client, mock, onSelect }: HazardsFea
   });
   map.onViewportChange(({ bbox, zoom }) => loader.request(bbox, zoom));
   map.onLayersChange(refresh);
-  const timer = setInterval(refresh, REFRESH_MS);
+  const timer = setInterval(() => {
+    if (!mock && loaderState.status === "ok") loader.retry();
+    refresh();
+  }, REFRESH_MS);
   refresh();
 
   return {

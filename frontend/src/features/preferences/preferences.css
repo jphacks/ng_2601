@@ -1,13 +1,19 @@
 /* 車種・坂道許容度・詳細パラメータ。ラジオ/セグメントは route.css の .route__segment を共用する。 */
 .pref { display: grid; gap: var(--space-3); }
-.pref__body, .pref__controls { display: grid; gap: var(--space-3); }
+.pref__body { display: grid; gap: var(--space-3); }
+/* 区切り線は使わない。枠や線がすでに多く、線を足すと画面が重くなるため。 */
+.pref__controls { display: grid; gap: calc(var(--space-4) + var(--space-3)); }
 
 /* 車種は5つなので折り返して並べる。 */
 .pref__segments { flex-wrap: wrap; }
 .pref__segments .route__segment { font-size: 13px; line-height: 1.3; padding-block: var(--space-1); text-align: center; }
 .pref__bikes .route__segment { flex: 1 1 calc(50% - var(--space-1)); }
+.pref__icon { display: grid; place-items: center; }
+.pref__icon svg { width: 28px; height: 28px; }
 
-.pref__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+/* fieldset の gap は legend に効かないので、余白は legend 側に付ける。 */
+.pref .route__fieldset > legend { margin-bottom: var(--space-3); }
+.pref__head { width: 100%; display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
 .pref__current { font-size: 13px; font-weight: 600; color: var(--color-primary); }
 .pref__slider { width: 100%; min-height: 44px; margin: 0; accent-color: var(--color-primary); }
 .pref__slider:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
@@ -42,3 +48,4 @@
 .pref__status { margin: 0; font-size: 13px; color: var(--color-text-muted); overflow-wrap: anywhere; }
 .pref__status--warn { color: var(--color-warning); }
 .pref__save-button { justify-self: start; }
+.pref__current-summary { margin: 0; font-size: 14px; font-weight: 600; }

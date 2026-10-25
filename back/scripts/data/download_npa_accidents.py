@@ -22,6 +22,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 BASE_URL = "https://www.npa.go.jp/publications/statistics/koutsuu/opendata/{year}/honhyo_{year}.csv"
 SOURCE_PAGE = "https://www.npa.go.jp/publications/statistics/koutsuu/opendata/index_opendata.html"
@@ -86,7 +87,7 @@ def normalize(raw_files: list[tuple[int, Path]], output: Path) -> None:
                     day = number(row.get("発生日時　　日", "1"))
                     hour = number(row.get("発生日時　　時", "0"))
                     minute = number(row.get("発生日時　　分", "0"))
-                    observed_at = datetime(year_value, month, day, hour, minute, tzinfo=timezone.utc).isoformat()
+                    observed_at = datetime(year_value, month, day, hour, minute, tzinfo=ZoneInfo("Asia/Tokyo")).isoformat()
                 except (ValueError, TypeError):
                     continue
                 if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
@@ -130,6 +131,7 @@ def normalize(raw_files: list[tuple[int, Path]], output: Path) -> None:
                     "authority": "National Police Agency of Japan",
                     "source_kind": "historical_accident_context",
                     "dataset_version": ",".join(str(year) for year, _ in raw_files),
+                    "window": {"from": f"{min(year for year, _ in raw_files)}-01-01", "to": f"{max(year for year, _ in raw_files)}-12-31"},
                     "retrieved_at": retrieved_at,
                     "coverage": "nationwide",
                     "license": "Japan PDL 1.0; attribution and processed-data notice required",

@@ -11,6 +11,7 @@ import { ATTRIBUTION } from "../map/style";
 import { createReviewPostFeature, type ReviewPostFeature } from "../reviews/postForm";
 import { formatOrigin, formatPoint, renderRouteView } from "../route/renderRoute";
 import { createPreferencesStore } from "../preferences/preferencesState";
+import { renderPreferencesSave } from "../preferences/renderPreferences";
 import { createRouteStore, type PickMode, type RouteSearchState } from "../route/routeState";
 import { buildRouteGradientSegments, type RouteGradientSegment } from "../elevation/gradientSegments";
 import type { RouteAnalysis } from "../elevation/analyze";
@@ -58,6 +59,7 @@ export function renderShell(root: HTMLElement): void {
   let view: ViewId = "route";
   // レイヤーパネルと経路ビューは1つだけ作って使い回す（再訪のたびにリスナーを増やさない）。
   let layerPanel: HTMLElement | undefined;
+  let settingsPanel: HTMLElement | undefined;
   const routeStore = createRouteStore(api);
   const prefsStore = createPreferencesStore(api, routeStore);
 
@@ -262,12 +264,14 @@ export function renderShell(root: HTMLElement): void {
   // 地図で指定した出発地を、既定の現在地へ戻す。
   const useCurrent = el("button", { className: "row__action", text: "現在地" });
   useCurrent.type = "button";
-  useCurrent.addEventListener("click", async () => {
-    const here = await locator.locate({ recenter: false });
+  // 失敗通知の「再試行」でも出発地を現在地にするところまでやり直す。
+  async function useCurrentLocationAsOrigin(): Promise<void> {
+    const here = await locator.locate({ recenter: false, onRetry: () => void useCurrentLocationAsOrigin() });
     if (!here) return;
     routeStore.setPoint("origin", here, "current");
     if (routeStore.getState().destination) void searchRoute();
-  });
+  }
+  useCurrent.addEventListener("click", () => void useCurrentLocationAsOrigin());
   originField.insertBefore(useCurrent, originPoint.cancel);
   const destinationPoint = pointRow("destination", "目的地", "地図で指定", "pin");
   // 指定の開始・終了を読み上げる（見た目は行の強調で伝える）。
@@ -328,6 +332,8 @@ export function renderShell(root: HTMLElement): void {
   function renderView(): void {
     const def = ALL_VIEWS.find((v) => v.id === view)!;
     viewTitle.textContent = def.label;
+    // タブで選んだ画面はタブ名と同じ見出しになるので出さない。
+    viewTitle.hidden = tabs.has(view);
     for (const [id, t] of tabs) {
       const selected = id === view;
       t.setAttribute("aria-selected", String(selected));
@@ -341,11 +347,12 @@ export function renderShell(root: HTMLElement): void {
         ? "使い方は準備中です。"
         : view === "about"
           ? `${APP_NAME} — 自転車のためのルート検索と、道路情報・口コミの共有。`
-          : view === "settings"
-          ? "車種と坂道許容度は、「経路」タブの「検索条件」で設定できます。"
           : `${def.label}は準備中です（${def.issue}で実装予定）。`;
     if (view === "route") {
       viewBody.replaceChildren(routeView);
+    } else if (view === "settings") {
+      settingsPanel ??= renderPreferencesSave(routeStore, prefsStore);
+      viewBody.replaceChildren(settingsPanel);
     } else if (view === "layers") {
       layerPanel ??= renderLayerPanel(mapController);
       viewBody.replaceChildren(layerPanel);
@@ -369,11 +376,19 @@ export function renderShell(root: HTMLElement): void {
   async function refreshCurrentOrigin(): Promise<boolean> {
     const { origin, originSource } = routeStore.getState();
     if (origin && originSource !== "current") return true;
-    const here = await locator.locate({ recenter: false, quiet: origin !== null, onRetry: () => void searchRoute() });
+    const here = await locator.locate({
+      recenter: false,
+      quiet: origin !== null,
+      // 初回の失敗後は出発地の地図指定に入っているので、それをやめてから取得・検索をやり直す。
+      onRetry: () => {
+        if (routeStore.getState().pickMode === "origin") routeStore.cancelPick();
+        void searchRoute();
+      },
+    });
     if (!here) return false;
-    // 取得を待つ間に地図で出発地を選んでいたら、そちらを優先する。
+    // 取得を待つ間に地図で出発地を選んだ・選び始めたら、そちらを優先する（現在地で上書きしない）。
     const now = routeStore.getState();
-    if (now.origin && now.originSource !== "current") return true;
+    if (now.pickMode === "origin" || (now.origin && now.originSource !== "current")) return true;
     routeStore.setPoint("origin", here, "current");
     return true;
   }
@@ -407,8 +422,7 @@ export function renderShell(root: HTMLElement): void {
       return;
     }
     openSearch("route");
-    // 別の検索の応答待ちで search() が何もしない場合に備えて、準備中は先に解除する（同じ処理の中なので画面はちらつかない）。
-    routeStore.setPreparing(false);
+    // search() は検索を始めるか入力エラーを出した時点で準備中を解除する。
     void routeStore.search();
   }
 

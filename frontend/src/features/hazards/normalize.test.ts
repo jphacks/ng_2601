@@ -87,6 +87,24 @@ describe("normalizeMapData (モック)", () => {
     expect(sources.find((s) => s.key === "accident")?.enabled).toBe(true);
   });
 
+  it("CoreS3 計測をユーザー報告と区別して未確認の点として表示する", () => {
+    const data = buildMockMapData(NOW);
+    data.route_context.surface = {
+      type: "FeatureCollection",
+      features: [{
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [136.88, 35.17] },
+        properties: { id: "measured-1", kind: "bump", observed_at: "2026-10-24T03:00:00Z", peak_delta_g: 0.8 },
+      }],
+      source_status: { enabled: true, source_id: "cores3_surface_v1" },
+    };
+    const result = normalizeMapData(data);
+    expect(result.items.find((i) => i.id === "surface:measured-1")).toMatchObject({
+      origin: "surface", infoClass: "measurement", category: "danger", verification: "unverified",
+    });
+    expect(result.sources.find((s) => s.key === "surface")?.enabled).toBe(true);
+  });
+
   it("id が無い・重複する feature でも ID が衝突しない", () => {
     const data = buildMockMapData(NOW);
     const dup = structuredClone(data.route_context.accidents.features[0]);

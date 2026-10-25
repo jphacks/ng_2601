@@ -3,6 +3,7 @@ import type { BikeType, PreferenceModes, RoutingOptions } from "../../types/api"
 import { el } from "../../ui/dom";
 import { renderState } from "../../ui/state";
 import type { RouteStore } from "../route/routeState";
+import { BIKE_TYPE_ICONS } from "./bikeIcons";
 import { BIKE_TYPE_ORDER, DETAIL_MODE_KEYS, MODE_META, bikeTypeLabel, modeLabel } from "./labels";
 import { defaultsFor, isUnsaved, type PreferencesState, type PreferencesStore } from "./preferencesState";
 
@@ -18,6 +19,7 @@ function segments<T extends string>(
   values: readonly T[],
   label: (v: T) => string,
   onChange: (v: T) => void,
+  iconOf?: (v: T) => string,
 ): { root: HTMLElement; inputs: Map<T, HTMLInputElement> } {
   const inputs = new Map<T, HTMLInputElement>();
   const root = el("div", { className: "route__segments pref__segments" });
@@ -30,7 +32,16 @@ function segments<T extends string>(
       if (input.checked) onChange(v);
     });
     inputs.set(v, input);
-    root.append(el("label", { className: "route__segment" }, [input, el("span", { text: label(v) })]));
+    const content = el("span", { text: label(v) });
+    if (iconOf) {
+      input.setAttribute("aria-label", label(v));
+      content.className = "pref__icon";
+      content.innerHTML = iconOf(v);
+      content.setAttribute("aria-hidden", "true");
+    }
+    const option = el("label", { className: "route__segment" }, [input, content]);
+    if (iconOf) option.title = label(v);
+    root.append(option);
   }
   return { root, inputs };
 }
@@ -38,7 +49,7 @@ function segments<T extends string>(
 type ModeKey = keyof PreferenceModes;
 
 /**
- * 段階を左から順に並べたつまみ。つまみの下に各段階の名前を並べ、見出しの右に現在の値を出す。
+ * 段階を左から順に並べたつまみ。つまみの上に各段階の名前を並べ（坂道許容度の両端表示と同じ位置）、見出しの右に現在の値を出す。
  * キーボードでは矢印キーで1段ずつ動かせる。
  */
 function stepSlider(
@@ -66,8 +77,8 @@ function stepSlider(
   for (const v of values) ticks.append(el("span", { text: (MODE_META[key].labels as Record<string, string>)[v] ?? v }));
   const node = el("div", { className: "route__field" }, [
     el("div", { className: "pref__head" }, [label, current]),
-    slider,
     ticks,
+    slider,
   ]);
   return {
     node,
@@ -90,7 +101,7 @@ interface Controls {
 /**
  * 車種・坂道許容度・詳細パラメータの編集パネル(#10)。
  * 値の編集は routeStore の draft に反映するだけで、「この条件で再検索」を押すまで経路の結果は変わらない(#6)。
- * 再検索ボタンは経路ビュー側（パネル下部）に置く。
+ * 再検索ボタンは経路ビュー側（パネル下部）に、保存は「設定」タブ（renderPreferencesSave）に置く。
  */
 export function renderPreferences(routeStore: RouteStore, prefs: PreferencesStore): HTMLElement {
   const body = el("div", { className: "pref__body" });
@@ -104,10 +115,19 @@ export function renderPreferences(routeStore: RouteStore, prefs: PreferencesStor
   function buildControls(options: RoutingOptions): Controls {
     // --- 車種 ---
     const bikes = BIKE_TYPE_ORDER.filter((b) => options.bikeTypes[b]);
-    const bike = segments<BikeType>("pref-bike-type", bikes, bikeTypeLabel, (b) => prefs.selectBike(b));
+    const bike = segments<BikeType>(
+      "pref-bike-type",
+      bikes,
+      bikeTypeLabel,
+      (b) => prefs.selectBike(b),
+      (b) => BIKE_TYPE_ICONS[b],
+    );
     bike.root.classList.add("pref__bikes");
+    // 選んだ車種名は各ラジオの aria-label で読み上げられるので、見出し横の表示は読み上げない。
+    const bikeCurrent = el("span", { className: "pref__current" });
+    bikeCurrent.setAttribute("aria-hidden", "true");
     const bikeSet = el("fieldset", { className: "route__fieldset" }, [
-      el("legend", { className: "route__field-label", text: "自転車の種類" }),
+      el("legend", { className: "route__field-label pref__head" }, [el("span", { text: "自転車の種類" }), bikeCurrent]),
       bike.root,
     ]);
 
@@ -133,6 +153,7 @@ export function renderPreferences(routeStore: RouteStore, prefs: PreferencesStor
         input.checked = b === draft.bikeType;
         input.disabled = busy;
       }
+      bikeCurrent.textContent = bikeTypeLabel(draft.bikeType);
       for (const slider of sliders) slider.sync(draft, busy);
       const defaults = defaultsFor(state, draft.bikeType);
       reset.disabled =
@@ -141,26 +162,6 @@ export function renderPreferences(routeStore: RouteStore, prefs: PreferencesStor
         (Object.keys(defaults) as Array<keyof PreferenceModes>).every((k) => defaults[k] === draft[k]);
     }
     return { node, sync };
-  }
-
-  // --- 保存 ---
-  const status = el("p", { className: "pref__status" });
-  status.setAttribute("role", "status");
-  const saveButton = textButton("この設定を保存", "route__button pref__save-button");
-  saveButton.addEventListener("click", () => void prefs.save());
-  const saveRow = el("div", { className: "pref__save" }, [status, saveButton]);
-
-  /** 保存状態の文言。通信の失敗と、未保存の値が残っていることは必ず伝える。 */
-  function saveMessage(state: PreferencesState, unsaved: boolean | null): { text: string; warn: boolean } {
-    if (state.save.kind === "saving") return { text: "保存中…", warn: false };
-    if (state.save.kind === "error") {
-      return { text: `保存に失敗しました。変更はまだ保存されていません。（${state.save.message}）`, warn: true };
-    }
-    if (unsaved === null) {
-      return { text: `保存済みの設定を取得できていません。${state.savedNote ?? ""}`.trim(), warn: true };
-    }
-    if (unsaved) return { text: "未保存の変更があります。", warn: true };
-    return { text: state.save.kind === "saved" ? "保存しました。" : "保存済みの設定と同じです。", warn: false };
   }
 
   function sync(): void {
@@ -183,11 +184,44 @@ export function renderPreferences(routeStore: RouteStore, prefs: PreferencesStor
     if (!controls || builtFor !== options.options) {
       controls = buildControls(options.options);
       builtFor = options.options;
-      body.replaceChildren(controls.node, saveRow);
+      body.replaceChildren(controls.node);
     }
     controls.sync(state);
+  }
 
-    const unsaved = isUnsaved(state, routeStore.getState().draft);
+  routeStore.subscribe(sync);
+  prefs.subscribe(sync);
+  sync();
+  return root;
+}
+
+/** 「設定」タブ。経路ビューで選んでいる条件（車種・坂道許容度・詳細パラメータ）を次回からの初期値として保存する。 */
+export function renderPreferencesSave(routeStore: RouteStore, prefs: PreferencesStore): HTMLElement {
+  const current = el("p", { className: "pref__current-summary" });
+  const status = el("p", { className: "pref__status" });
+  status.setAttribute("role", "status");
+  const saveButton = textButton("この設定を保存", "route__button pref__save-button");
+  saveButton.addEventListener("click", () => void prefs.save());
+  const saveRow = el("div", { className: "pref__save" }, [status, saveButton]);
+
+  /** 保存状態の文言。通信の失敗と、未保存の値が残っていることは必ず伝える。 */
+  function saveMessage(state: PreferencesState, unsaved: boolean | null): { text: string; warn: boolean } {
+    if (state.save.kind === "saving") return { text: "保存中…", warn: false };
+    if (state.save.kind === "error") {
+      return { text: `保存に失敗しました。変更はまだ保存されていません。（${state.save.message}）`, warn: true };
+    }
+    if (unsaved === null) {
+      return { text: `保存済みの設定を取得できていません。${state.savedNote ?? ""}`.trim(), warn: true };
+    }
+    if (unsaved) return { text: "未保存の変更があります。", warn: true };
+    return { text: state.save.kind === "saved" ? "保存しました。" : "保存済みの設定と同じです。", warn: false };
+  }
+
+  function sync(): void {
+    const state = prefs.getState();
+    const { draft } = routeStore.getState();
+    current.textContent = `いまの条件：${bikeTypeLabel(draft.bikeType)}・坂道 ${modeLabel("hillMode", draft.hillMode)}`;
+    const unsaved = isUnsaved(state, draft);
     const msg = saveMessage(state, unsaved);
     status.textContent = msg.text;
     status.classList.toggle("pref__status--warn", msg.warn);
@@ -198,5 +232,9 @@ export function renderPreferences(routeStore: RouteStore, prefs: PreferencesStor
   routeStore.subscribe(sync);
   prefs.subscribe(sync);
   sync();
-  return root;
+  return el("section", { className: "pref" }, [
+    el("p", { className: "pref__status", text: "「経路」で選んだ条件（詳細パラメータを含む）を、次回からの初期値として保存します。" }),
+    current,
+    saveRow,
+  ]);
 }

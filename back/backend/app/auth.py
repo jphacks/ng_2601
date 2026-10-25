@@ -17,6 +17,7 @@ import ssl
 from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 from typing import Any, Literal
+from uuid import UUID
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import httpx
@@ -68,7 +69,7 @@ class MagicLinkRequest(BaseModel):
     @classmethod
     def normalize_email(cls, value: str) -> str:
         value = value.strip().lower()
-        if "@" not in value or value.startswith("@") or value.endswith("@"):
+        if value.count("@") != 1 or value.startswith("@") or value.endswith("@") or any(character.isspace() or ord(character) < 32 for character in value):
             raise ValueError("A valid email address is required")
         return value
 
@@ -207,8 +208,9 @@ class AuthService:
 
     def decode_access_token(self, token: str) -> str:
         try:
-            payload = jwt.decode(token, self.session_secret, algorithms=["HS256"])
-        except jwt.PyJWTError as error:
+            payload = jwt.decode(token, self.session_secret, algorithms=["HS256"], options={"require": ["sub", "exp", "iat", "typ"]})
+            UUID(payload["sub"])
+        except (jwt.PyJWTError, ValueError, TypeError, AttributeError) as error:
             raise HTTPException(status_code=401, detail="Invalid or expired access token") from error
         if payload.get("typ") != "access" or not payload.get("sub"):
             raise HTTPException(status_code=401, detail="Invalid access token")

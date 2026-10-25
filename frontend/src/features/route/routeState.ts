@@ -213,7 +213,7 @@ export function createRouteStore(api: ApiClient, analyzer: RouteAnalyzer = analy
       if (state.status.kind === "success" && state.elevation.kind !== "loading") void runElevation(state.status.route);
     },
     async search() {
-      if (state.status.kind === "loading") return;
+      // 検索中でも新しい検索を優先する（目的地を決め直したときなど）。古い応答は seq で捨てる。
       const { origin, originSource, destination, draft } = state;
       if (!destination) {
         update({ validationError: "目的地を地図で指定してください。", preparing: false });

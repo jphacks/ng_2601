@@ -9,13 +9,14 @@ export const BASEMAP_MAX_ZOOM = 18;
 export const BASEMAP_LEGEND_LABEL = "国土地理院 淡色地図";
 
 /** 地図右下に常時表示する帰属。リンクは呼び出し側で組み立てる。 */
+// 経路の標高も国土地理院の標高タイルを加工して出しているので、規約上の出典はここにまとめて書く。
 export const ATTRIBUTION = {
-  label: "地理院タイル",
+  label: "地理院タイル（標高タイルを加工して利用）",
   url: "https://maps.gsi.go.jp/development/ichiran.html",
 } as const;
 
-/** 東京駅周辺（モックデータの範囲） */
-export const INITIAL_VIEW = { center: [139.7685, 35.6825] as [number, number], zoom: 15 };
+/** 名古屋駅周辺（シードとモックデータの範囲） */
+export const INITIAL_VIEW = { center: [136.8816, 35.1709] as [number, number], zoom: 15 };
 
 export function createStyle(): StyleSpecification {
   return {

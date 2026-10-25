@@ -80,8 +80,6 @@ export interface ProfileChart {
   apply(selection: RouteSelection | null, segment: RouteGradientSegment | null): void;
 }
 
-let chartSequence = 0;
-
 /**
  * 標高プロファイルと選択位置の表示。
  * ポインタ操作は requestAnimationFrame で1フレーム1回にまとめ、低頻度の描画だけを行う。
@@ -100,9 +98,6 @@ export function createProfileChart(points: readonly ProfilePoint[], handlers: Pr
     return { element, apply: () => undefined };
   }
   const { svg, x, y, total } = scale;
-  chartSequence += 1;
-  const sliderId = `elevation-position-${chartSequence}`;
-  const hintId = `elevation-position-hint-${chartSequence}`;
 
   // --- 選択位置の描画（縦の破線＋標高の点。欠測時は軸上の四角） ---------
   const cursor = svgEl("g", { class: "elevation__cursor" });
@@ -186,34 +181,23 @@ export function createProfileChart(points: readonly ProfilePoint[], handlers: Pr
   slider.max = String(Math.max(SLIDER_STEP_M, Math.round(total)));
   slider.step = String(SLIDER_STEP_M);
   slider.value = "0";
-  slider.id = sliderId;
-  slider.setAttribute("aria-describedby", hintId);
   slider.setAttribute("aria-label", "標高グラフの選択位置（経路に沿った距離）");
   slider.setAttribute("aria-valuetext", "未選択");
   slider.addEventListener("input", () => handlers.onSelect(sliderValueToDistance(Number(slider.value), total, SLIDER_STEP_M)));
-  const sliderLabel = el("label", { className: "elevation__slider-label", text: "グラフ位置（←→キー・10m単位）" });
-  sliderLabel.htmlFor = sliderId;
-
-  const hint = el("p", {
-    className: "elevation__hint",
-    text: "グラフ上を移動するか、スライダー（←→キー）で位置を選べます。欠測区間は「不明」と表示し、0m・0%としては扱いません。地図のルート区間をタップしても同じ位置を選べます。",
-  });
-  hint.id = hintId;
-  svg.setAttribute("aria-describedby", hintId);
 
   // --- 数値表示（色だけに依存しない） -----------------------------------
-  const emptyText = "位置を選ぶと、対応するルート位置・推定標高・100m平均勾配を表示します。";
-  const readout = el("p", { className: "elevation__readout", text: emptyText });
+  const readout = el("p", { className: "elevation__readout" });
+  readout.hidden = true;
   readout.setAttribute("role", "status");
   readout.setAttribute("aria-live", "polite");
   readout.setAttribute("aria-atomic", "true");
 
-  element.append(svg, el("div", { className: "elevation__slider" }, [sliderLabel, slider]), readout, hint);
+  element.append(svg, slider, readout);
 
   function apply(selection: RouteSelection | null, segment: RouteGradientSegment | null): void {
     if (!selection) {
       cursor.setAttribute("hidden", "");
-      readout.textContent = emptyText;
+      readout.hidden = true;
       slider.setAttribute("aria-valuetext", "未選択");
       return;
     }
@@ -233,9 +217,9 @@ export function createProfileChart(points: readonly ProfilePoint[], handlers: Pr
     }
     slider.value = String(Math.round(selection.distanceM));
     const details = describeSelection(selection, segment);
-    const grade = details.window ? `${details.grade}（100m窓 ${details.window}）` : details.grade;
-    readout.textContent = `${details.distance} ／ 標高 ${details.elevation} ／ ${grade}`;
-    slider.setAttribute("aria-valuetext", `${details.distance}、標高 ${details.elevation}、${grade}`);
+    readout.hidden = false;
+    readout.textContent = `${details.distance} ／ 標高 ${details.elevation} ／ 勾配 ${details.grade}`;
+    slider.setAttribute("aria-valuetext", `${details.distance}、標高 ${details.elevation}、勾配 ${details.grade}`);
   }
 
   return { element, apply };
