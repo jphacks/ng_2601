@@ -5,8 +5,8 @@ import type { AuthStore } from "./authState";
 
 export interface LoginScreen {
   dialog: HTMLDialogElement;
-  /** reason はログインが必要になった操作の説明。ログインできたら then を呼ぶ。 */
-  open(reason?: string, then?: () => void): void;
+  /** ログインできたら then を呼ぶ。 */
+  open(then?: () => void): void;
 }
 
 export function createLoginScreen(auth: AuthStore, mock: boolean): LoginScreen {
@@ -18,12 +18,6 @@ export function createLoginScreen(auth: AuthStore, mock: boolean): LoginScreen {
   close.type = "button";
   close.setAttribute("aria-label", "ログインを閉じる");
   close.addEventListener("click", () => dialog.close());
-
-  const reason = el("p", { className: "login__reason" });
-  const lead = el("p", {
-    className: "login__lead",
-    text: "ログインしなくても、地図・経路検索・口コミの閲覧は使えます。ログインすると口コミを投稿できます。",
-  });
 
   const google = el("button", { className: "login__google", text: "Google でログイン" });
   google.type = "button";
@@ -46,20 +40,14 @@ export function createLoginScreen(auth: AuthStore, mock: boolean): LoginScreen {
     finish(email.value.trim());
   });
 
-  const note = el("p", {
-    className: "login__note",
-    text: mock
-      ? "デモ版のため、メールや Google には接続せず、そのままログインします。"
-      : "実サーバーとのログイン接続は準備中です（#42）。",
-  });
+  const note = el("p", { className: "login__note", text: "実サーバーとのログイン接続は準備中です（#42）。" });
+  note.hidden = mock;
   google.disabled = !mock;
   email.disabled = !mock;
   send.disabled = !mock;
 
   const dialog = el("dialog", { className: "login" }, [
     el("div", { className: "login__header" }, [title, close]),
-    reason,
-    lead,
     google,
     el("p", { className: "login__or", text: "または" }),
     form,
@@ -84,10 +72,8 @@ export function createLoginScreen(auth: AuthStore, mock: boolean): LoginScreen {
 
   return {
     dialog,
-    open(why, next) {
+    open(next) {
       then = next;
-      reason.textContent = why ?? "";
-      reason.hidden = !why;
       form.reset();
       dialog.showModal();
     },

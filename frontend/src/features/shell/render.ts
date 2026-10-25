@@ -113,7 +113,7 @@ export function renderShell(root: HTMLElement): void {
     },
     onPost: (at) => {
       if (auth.getUser()) reviewPost?.start(at);
-      else login.open("口コミを投稿するにはログインしてください。", () => reviewPost?.start(at));
+      else login.open(() => reviewPost?.start(at));
     },
   });
   reviewPost = createReviewPostFeature({
@@ -171,8 +171,7 @@ export function renderShell(root: HTMLElement): void {
       setMenu(false, false);
       login.open();
     });
-    const name = user ? `${user.name} でログイン中` : "ログインすると口コミを投稿できます";
-    account.replaceChildren(el("span", { className: "drawer__account-name", text: name }), action);
+    account.replaceChildren(el("span", { className: "drawer__account-name", text: user?.name ?? "" }), action);
   }
   auth.subscribe(() => {
     const focused = account.contains(document.activeElement);
