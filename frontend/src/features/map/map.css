@@ -80,6 +80,13 @@
 .map-marker--hazard { background: var(--color-warning); }
 .map-marker--review { background: var(--color-primary); }
 .map-marker--pick { background: var(--color-route); width: 18px; height: 18px; }
+.map-marker--selected-point {
+  background: var(--color-route);
+  width: 32px;
+  height: 32px;
+  cursor: default;
+  z-index: 1;
+}
 .map-marker--draft { background: var(--color-accent); color: var(--color-text); }
 .map-marker--origin { background: var(--color-primary); }
 .map-marker--destination { background: var(--color-accent); color: var(--color-text); }
