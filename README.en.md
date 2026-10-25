@@ -30,6 +30,10 @@ Routes link to estimated elevation profiles and grade colors derived from Geospa
 
 An M5Stack CoreS3 and GPS unit capture possible bumps and roughness, then upload and display them. **Implemented, with data collection confirmed on the physical device.** Using those measurements to select routes is a future step.
 
+#### 4. Easy-to-use UI/UX
+
+A clean UI/UX designed around how riders actually use the app.
+
 ### What it solves
 
 The same distance can feel very different depending on the bicycle and rider. CyclerHub helps people choose routes that suit their bicycle and preferences, with road restrictions, traffic, hills, and surfaces in view.
@@ -82,6 +86,10 @@ The role of each source is described in the [external data documentation](back/d
 - Built bicycle-specific [routing settings](back/config/routing_catalog.json) and a [BRouter profile](back/brouter_extension/profiles/japan_bicycle.brf).
 - Added a [route API](back/backend/app/main.py) that evaluates BRouter candidates using road restrictions and traffic data.
 - Implemented CoreS3 [measurement and upload firmware](seams/M5StackS3/src/main.cpp) and a [device ingest API](back/backend/app/device_events.py).
+
+## Demo video
+
+https://youtu.be/X4GLAS3fw6A
 
 ## Acknowledgements
 
