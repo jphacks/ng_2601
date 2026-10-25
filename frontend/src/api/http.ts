@@ -62,7 +62,7 @@ function mapDataError(status: number, parsed: unknown): ApiErrorBody {
 }
 
 // エンドポイントは暫定。経路検索・設定以外はバックエンド確定後に合わせる。
-// getAccessToken: ログイン済みのときアクセストークンを返す。認証UIは未実装（#23）のため現状は未指定。
+// getAccessToken: ログイン済みのときアクセストークンを返す。
 export function createHttpClient(baseUrl: string, getAccessToken?: () => string | null): ApiClient {
   async function request<T>(
     method: string,

@@ -17,7 +17,7 @@ import type { RouteAnalysis } from "../elevation/analyze";
 import { createRouteLink, type RouteLink } from "../elevation/link";
 import type { Route } from "../../types/api";
 import { createReviewsFeature, type ReviewsFeature } from "../reviews/reviewsFeature";
-import { createAuthStore } from "../auth/authState";
+import { auth } from "../auth";
 import { createLoginScreen } from "../auth/loginScreen";
 
 type ViewId = "route" | "settings" | "hazards" | "reviews" | "layers" | "help" | "about";
@@ -60,7 +60,6 @@ export function renderShell(root: HTMLElement): void {
   let layerPanel: HTMLElement | undefined;
   const routeStore = createRouteStore(api);
   const prefsStore = createPreferencesStore(api, routeStore);
-  const auth = createAuthStore(localStorage);
   const login = createLoginScreen(auth, isMockApi);
 
   // --- map area ---------------------------------------------------------

@@ -1,5 +1,7 @@
 export interface User {
   name: string;
+  accessToken?: string;
+  refreshToken?: string;
 }
 
 export interface AuthStore {

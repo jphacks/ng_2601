@@ -76,7 +76,7 @@
   font-size: 14px;
 }
 
-.login__note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--color-text-muted); }
+.login__error { margin: 0; font-size: 13px; color: var(--color-warning); }
 
 /* ドロワーのアカウント欄 */
 .drawer__account {

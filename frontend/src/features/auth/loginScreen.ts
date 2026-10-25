@@ -1,7 +1,8 @@
 import "./login.css";
 import { el } from "../../ui/dom";
 import { icon } from "../../ui/icon";
-import type { AuthStore } from "./authState";
+import type { AuthStore, User } from "./authState";
+import { finishGoogleLogin, GOOGLE_CALLBACK_PATH, startGoogleLogin } from "./google";
 
 export interface LoginScreen {
   dialog: HTMLDialogElement;
@@ -23,7 +24,22 @@ export function createLoginScreen(auth: AuthStore, mock: boolean): LoginScreen {
 
   const google = el("button", { className: "login__google", text: "Google でログイン" });
   google.type = "button";
-  google.addEventListener("click", () => finish("Google ユーザー"));
+  const error = el("p", { className: "login__error" });
+  error.setAttribute("role", "alert");
+  error.hidden = true;
+  google.addEventListener("click", () => {
+    if (mock) {
+      finish({ name: "Google ユーザー" });
+      return;
+    }
+    google.disabled = true;
+    error.hidden = true;
+    startGoogleLogin().catch(() => {
+      google.disabled = false;
+      error.textContent = "Google でのログインを始められませんでした。時間をおいてもう一度お試しください。";
+      error.hidden = false;
+    });
+  });
 
   const email = el("input", { className: "login__input" });
   email.type = "email";
@@ -39,21 +55,17 @@ export function createLoginScreen(auth: AuthStore, mock: boolean): LoginScreen {
   const form = el("form", { className: "login__form" }, [emailLabel, send]);
   form.addEventListener("submit", (e) => {
     e.preventDefault();
-    finish(email.value.trim());
+    finish({ name: email.value.trim() });
   });
 
-  const note = el("p", { className: "login__note", text: "実サーバーとのログイン接続は準備中です（#42）。" });
-  note.hidden = mock;
-  google.disabled = !mock;
-  email.disabled = !mock;
-  send.disabled = !mock;
+  // メールのリンクでのログインは BE にあるが、リンクを受け取る画面がまだないため実API時は出さない。
+  const emailLogin = mock ? [el("p", { className: "login__or", text: "または" }), form] : [];
 
   const dialog = el("dialog", { className: "login" }, [
     el("div", { className: "login__header" }, [title, close]),
     google,
-    el("p", { className: "login__or", text: "または" }),
-    form,
-    note,
+    error,
+    ...emailLogin,
   ]);
   dialog.setAttribute("aria-labelledby", title.id);
   const toast = el("div", { className: "login-toast" });
@@ -67,16 +79,26 @@ export function createLoginScreen(auth: AuthStore, mock: boolean): LoginScreen {
     if (e.target === dialog) dialog.close();
   });
 
-  function finish(name: string): void {
-    auth.login({ name });
-    dialog.close();
+  function showToast(text: string): void {
     window.clearTimeout(toastTimer);
-    toast.textContent = `${name} でログインしました`;
+    toast.textContent = text;
     toast.hidden = false;
     toastTimer = window.setTimeout(() => (toast.hidden = true), 3000);
+  }
+
+  function finish(user: User): void {
+    auth.login(user);
+    dialog.close();
+    showToast(`${user.name} でログインしました`);
     const next = then;
     then = undefined;
     next?.();
+  }
+
+  if (location.pathname === GOOGLE_CALLBACK_PATH) {
+    const search = location.search;
+    history.replaceState(null, "", "/");
+    finishGoogleLogin(search).then(finish, () => showToast("Google でのログインに失敗しました"));
   }
 
   return {
