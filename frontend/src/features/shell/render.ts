@@ -187,22 +187,18 @@ export function renderShell(root: HTMLElement): void {
   const locator = setupLocate(locate, mapController, { onStart: () => closeSearch(false) });
   const controls = el("div", { className: "map-controls" }, [layersButton, compass, locate, zoomIn, zoomOut]);
 
-  // --- search card: one DOM instance, only its position/size changes ----
-  // 住所検索（ジオコーディング）は未対応のため、目的地・出発地は地図で指定した地点を表示するだけの読み取り専用。
+  // --- route button (bottom right): opens the search card -------------------
+  // 住所検索（ジオコーディング）は未対応なので検索バーは置かず、目立つ「経路」ボタンからパネルを開く。
   // 出発地は既定で現在地。利用者は地図をタップして目的地だけ決めればよい。
-  const input = el("input", { className: "bar__input" });
-  input.type = "text";
-  input.readOnly = true;
-  input.placeholder = "どこへ行く？（地図をタップ）";
-  input.setAttribute("aria-label", "目的地");
-  input.autocomplete = "off";
-  const barClose = button("検索を閉じる", "bar__close", "close");
-  barClose.hidden = true;
-  const bar = el("div", { className: "bar" }, [
-    el("span", { className: "bar__icon" }, [icon("search")]),
-    input,
-    barClose,
-  ]);
+  const routeButton = el("button", { className: "route-fab" }, [icon("route"), el("span", { text: "経路" })]);
+  routeButton.type = "button";
+  routeButton.setAttribute("aria-label", "経路を開く");
+  routeButton.setAttribute("aria-expanded", "false");
+  routeButton.setAttribute("aria-controls", "search-panel");
+  routeButton.addEventListener("click", () => openSearch("route"));
+
+  // --- search card: one DOM instance, only its position/size changes ----
+  const panelClose = button("パネルを閉じる", "panel__close", "close");
 
   function pointRow(
     mode: "origin" | "destination",
@@ -277,15 +273,16 @@ export function renderShell(root: HTMLElement): void {
   viewBox.setAttribute("role", "tabpanel");
   viewBox.tabIndex = -1;
   // 出発地は経路ビューだけで使う。DOMは保持し、切り替えても入力値を失わない。
-  const panel = el("div", { className: "panel" }, [originRow, tablist, viewBox]);
+  const panelHeader = el("div", { className: "panel__header" }, [tablist, panelClose]);
+  const panel = el("div", { className: "panel" }, [panelHeader, originRow, viewBox]);
+  panel.id = "search-panel";
   panel.inert = true;
-  const card = el("div", { className: "search-card" }, [bar, panel]);
+  const card = el("div", { className: "search-card" }, [panel]);
 
   // --- behaviour --------------------------------------------------------
   function syncRoutePanel(state = routeStore.getState()): void {
     const showRouteResults = searchOpen && view === "route" && state.status.kind !== "idle";
     card.classList.toggle("search-card--route-results", showRouteResults);
-    bar.hidden = showRouteResults;
     // 結果表示中も出発地・目的地を出し、そこから変更・現在地への戻し・再検索ができるようにする。
     originRow.hidden = view !== "route";
   }
@@ -397,21 +394,30 @@ export function renderShell(root: HTMLElement): void {
     card.classList.add("is-open");
     panel.inert = false;
     syncRoutePanel();
-    barClose.hidden = false;
+    syncRouteButton();
     menuButton.hidden = true;
-    input.focus({ preventScroll: true });
+    (tabs.get(view) ?? viewBox).focus({ preventScroll: true });
     revealFocused();
   }
 
-  function closeSearch(blur: boolean): void {
+  /** restoreFocus は閉じるボタンなどキーボードで閉じたとき。地図タップで閉じたときはフォーカスを外すだけ。 */
+  function closeSearch(blur: boolean, restoreFocus = false): void {
     if (!searchOpen) return;
     searchOpen = false;
     card.classList.remove("is-open");
     syncRoutePanel();
     panel.inert = true;
-    barClose.hidden = true;
+    syncRouteButton();
     menuButton.hidden = false;
-    if (blur) input.blur();
+    const active = document.activeElement;
+    if (restoreFocus && !routeButton.hidden) routeButton.focus();
+    else if (blur && active instanceof HTMLElement && panel.contains(active)) active.blur();
+  }
+
+  /** 経路ボタンは、パネルを開いている間と地点指定中は隠す。 */
+  function syncRouteButton(): void {
+    routeButton.hidden = searchOpen || routeStore.getState().pickMode !== null;
+    routeButton.setAttribute("aria-expanded", String(searchOpen));
   }
 
   function setMenu(open: boolean, restoreFocus = true): void {
@@ -444,11 +450,7 @@ export function renderShell(root: HTMLElement): void {
     revealFocused();
   };
 
-  input.addEventListener("click", () => openSearch());
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === "ArrowDown") openSearch();
-  });
-  barClose.addEventListener("click", () => closeSearch(true));
+  panelClose.addEventListener("click", () => closeSearch(true, true));
   map.addEventListener("pointerdown", () => closeSearch(true));
   menuButton.addEventListener("click", () => setMenu(true));
   drawerClose.addEventListener("click", () => setMenu(false));
@@ -470,8 +472,8 @@ export function renderShell(root: HTMLElement): void {
     // 未指定のときは既定の「現在地」が表示されているので、地図で指定したときだけ戻すボタンを出す。
     useCurrent.hidden = state.originSource !== "map";
     destination.value = state.destination ? formatPoint(state.destination) : "";
-    input.value = destination.value;
     mapFilter.hidden = picking;
+    syncRouteButton();
 
     // 結果が成功のときだけ経路を描く。検索中・空・失敗で古い経路を残さない。
     // 検索の準備中（目的地を決め直して現在地を取り直している間）も、古い経路は新しい経路に見えないよう外す。
@@ -507,7 +509,7 @@ export function renderShell(root: HTMLElement): void {
       if (menuOpen) setMenu(false);
       else if (routeStore.getState().pickMode) routeStore.cancelPick();
       else if (reviewPost?.handleEscape()) return;
-      else if (searchOpen) closeSearch(false);
+      else if (searchOpen) closeSearch(false, true);
       else if (!hazards?.closeDetail()) reviews?.handleEscape();
       return;
     }
@@ -538,6 +540,7 @@ export function renderShell(root: HTMLElement): void {
     mapFilter,
     menuButton,
     controls,
+    routeButton,
     reviews.status,
     reviews.sheet,
     reviewPost.sheet,

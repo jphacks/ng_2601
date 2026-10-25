@@ -21,7 +21,7 @@
   position: absolute;
   z-index: 6;
   left: 50%;
-  bottom: calc(var(--bottom-offset, var(--space-3)) + var(--row-height) + var(--space-2));
+  bottom: calc(var(--bottom-offset, var(--space-3)) + var(--fab-size) + var(--space-2));
   transform: translateX(-50%);
   display: grid;
   grid-template-columns: minmax(0, max-content);

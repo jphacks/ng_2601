@@ -99,7 +99,7 @@
   z-index: 15;
   left: var(--left-offset);
   right: var(--right-offset);
-  bottom: calc(var(--bottom-offset) + var(--row-height) + var(--space-3));
+  bottom: calc(var(--bottom-offset) + var(--fab-size) + var(--space-3));
   max-height: 45dvh;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -113,7 +113,7 @@
   .hazard-card {
     left: auto;
     right: calc(var(--right-offset) + var(--button-size) + var(--space-3));
-    /* 検索バー（展開時は上部に全幅）の下に置く。 */
+    /* 上部のカテゴリチップの下に置く。 */
     top: calc(var(--top-offset) + var(--row-height) + var(--space-2));
     bottom: auto;
     width: 360px;
