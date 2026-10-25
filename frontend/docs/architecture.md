@@ -2,19 +2,19 @@
 
 ## 確認時点と根拠
 
-2026-10-25確認。mainの基準は[6493512](https://github.com/jphacks/ng_2601/commit/6493512fa8197d974b593437661cbc69886ead12)（PR #25のマージ）です。`frontend/`（FE-01〜FE-04）と`back/`（[PR #18](https://github.com/jphacks/ng_2601/pull/18)、マージ済み）が含まれます。
+2026-10-25確認。現行checkoutには`frontend/`と`back/`があり、バックエンドの現行API契約は[`back/docs/api.md`](../../back/docs/api.md)、フロントエンドのHTTP境界は`src/api/http.ts`です。以下は実装済みの経路と、認証UIや実BE結合のようにまだ未接続の部分を分けて記載します。
 
-### 2026-10-25 / FE-07の更新
+### 2026-10-25 / 標高表示と地図連動
 
-Issue #9はPR #35（#8）の積み上げブランチ`norinori1/fe-06-gradient-colors`（`4fa94a9`）を基準にする。標高プロファイル上の選択位置と地図上のルート位置・区間を双方向に連動させる。選択状態は[`features/elevation/selection.ts`](../src/features/elevation/selection.ts)と[`link.ts`](../src/features/elevation/link.ts)が持ち、経路に沿った距離でグラフ・地図・数値表示を対応付ける。地図側は#8の100m計測窓を帯で、選択位置を丸印で示す。`Route`型・API契約・依存関係は変更しない。グラフの `pointermove` はrAFで1フレーム1回にまとめ、地図のハイライト更新は窓が変わったときだけ行う。検索カードの箱が地図操作を妨げていたため、[`shell.css`](../src/features/shell/shell.css)でバー・パネルの外側を地図へ通す最小修正を入れた。詳細・確認結果は[地図とグラフの連動](route-elevation.md#地図とグラフの連動fe-07--issue-9)を参照。実DEMの連動・実BE・実機モバイルは未検証。
+標高プロファイル上の選択位置と地図上のルート位置・区間を双方向に連動させる実装が`features/elevation/selection.ts`と`link.ts`にあります。`Route`型・API契約は変更せず、ブラウザで取得したDEM由来の推定値だけを扱います。詳細・確認結果は[地図とグラフの連動](route-elevation.md#地図とグラフの連動fe-07--issue-9)を参照。実DEMの結合・実BE・実機モバイルは未検証です。
 
-### 2026-10-25 / FE-05の更新
+### 2026-10-25 / 標高データの責務
 
-Issue #7の作業基準はmainの`6493512`（PR #25マージ済み）。このcheckoutにはFE基盤・画面シェル・MapLibre地図・単一ルート検索とBEが存在する。以下の2026-10-24時点の履歴より、該当機能ではこの更新と現行ソースを優先する。
+`features/elevation/`は経路成功後に国土地理院DEMを取得し、獲得標高・下降量・平均勾配をFE側で推定します。モックモードでは合成標高を同じ解析処理に渡します。詳しい計算・出典・欠測規則は[ルート標高解析](route-elevation.md)、APIへの影響は[API契約](api-contract.md)を参照してください。
 
-標高表示は[`features/elevation/`](../src/features/elevation/)で実装。`RouteStore`は経路検索と標高解析を別状態で管理し、経路成功後にブラウザから国土地理院DEMを取得する。`ApiClient`経由の距離・時間と、DEMからFEで計算した推定標高を結果タブで表示する。解析中断は共有タイル通信を妨げず、古い応答は捨てる。モックモードでは合成標高を同じ解析処理に渡す。詳しい計算・出典・欠測規則は[ルート標高解析](route-elevation.md)、APIへの影響は[API契約](api-contract.md)を参照。FE-06積み上げブランチ`norinori1/fe-06-gradient-colors`で#8を実装中。#7のDEM由来100m窓を再利用し、Route API型は変更しない。#9の地図・グラフ連動は別Issueで未実装。
+### 過去のIssue／PRへの参照
 
-
+以下は実装状態の根拠ではなく、作業の来歴を追うための参照です。現行状態は上の表とソースを優先します。
 - [Issue #2（FE Epic）](https://github.com/jphacks/ng_2601/issues/2)はOPENです。子Issueは#3・#4・#5がCLOSED、#11を含む他はOPENでした。要件の記載は、実装完了やBEとの合意を意味しません。
 - [FE-01 / Issue #3](https://github.com/jphacks/ng_2601/issues/3)の[PR #16](https://github.com/jphacks/ng_2601/pull/16)はマージ済みです。導入されたAPI基盤は`frontend/src/api/`等にあります（初回確認のhead: [b9de6e2](https://github.com/jphacks/ng_2601/tree/b9de6e2bc07f173f00ae6cb8491bf348974578ea)）。
 - [FE-03 / Issue #5](https://github.com/jphacks/ng_2601/issues/5)の[PR #22](https://github.com/jphacks/ng_2601/pull/22)はマージ済み（取り込み後のHEADは`abe740b`）。地図表示の実装は[`frontend/src/features/map/`](../src/features/map)です。
@@ -27,34 +27,34 @@ Issue #7の作業基準はmainの`6493512`（PR #25マージ済み）。このch
 
 ## 構成と責務
 
-この表はmainの`6493512`とPR #32時点で確認した状態です。2026-10-24の記録は履歴であり、状態が変わった行はこの表を優先してください。
+この表は2026-10-25時点の現行checkoutを確認した状態です。Issue／PRの番号は来歴の参照であり、状態の判断はこの表と現行ソースを優先してください。
 
 | 領域 | 確認できた方針・責務 | 実装状態・根拠 |
 | --- | --- | --- |
-| フロントエンド | 地点・設定入力、地図と検索結果・標高・危険情報・口コミの表示、読み込み／空／失敗状態を扱う | main（6493512）に画面シェル（FE-02）・地図（FE-03）・API基盤（FE-01）・経路検索（FE-04）がある。標高表示はPR #32（未マージ）で追加。設定・口コミ等は未実装。[Epic #2](https://github.com/jphacks/ng_2601/issues/2)の要件 |
+| フロントエンド | 地点・設定入力、地図と検索結果・標高・道路情報・口コミの表示、読み込み／空／失敗状態を扱う | `src/features/shell/`、`map/`、`route/`、`elevation/`、`hazards/`、`reviews/`、`preferences/`に実装。実API利用は`VITE_API_MODE=http`で選択できる。ログイン画面とアクセストークン保持は未実装のため、認証が必要な操作は実BEでは401になる |
 | FE開発・通信基盤 | Vite + TypeScript、UIライブラリなし。画面はApiClient経由でモック／HTTPを切り替える | [PR #16](https://github.com/jphacks/ng_2601/pull/16)でマージ済み。`frontend/src/features/`、`frontend/src/ui/`、`frontend/src/api/`、`frontend/src/types/`、`frontend/src/mocks/`に分離 |
-| バックエンド | FEから経路探索を依頼し、Preferencesを取得・保存する連携を想定 | [#6](https://github.com/jphacks/ng_2601/issues/6)、[#10](https://github.com/jphacks/ng_2601/issues/10)の要件。`back/`にBE実装があるが（PR #18）、FEの暫定APIとの整合は未合意。`/v1/map-data`は確認したmainに存在しない。構成の詳細は`back/docs/`を参照し、本文書では未確認とする |
-| 地図表示 | MapLibreで地点選択、ルート・危険情報・口コミのレイヤー表示、帰属表示 | [#5](https://github.com/jphacks/ng_2601/issues/5)のPR #22で`frontend/src/features/map/`に実装（マージ済み）。ベースマップはOpenFreeMap Libertyのベクタータイルから、POI・道路番号・一方通行矢印などを除いて日本語ラベルにしたもの（`style.ts`）、帰属は「© OpenFreeMap © OpenMapTiles © OpenStreetMap」を常時表示。ルートは検索結果（PR #25）を描画し、口コミはモックを重ねており、API接続は#12。道路・危険情報は#11（PR #27・未マージ）でMapLibreのGeoJSONレイヤーとして描画する予定（下の行）。標高・勾配は#7〜#9 |
-| 現在地表示 | 利用者の操作で現在地を1回取得して表示。拒否・タイムアウト・非対応でも地図と手動の地点指定は使える。位置は保存・送信しない | [#14](https://github.com/jphacks/ng_2601/issues/14)で`frontend/src/features/geolocation/`に実装（[PR #31](https://github.com/jphacks/ng_2601/pull/31)・未マージ、確認したhead `281b46c`）。仕様と制約は[geolocation.md](geolocation.md) |
-| 経路探索 | FEは出発地・目的地・車種・坂道許容度を送り、返却された単一経路を描画する | [#6](https://github.com/jphacks/ng_2601/issues/6)で`frontend/src/features/route/`に実装（[PR #25](https://github.com/jphacks/ng_2601/pull/25)・マージ済み。実BE結合は未検証）。BEは`back/backend/app/main.py`の`POST /v1/routes`。地点指定は地図タップのみ（住所検索なし） |
-| 車種・坂道許容度（Preferences） | 車種・坂道許容度・詳細パラメータ（交通量・路面・押し歩き）を選び、保存・初期値リセット・再検索に使う | [#10](https://github.com/jphacks/ng_2601/issues/10)で`frontend/src/features/preferences/`に実装（[PR #34](https://github.com/jphacks/ng_2601/pull/34)・未マージ、確認したhead `29671c1`）。選択肢・初期値は`GET /v1/routing-options`、保存・取得は`/v1/auth/me*`（要ログイン。FEのログインは未実装でBE結合は未検証）。編集値は経路検索の`draft`に反映し、再検索まで結果は変わらない |
-| 標高・勾配 | 距離・獲得標高・下降量・標高プロファイルの表示と勾配色分け | #7はPR #32の未マージ実装でFEが国土地理院DEMを解析。#8はこの積み上げブランチで100m勾配窓の地図表示を実装し、API型は変更しない。#9も同じ積み上げブランチでグラフと地図の選択位置を連動させる（PR未マージ）。バックエンドとの勾配閾値合意は未確認 |
-| 道路・危険情報 | レイヤー・フィルタ・詳細で種類、情報源、更新日時、有効期限を表示 | [#11](https://github.com/jphacks/ng_2601/issues/11)のPR #27（OPEN・未マージ）で`frontend/src/features/hazards/`に実装中。取得は`api/mapDataLoader.ts`が表示領域（bbox）ごとに`getMapData`を呼ぶ。応答はBE担当共有のスニペット`GET /v1/map-data`（公的規制・事故履歴・交通量・ユーザー報告を別々のGeoJSONで返す）の形に合わせたが、このエンドポイントはリポジトリ未確認で、実サーバーとの接続は未検証。FEで4分類（危険／便利／地形／道路設備）と情報区分（公的規制／統計／ユーザー報告）に正規化し、更新日時の不明・欠測、期限切れ、解消済み、未確認を区別して表示する。収集・配信元と保存方式は未決定 |
-| 口コミ | 地点に紐づく一覧・詳細・投稿、ユーザー情報と公的情報の区別 | 閲覧は[#12](https://github.com/jphacks/ng_2601/issues/12)で[`features/reviews/`](../src/features/reviews/)に実装。mainのBBox・表示領域イベントに合わせ、`GET /v1/observations`をアダプターで変換し、地図ピンから一覧・詳細を表示する。道路情報はmainの取得・フィルタ・詳細表示を共有し、経路の地点指定を優先する。BEの[PR #26](https://github.com/jphacks/ng_2601/pull/26)はmainにマージ済みだが、実サーバーとの結合は未検証。投稿は[#13](https://github.com/jphacks/ng_2601/issues/13)でフォーム・送信フローを実装（[`postForm.ts`](../src/features/reviews/postForm.ts)）。`POST /v1/observations`に合わせた暫定実装で、FEのログインは未実装。認証・投稿制限・モデレーション・通報窓口の表示方針は未合意 |
+| バックエンド | FEから経路探索、地図データ、観測、設定を受け付け、外部データの出典を返す | `back/backend/app/main.py` と `auth.py` に実装。`POST /v1/routes`、`GET /v1/map-data`、`GET/POST /v1/observations`、`GET /v1/routing-options`、`/v1/auth/me*`などの正本は[`back/docs/api.md`](../../back/docs/api.md)。FEとの実サーバー結合テストは未実施 |
+| 地図表示 | MapLibreで地点選択、ルート・道路情報・口コミのレイヤー表示、帰属表示 | `features/map/` と `features/hazards/`、`features/reviews/`に実装。ベースマップはOpenFreeMap Libertyのベクタータイルから、POI・道路番号・一方通行矢印などを除いて日本語ラベルにしたもの（`map/style.ts`）、帰属は「© OpenFreeMap © OpenMapTiles © OpenStreetMap」を常時表示。モック／HTTPを切り替え、HTTPモードでは表示領域のbboxを`GET /v1/map-data`へ送る。実データの結合・モバイル実機は未検証 |
+| 現在地表示 | 利用者の操作で現在地を1回取得して表示。拒否・タイムアウト・非対応でも地図と手動の地点指定は使える。位置は保存・送信しない | `features/geolocation/`に実装。仕様と制約は[geolocation.md](geolocation.md) |
+| 経路探索 | FEは出発地・目的地・車種・4つの設定を送り、返却された単一経路を描画する | `features/route/` と `api/routeAdapter.ts`に実装。HTTPモードは`POST /v1/routes`へ接続し、地点指定は地図タップのみ（住所検索なし）。実BE結合は未検証 |
+| 車種・坂道許容度（Preferences） | 車種・坂道許容度・詳細パラメータ（交通量・路面・押し歩き）を選び、初期値・再検索に使う | `features/preferences/`に実装。選択肢・初期値は`GET /v1/routing-options`、保存・取得は`/v1/auth/me*`（要ログイン）。ログインUIとトークン注入は未実装なので、編集値を検索へ送る機能と、認証済み保存の接続状態を分けて扱う |
+| 標高・勾配 | 距離・獲得標高・下降量・標高プロファイルの表示と勾配色分け | `features/elevation/`に実装し、HTTPモードでは国土地理院DEMをブラウザから取得する。これはルートAPIの応答に含まれないFE側の推定値で、欠測・出典を別表示する。実DEMの結合・実機モバイルは未検証 |
+| 道路・危険情報 | レイヤー・フィルタ・詳細で種類、情報源、更新日時、有効期限を表示 | `features/hazards/` と `api/mapDataLoader.ts`に実装。HTTPモードでは表示領域のbboxを`GET /v1/map-data`へ送り、規制・事故・交通量・観測を別レイヤーとして扱う。出典と鮮度はバックエンドのsource metadataを表示する。認証不要の取得は接続済みだが、実データでの受入検証は未実施 |
+| 口コミ | 地点に紐づく一覧・詳細・投稿、ユーザー情報と公的情報の区別 | `features/reviews/`に実装。HTTPモードでは`GET /v1/observations`を表示bboxで取得し、投稿は`POST /v1/observations`へ送る。投稿にはBearer認証が必要だが、FEのログインUI・トークン保持は未実装なので実BEでは401になる。モデレーション画面、通報窓口、実BEでの結合検証は未実施 |
 
 ## データフロー
 
-以下はIssue上の予定フローです。mainで動作する通信経路ではありません。
+以下は現行の通信経路です。モックモードでは同じ境界をモック実装へ切り替えます。
 
 ```text
 利用者の設定・出発地／目的地
   → FEの入力・表示処理
   → API通信境界
-  → BEへの経路探索依頼（探索・データ源は未決定）
+  → BEへの`POST /v1/routes`（BRouter・公式規制・交通量を評価し、事故履歴は別コンテキストで返す）
   → 返却された経路・解析データをFEで地図／グラフ表示
 
 地図の表示領域・選択地点
-  → 危険情報／口コミの取得
+  → `GET /v1/map-data`／`GET /v1/observations`
   → FEでレイヤー／詳細表示
 
 口コミ投稿入力 → 入力検証 → 投稿API → 取得結果の再表示
@@ -62,11 +62,11 @@ Issue #7の作業基準はmainの`6493512`（PR #25マージ済み）。このch
 
 画面 → `ApiClient` → `createMockClient`または`createHttpClient`という境界があります。[API client](https://github.com/jphacks/ng_2601/blob/b9de6e2bc07f173f00ae6cb8491bf348974578ea/frontend/src/api/client.ts)と[切り替え実装](https://github.com/jphacks/ng_2601/blob/b9de6e2bc07f173f00ae6cb8491bf348974578ea/frontend/src/api/index.ts)が根拠です。HTTP clientの存在は、対応するBE APIの稼働・実装を意味しません。
 
-FEは表示と利用者操作、BEは合意したAPIの提供を境界として調整します。ただし勾配色分け（#8）の閾値や、危険情報・口コミの実データ取得責務などは未確定です。[API契約の未合意点](api-contract.md)を先に解決してください。モック結果を実測値・安全性の保証として扱いません。
+FEは表示と利用者操作、BEはAPIとデータ出典の提供を境界とします。ログインUIとアクセストークンの保持、実BE結合、実機モバイルは未接続・未検証です。モック結果を実測値・安全性の保証として扱いません。詳細な未合意事項は[API契約](api-contract.md)と[`back/docs/api.md`](../../back/docs/api.md)を確認してください。
 
 ## 次に確認すること
 
-- FEとBEの接続前に、[api-contract.md](api-contract.md)に挙げた差分と未決定事項を関係Issueで合意する。
+- FEとBEの接続検証では、[api-contract.md](api-contract.md)と[`back/docs/api.md`](../../back/docs/api.md)の差分を確認する。
 - 機能の受入条件は各Issueを使う。結合・モバイル・通信失敗・欠測の検証は[#15](https://github.com/jphacks/ng_2601/issues/15)で集約する。
 - 将来構想（リアルタイムナビ、推薦等）はEpic #2で区別されており、現状の構成には含めない。
 

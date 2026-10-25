@@ -95,3 +95,23 @@ erDiagram
     timestamptz created_at
     timestamptz updated_at
   }
+
+  device_surface_events {
+    text device_id PK
+    text event_id PK
+    uuid id UK
+    text kind "bump | roughness"
+    timestamptz observed_at
+    geography location "Point, SRID 4326"
+    real peak_delta_g
+    real rms_g
+    real gps_hdop
+    real speed_kmph
+    text payload_fingerprint
+    timestamptz received_at
+  }
+
+  schema_migrations {
+    text version PK
+    timestamptz applied_at
+  }
