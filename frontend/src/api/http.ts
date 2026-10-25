@@ -54,6 +54,13 @@ function preferencesError(status: number, parsed: unknown): ApiErrorBody {
   return { code: "http_error", message: `設定の通信に失敗しました（HTTP ${status}）。`, details };
 }
 
+function mapDataError(status: number, parsed: unknown): ApiErrorBody {
+  const details = typeof parsed === "object" && parsed !== null ? (parsed as { detail?: unknown }).detail : undefined;
+  if (status === 422) return { code: "invalid_request", message: "表示範囲が受け付けられませんでした。", details };
+  if (status === 503) return { code: "map_data_unavailable", message: "道路情報サービスを利用できません。時間をおいて再試行してください。", details };
+  return { code: "http_error", message: `HTTP ${status}`, details };
+}
+
 // エンドポイントは暫定。経路検索・設定以外はバックエンド確定後に合わせる。
 // getAccessToken: ログイン済みのときアクセストークンを返す。認証UIは未実装（#23）のため現状は未指定。
 export function createHttpClient(baseUrl: string, getAccessToken?: () => string | null): ApiClient {
@@ -145,7 +152,7 @@ export function createHttpClient(baseUrl: string, getAccessToken?: () => string 
           limit: limit === undefined ? undefined : String(limit),
         })}`,
         undefined,
-        { signal, timeoutMs: MAP_DATA_TIMEOUT_MS, timeoutMessage: "道路情報の取得に時間がかかっています。時間をおいて再試行してください。" },
+        { signal, toError: mapDataError, timeoutMs: MAP_DATA_TIMEOUT_MS, timeoutMessage: "道路情報の取得に時間がかかっています。時間をおいて再試行してください。" },
       ).then(assertMapData),
     getRoute: (id) => request("GET", `/routes/${encodeURIComponent(id)}`),
     listHazards: (routeId) => request("GET", `/hazards${qs({ routeId })}`),

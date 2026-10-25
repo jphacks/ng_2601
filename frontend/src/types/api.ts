@@ -131,7 +131,7 @@ export interface ApiErrorBody {
 /** [minLon, minLat, maxLon, maxLat] */
 export type BBox = [minLon: number, minLat: number, maxLon: number, maxLat: number];
 
-// --- GET /v1/map-data（BE担当共有のスニペット。リポジトリ未取り込みのため全て @provisional） ---------
+// --- GET /v1/map-data（back/backend/app/main.py。observations 以外の実データでの確認は未実施のため @provisional） ---------
 // キー欠落（undefined）は「欠測」、null は「提供元が不明と明示」として区別して扱う。
 
 /** @provisional 提供元ごとの状態。enabled=false はデータ提供なし（0件＝安全ではない）。 */
@@ -188,13 +188,11 @@ export type ObservationTemporalKind = "permanent" | "time_of_day" | "date_range"
 export type ObservationStatus = "active" | "resolved" | "withdrawn" | "expired";
 export type ObservationVerification = "unverified" | "corroborated" | "moderated";
 
-/**
- * @provisional `_observation_features` の実装は未確認。observations テーブル
- * (back/docs/database-schema.mmd) の列名と同名と仮定している。実レスポンス確認後に差し替える。
- */
+/** id を持たないのは、BE（main.py の `_observation_features`）が報告の id を Feature.id で返すため。 */
 export interface ObservationProps {
-  id: string;
-  /** 値の一覧は未確認。未知の値は「その他」として扱う。 */
+  source_id?: string;
+  authority?: string;
+  /** BE は自由入力の文字列（小文字化のみ）。未知の値は「その他」として扱う。 */
   category?: string | null;
   temporal_kind?: ObservationTemporalKind | null;
   observed_at?: string | null;
@@ -204,10 +202,11 @@ export interface ObservationProps {
   status?: ObservationStatus | null;
   verification_state?: ObservationVerification | null;
   description?: string | null;
+  created_at?: string | null;
   updated_at?: string | null;
 }
 
-type Collection<G extends Geometry, P> = FeatureCollection<G, P>;
+type Collection<G extends Geometry, P> = FeatureCollection<G, P> & { truncated?: boolean };
 
 /** @provisional */
 export interface MapDataResponse {

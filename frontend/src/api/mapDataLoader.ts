@@ -7,7 +7,7 @@ export interface MapDataState {
   /** idle: 取得していない（ズーム不足など）。 */
   status: "idle" | "loading" | "ok" | "error";
   data?: MapDataResponse;
-  /** observations が limit に達した。一部しか取得できていない可能性がある。 */
+  /** いずれかのレイヤーが limit で打ち切られた。一部しか取得できていない可能性がある。 */
   truncated: boolean;
   /** idle の理由。 */
   reason?: "zoom";
@@ -71,7 +71,11 @@ export function createMapDataLoader(client: ApiClient, options: MapDataLoaderOpt
     try {
       const data = await client.getMapData(box, { limit, signal: ctrl.signal });
       if (mine !== sequence || disposed) return;
-      const truncated = (data.observations?.features?.length ?? 0) >= limit;
+      const layers = [data.restrictions, data.route_context.accidents, data.route_context.traffic, data.observations];
+      // 件数だけで判定しないのは、BE が limit+1 件で調べた正確な truncated を返すため（ちょうど limit 件でも欠けていない）。
+      const truncated =
+        layers.some((l) => l.truncated === true) ||
+        (data.observations.truncated === undefined && data.observations.features.length >= limit);
       loaded = { box, truncated };
       setState({ status: "ok", data, truncated });
     } catch (e) {

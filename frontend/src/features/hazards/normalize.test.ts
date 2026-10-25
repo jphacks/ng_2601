@@ -105,3 +105,79 @@ describe("normalizeMapData (モック)", () => {
     });
   });
 });
+
+describe("normalizeMapData (main.py の `_observation_features` に合わせた応答)", () => {
+  const disabled = { enabled: false, feature_count: 0, source_id: "npa_accident_history", path: null, metadata: {} };
+  const response = {
+    restrictions: { type: "FeatureCollection", features: [], truncated: false, source_status: { enabled: false, feature_count: 0, sources: { jartic: { enabled: false, feature_count: 0 } } } },
+    route_context: {
+      accidents: { type: "FeatureCollection", features: [], truncated: false, source_status: disabled },
+      traffic: { type: "FeatureCollection", features: [], truncated: false, source_status: disabled },
+    },
+    observations: {
+      type: "FeatureCollection",
+      truncated: false,
+      source: { source_id: "user_report", authority: "community", routing_effect: "none_until_validated" },
+      features: [
+        {
+          type: "Feature",
+          id: "00000000-0000-4000-8000-000000000001",
+          geometry: { type: "Point", coordinates: [136.881, 35.171] },
+          properties: {
+            source_id: "user_report",
+            authority: "community",
+            category: "obstruction",
+            temporal_kind: "temporary",
+            observed_at: "2026-10-25T01:53:55.045807+00:00",
+            starts_at: null,
+            ends_at: null,
+            expires_at: "2026-11-01T01:53:55.045807+00:00",
+            status: "active",
+            verification_state: "unverified",
+            description: "Development seed: temporary obstruction example",
+            created_at: "2026-10-25T01:53:55.045807+00:00",
+            updated_at: "2026-10-25T01:53:55.045807+00:00",
+          },
+        },
+        {
+          type: "Feature",
+          id: "00000000-0000-4000-8000-000000000002",
+          geometry: { type: "Point", coordinates: [136.895, 35.178] },
+          properties: {
+            source_id: "user_report",
+            authority: "community",
+            category: "surface",
+            temporal_kind: "permanent",
+            observed_at: "2026-10-25T01:53:55.189607+00:00",
+            starts_at: null,
+            ends_at: null,
+            expires_at: null,
+            status: "active",
+            verification_state: "unverified",
+            description: "Development seed: difficult surface example",
+            created_at: "2026-10-25T01:53:55.189607+00:00",
+            updated_at: "2026-10-25T01:53:55.189607+00:00",
+          },
+        },
+      ],
+    },
+  } as unknown as MapDataResponse;
+  const { items } = normalizeMapData(response);
+
+  it("報告の ID には Feature.id を使う", () => {
+    expect(items.map((i) => i.id)).toEqual([
+      "observation:00000000-0000-4000-8000-000000000001",
+      "observation:00000000-0000-4000-8000-000000000002",
+    ]);
+  });
+
+  it("マイクロ秒・オフセット付きの日時を値ありとして扱う", () => {
+    expect(items[0].updatedAt.state).toBe("known");
+    expect(items[0].expiresAt.state).toBe("known");
+  });
+
+  it("obstruction は「障害物」、surface は「路面」に分類する", () => {
+    expect(items[0]).toMatchObject({ category: "danger", kindLabel: "障害物" });
+    expect(items[1]).toMatchObject({ category: "terrain", kindLabel: "路面" });
+  });
+});

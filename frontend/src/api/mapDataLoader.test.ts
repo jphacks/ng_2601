@@ -145,6 +145,35 @@ describe("createMapDataLoader", () => {
     expect(calls).toHaveLength(2);
   });
 
+  it("BE が observations 以外のレイヤーを truncated と返したら truncated とし、範囲内でも再取得する", async () => {
+    const { client, calls } = fakeClient();
+    const loader = createMapDataLoader(client, { debounceMs: DEBOUNCE });
+    loader.request(VIEW, 15);
+    await tick();
+    const data = buildMockMapData();
+    data.restrictions.truncated = true;
+    calls[0].resolve(data);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(loader.getState().truncated).toBe(true);
+
+    loader.request([139.765, 35.682, 139.775, 35.688], 16);
+    await tick();
+    expect(calls).toHaveLength(2);
+  });
+
+  it("BE が truncated=false を返せば、observations がちょうど limit 件でも truncated にしない", async () => {
+    const { client, calls } = fakeClient();
+    const loader = createMapDataLoader(client, { debounceMs: DEBOUNCE, limit: 2 });
+    loader.request(VIEW, 15);
+    await tick();
+    const data = buildMockMapData();
+    data.observations.features = data.observations.features.slice(0, 2);
+    data.observations.truncated = false;
+    calls[0].resolve(data);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(loader.getState().truncated).toBe(false);
+  });
+
   it("失敗は error にして古いデータを残さず、retry で再取得できる", async () => {
     const { client, calls } = fakeClient();
     const loader = createMapDataLoader(client, { debounceMs: DEBOUNCE });

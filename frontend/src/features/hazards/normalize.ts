@@ -154,7 +154,7 @@ function normalizeObservation(
   const kind = classifyObservation(p.category);
   const status = p.status && OBSERVATION_STATUSES.includes(p.status) ? (p.status as ItemStatus) : undefined;
   return {
-    id: makeId("observation", text(p.id), geometry),
+    id: makeId("observation", feature.id === undefined ? undefined : text(String(feature.id)), geometry),
     origin: "observation",
     infoClass: ORIGIN_DEFAULTS.observation.infoClass,
     category: kind.category,
