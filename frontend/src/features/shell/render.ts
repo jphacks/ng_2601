@@ -328,6 +328,9 @@ export function renderShell(root: HTMLElement): void {
    * 出発地が現在地（または未指定）なら、検索の直前に現在地を取り直す。移動しながら使っても前の位置で検索しない。
    * 取得中の案内は初回（未指定）だけ出す。取得できなければ false（失敗の通知は locator が出す）。
    */
+  /** searchRoute の呼び出しごとの連番。現在地を待つ間に次の検索が始まったら、古い呼び出しは何もしない。 */
+  let searchGeneration = 0;
+
   async function refreshCurrentOrigin(): Promise<boolean> {
     const { origin, originSource } = routeStore.getState();
     if (origin && originSource !== "current") return true;
@@ -346,21 +349,31 @@ export function renderShell(root: HTMLElement): void {
    * （指定後にもう一度ここへ来る）。再検索で取り直せないときは、古い位置で検索せず失敗の通知だけ出す。
    */
   async function searchRoute(): Promise<void> {
+    const mine = ++searchGeneration;
     const before = routeStore.getState();
     if (before.pickMode) return;
     if (!before.destination) {
       void routeStore.search(); // 「目的地を地図で指定してください」を出す
       return;
     }
+    // 現在地を取り直す間も、探索中と分かるようにパネルを開いて見せる（初回は取得中の案内を出すので開かない）。
+    if (before.origin && before.originSource === "current") {
+      routeStore.setPreparing(true);
+      openSearch("route");
+    }
     const ok = await refreshCurrentOrigin();
+    // 待つ間に次の検索が始まっていたら、そちらに任せる。
+    if (mine !== searchGeneration) return;
     const now = routeStore.getState();
     // 取得を待つ間に利用者が別の操作をしていたら、それを優先する。
-    if (now.pickMode || now.destination !== before.destination) return;
-    if (!ok) {
-      if (!now.origin) routeStore.startPick("origin");
+    if (now.pickMode || now.destination !== before.destination || !ok) {
+      routeStore.setPreparing(false);
+      if (!ok && !now.pickMode && !now.origin) routeStore.startPick("origin");
       return;
     }
     openSearch("route");
+    // 別の検索の応答待ちで search() が何もしない場合に備えて、準備中は先に解除する（同じ処理の中なので画面はちらつかない）。
+    routeStore.setPreparing(false);
     void routeStore.search();
   }
 
@@ -461,7 +474,8 @@ export function renderShell(root: HTMLElement): void {
     mapFilter.hidden = picking;
 
     // 結果が成功のときだけ経路を描く。検索中・空・失敗で古い経路を残さない。
-    const route = state.status.kind === "success" ? state.status.route : null;
+    // 検索の準備中（目的地を決め直して現在地を取り直している間）も、古い経路は新しい経路に見えないよう外す。
+    const route = state.status.kind === "success" && !state.preparing ? state.status.route : null;
     if (route !== shownRoute) {
       mapController.setRoutes(route ? [route] : []);
       if (route) mapController.fitToRoute(route);

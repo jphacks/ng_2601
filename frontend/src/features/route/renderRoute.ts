@@ -154,10 +154,10 @@ export function renderRouteView(
     return details;
   }
 
-  function endpoints(applied: AppliedSearch): HTMLElement {
+  function endpoints(p: Pick<RouteSearchState, "origin" | "originSource" | "destination">): HTMLElement {
     const rows = ([
-      ["出発地", formatOrigin(applied.origin, applied.originSource)],
-      ["目的地", formatPoint(applied.destination)],
+      ["出発地", formatOrigin(p.origin, p.originSource)],
+      ["目的地", formatPoint(p.destination)],
     ] as const).map(([label, value]) =>
       el("div", { className: "route__endpoint" }, [
         el("span", { className: "route__endpoint-label", text: label }),
@@ -173,6 +173,17 @@ export function renderRouteView(
     const active = document.activeElement instanceof HTMLElement && resultPane.contains(document.activeElement)
       ? document.activeElement.dataset.resultControl : undefined;
     const { status } = state;
+    // 目的地を決め直した直後など、検索の準備（現在地の取り直し）中も探索中として見せる。古い結果は出さない。
+    if (state.preparing) {
+      resultPane.replaceChildren(
+        endpoints(state),
+        renderState({
+          kind: "loading",
+          message: state.originSource === "current" ? "現在地を確認して、ルートを検索中…" : "ルートを検索中…",
+        }),
+      );
+      return;
+    }
     if (status.kind === "idle") {
       resultPane.replaceChildren(
         renderState({ kind: "empty", message: "地図をタップして「ここを目的地にする」を選ぶと、現在地からのルートがここに表示されます。" }),
@@ -224,7 +235,7 @@ export function renderRouteView(
   }
 
   function syncConditions(state: RouteSearchState): void {
-    const loading = state.status.kind === "loading";
+    const loading = state.status.kind === "loading" || state.preparing;
     validation.textContent = state.validationError ?? "";
     validation.hidden = state.validationError === null;
     submit.textContent = state.status.kind === "idle" ? "経路を検索" : "この条件で再検索";
@@ -233,17 +244,20 @@ export function renderRouteView(
   }
 
   let prevKind = store.getState().status.kind;
+  let prevPreparing = store.getState().preparing;
   prefs.subscribe(() => syncConditions(store.getState()));
   store.subscribe((state) => {
     syncConditions(state);
     renderResult(state);
     const kind = state.status.kind;
-    // 検索を始めたとき、成功したときは結果タブを見せる（検索中・空・失敗もそこで伝える）。
-    if (kind !== prevKind && (kind === "loading" || kind === "success")) {
+    // 検索の準備・検索を始めたとき、成功したときは結果タブを見せる（検索中・空・失敗もそこで伝える）。
+    const started = state.preparing && !prevPreparing;
+    if (started || (kind !== prevKind && (kind === "loading" || kind === "success"))) {
       showTab("result");
       resultPane.focus({ preventScroll: true });
     }
     prevKind = kind;
+    prevPreparing = state.preparing;
   });
 
   const initial = store.getState();

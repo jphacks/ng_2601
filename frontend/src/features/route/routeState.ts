@@ -38,6 +38,8 @@ export interface RouteSearchState {
   elevation: ElevationState;
   /** 検索前の入力検証エラー。次の操作で消える。 */
   validationError: string | null;
+  /** 検索の準備中（出発地にする現在地を取り直している間など）。検索が始まると false に戻る。 */
+  preparing: boolean;
 }
 
 /**
@@ -95,6 +97,8 @@ export interface RouteStore {
   /** 地点と結果をすべて消す。 */
   reset(): void;
   setDraft(patch: Partial<SearchConditions>): void;
+  /** 検索の前に時間のかかる準備をする間、探索中として見せる。 */
+  setPreparing(on: boolean): void;
   search(): Promise<void>;
   retryElevation(): void;
 }
@@ -109,6 +113,7 @@ export function createRouteStore(api: ApiClient, analyzer: RouteAnalyzer = analy
     status: { kind: "idle" },
     elevation: { kind: "idle" },
     validationError: null,
+    preparing: false,
   };
   const listeners = new Set<(s: RouteSearchState) => void>();
   /** 古い応答が新しい検索結果を上書きしないための連番。 */
@@ -188,10 +193,21 @@ export function createRouteStore(api: ApiClient, analyzer: RouteAnalyzer = analy
     reset() {
       invalidatePending();
       cancelElevation();
-      update({ origin: null, originSource: null, destination: null, pickMode: null, status: { kind: "idle" }, elevation: { kind: "idle" } });
+      update({
+        origin: null,
+        originSource: null,
+        destination: null,
+        pickMode: null,
+        preparing: false,
+        status: { kind: "idle" },
+        elevation: { kind: "idle" },
+      });
     },
     setDraft(patch) {
       update({ draft: { ...state.draft, ...patch } });
+    },
+    setPreparing(on) {
+      if (state.preparing !== on) update({ preparing: on, validationError: state.validationError });
     },
     retryElevation() {
       if (state.status.kind === "success" && state.elevation.kind !== "loading") void runElevation(state.status.route);
@@ -200,22 +216,22 @@ export function createRouteStore(api: ApiClient, analyzer: RouteAnalyzer = analy
       if (state.status.kind === "loading") return;
       const { origin, originSource, destination, draft } = state;
       if (!destination) {
-        update({ validationError: "目的地を地図で指定してください。" });
+        update({ validationError: "目的地を地図で指定してください。", preparing: false });
         return;
       }
       if (!origin) {
-        update({ validationError: "出発地が未指定です。現在地を取得するか、地図で指定してください。" });
+        update({ validationError: "出発地が未指定です。現在地を取得するか、地図で指定してください。", preparing: false });
         return;
       }
       if (haversineM(origin, destination) < MIN_DISTANCE_M) {
-        update({ validationError: "出発地と目的地が近すぎます。離れた地点を指定してください。" });
+        update({ validationError: "出発地と目的地が近すぎます。離れた地点を指定してください。", preparing: false });
         return;
       }
       const applied: AppliedSearch = { origin, originSource: originSource ?? "map", destination, ...draft };
       const mine = ++seq;
       cancelElevation();
       // 検索を始めた時点で古い経路は表示から外す。失敗しても古いルートが新しい結果に見えない。
-      update({ pickMode: null, status: { kind: "loading", applied }, elevation: { kind: "idle" } });
+      update({ pickMode: null, preparing: false, status: { kind: "loading", applied }, elevation: { kind: "idle" } });
       try {
         const route = await api.searchRoute({ origin, destination, ...draft });
         if (mine !== seq) return;

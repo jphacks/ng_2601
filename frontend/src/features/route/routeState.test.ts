@@ -115,6 +115,20 @@ describe("origin defaults", () => {
     s.clearPoint("origin");
     expect(s.getState().originSource).toBeNull();
   });
+  it("preparing lasts until the search starts or fails validation", async () => {
+    const s = store();
+    s.setPoint("origin", [139.76, 35.68], "current");
+    s.setPoint("destination", [139.77, 35.69]);
+    s.setPreparing(true);
+    expect(s.getState().preparing).toBe(true);
+    const searching = s.search();
+    expect(s.getState()).toMatchObject({ preparing: false, status: { kind: "loading" } });
+    await searching;
+    s.setPoint("destination", [139.76001, 35.68001]);
+    s.setPreparing(true);
+    await s.search();
+    expect(s.getState()).toMatchObject({ preparing: false, validationError: expect.stringContaining("近すぎ") });
+  });
   it("asks for the destination first when nothing is set", async () => {
     const s = store();
     await s.search();
