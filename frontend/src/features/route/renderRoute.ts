@@ -8,15 +8,18 @@ import type { PreferencesStore } from "../preferences/preferencesState";
 import { renderPreferences } from "../preferences/renderPreferences";
 import {
   isStale,
-  type PickMode,
+  type OriginSource,
   type RouteSearchState,
   type RouteStore,
 } from "./routeState";
 
-const POINT_LABEL: Record<PickMode, string> = { origin: "出発地", destination: "目的地" };
-
 export function formatPoint(p: LngLat | null, empty = "未指定"): string {
   return p ? "地図で指定済み" : empty;
+}
+
+/** 出発地の表示。現在地から決めたときは「現在地」と出す。 */
+export function formatOrigin(p: LngLat | null, source: OriginSource | null, empty = "未指定"): string {
+  return p && source === "current" ? "現在地" : formatPoint(p, empty);
 }
 
 function textButton(label: string, className = "route__button"): HTMLButtonElement {
@@ -25,56 +28,22 @@ function textButton(label: string, className = "route__button"): HTMLButtonEleme
   return b;
 }
 
-/** 地図で地点を指定している間、地図上部に出す案内。キャンセルできる。 */
-export function renderPickBanner(store: RouteStore): HTMLElement {
-  const text = el("span", { className: "pick-banner__text" });
-  const cancel = textButton("キャンセル", "pick-banner__cancel");
-  cancel.addEventListener("click", () => store.cancelPick());
-  const banner = el("div", { className: "pick-banner" }, [text, cancel]);
-  banner.setAttribute("role", "status");
-  banner.hidden = true;
-  store.subscribe((state) => {
-    banner.hidden = state.pickMode === null;
-    if (state.pickMode) text.textContent = `地図をタップして${POINT_LABEL[state.pickMode]}を指定`;
-  });
-  return banner;
+export interface RouteViewOptions {
+  /** 「経路を検索」「この条件で再検索」。現在地の取り直しなどを挟むため、検索の実行は呼び出し側に任せる。 */
+  onSearch?: () => void;
 }
 
 /** 「経路」ビュー本体。ルート結果の下に検索条件を並べる。link は標高グラフと地図の選択位置を共有する。 */
-export function renderRouteView(store: RouteStore, prefs: PreferencesStore, link: RouteLink): HTMLElement {
+export function renderRouteView(
+  store: RouteStore,
+  prefs: PreferencesStore,
+  link: RouteLink,
+  { onSearch = () => void store.search() }: RouteViewOptions = {},
+): HTMLElement {
   // --- conditions pane (built once; values are synced in place so focus is kept) ---
-  const pointViews = new Map<PickMode, { value: HTMLElement; pick: HTMLButtonElement; clear: HTMLButtonElement }>();
-  const pointRows: HTMLElement[] = [];
-  for (const mode of ["origin", "destination"] as const) {
-    const label = POINT_LABEL[mode];
-    const value = el("span", { className: "route__point-value" });
-    const pick = textButton("地図で指定");
-    pick.setAttribute("aria-label", `${label}を地図で指定`);
-    pick.addEventListener("click", () => store.startPick(mode));
-    const clear = textButton("クリア");
-    clear.setAttribute("aria-label", `${label}をクリア`);
-    clear.addEventListener("click", () => store.clearPoint(mode));
-    pointViews.set(mode, { value, pick, clear });
-    pointRows.push(
-      el("div", { className: "route__point" }, [
-        el("span", { className: "route__point-label", text: label }),
-        value,
-        el("span", { className: "route__actions" }, [pick, clear]),
-      ]),
-    );
-  }
-  const swap = textButton("出発地と目的地を入れ替え");
-  swap.addEventListener("click", () => store.swap());
-  const initialPoints = store.getState();
-  let pointsWereComplete = initialPoints.origin !== null && initialPoints.destination !== null;
-  const pointDetails = el("details", { className: "route__points" }, [
-    el("summary", { text: "出発地・目的地" }),
-    el("div", { className: "route__point-editor" }, [...pointRows, swap]),
-  ]);
-  pointDetails.open = !pointsWereComplete;
-
+  // 出発地・目的地は検索パネル上部の行と地図で決める。ここには車種と走り方の条件だけを置く。
   const submit = textButton("経路を検索", "route__submit");
-  submit.addEventListener("click", () => void store.search());
+  submit.addEventListener("click", onSearch);
   const validation = el("p", { className: "route__validation" });
   validation.setAttribute("role", "alert");
   validation.hidden = true;
@@ -82,7 +51,6 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore, link
   // 車種・坂道許容度・詳細パラメータ(#10)。縦に長くなるので、検索ボタンはパネル下部に固定して常に押せるようにする。
   const submitBar = el("div", { className: "route__submit-bar" }, [validation, submit]);
   const conditionsPane = el("section", { className: "route__pane route__pane--conditions" }, [
-    pointDetails,
     renderPreferences(store, prefs),
     submitBar,
   ]);
@@ -98,6 +66,17 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore, link
     const active = document.activeElement instanceof HTMLElement && resultPane.contains(document.activeElement)
       ? document.activeElement.dataset.resultControl : undefined;
     const { status } = state;
+    // 目的地を決め直した直後など、検索の準備（現在地の取り直し）中も探索中として見せる。古い結果は出さない。
+    if (state.preparing) {
+      resultPane.hidden = false;
+      resultPane.replaceChildren(
+        renderState({
+          kind: "loading",
+          message: state.originSource === "current" ? "現在地を確認して、ルートを検索中…" : "ルートを検索中…",
+        }),
+      );
+      return;
+    }
     resultPane.hidden = status.kind === "idle";
     if (status.kind === "idle") {
       resultPane.replaceChildren();
@@ -129,18 +108,7 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore, link
   }
 
   function syncConditions(state: RouteSearchState): void {
-    const loading = state.status.kind === "loading";
-    const pointsComplete = state.origin !== null && state.destination !== null;
-    if (!pointsComplete) pointDetails.open = true;
-    else if (!pointsWereComplete) pointDetails.open = false;
-    pointsWereComplete = pointsComplete;
-    for (const [mode, v] of pointViews) {
-      const p = state[mode];
-      v.value.textContent = formatPoint(p);
-      v.pick.disabled = loading;
-      v.clear.disabled = loading || p === null;
-    }
-    swap.disabled = loading || (!state.origin && !state.destination);
+    const loading = state.status.kind === "loading" || state.preparing;
     validation.textContent = state.validationError ?? "";
     validation.hidden = state.validationError === null;
     submit.textContent = state.status.kind === "idle" ? "経路を検索" : "この条件で再検索";
@@ -149,17 +117,20 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore, link
   }
 
   let prevKind = store.getState().status.kind;
+  let prevPreparing = store.getState().preparing;
   prefs.subscribe(() => syncConditions(store.getState()));
   store.subscribe((state) => {
     syncConditions(state);
     renderResult(state);
     const kind = state.status.kind;
-    // 検索を始めたとき、成功したときは結果までスクロールする（検索中・空・失敗もそこで伝える）。
-    if (kind !== prevKind && (kind === "loading" || kind === "success")) {
+    // 検索の準備・検索を始めたとき、成功したときは結果までスクロールする（検索中・空・失敗もそこで伝える）。
+    const started = state.preparing && !prevPreparing;
+    if (started || (kind !== prevKind && (kind === "loading" || kind === "success"))) {
       resultPane.focus({ preventScroll: true });
       resultPane.scrollIntoView({ block: "start" });
     }
     prevKind = kind;
+    prevPreparing = state.preparing;
   });
 
   const initial = store.getState();

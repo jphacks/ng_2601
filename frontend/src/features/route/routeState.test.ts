@@ -98,3 +98,62 @@ describe("route and elevation lifecycle", () => {
     expect(store.getState().validationError).toBe(error);
   });
 });
+
+describe("origin defaults", () => {
+  const store = () => createRouteStore({ searchRoute: vi.fn(async () => mockRoutes[0]) } as unknown as ApiClient);
+  it("picking only a destination ends picking and leaves the origin to the caller", () => {
+    const s = store();
+    s.startPick("destination"); s.pick([139.77, 35.69]);
+    expect(s.getState()).toMatchObject({ destination: [139.77, 35.69], origin: null, pickMode: null });
+  });
+  it("records whether the origin is the current location", () => {
+    const s = store();
+    s.setPoint("origin", [139.76, 35.68], "current");
+    expect(s.getState().originSource).toBe("current");
+    s.startPick("origin"); s.pick([139.75, 35.67]);
+    expect(s.getState()).toMatchObject({ originSource: "map", pickMode: "destination" });
+    s.clearPoint("origin");
+    expect(s.getState().originSource).toBeNull();
+  });
+  it("preparing lasts until the search starts or fails validation", async () => {
+    const s = store();
+    s.setPoint("origin", [139.76, 35.68], "current");
+    s.setPoint("destination", [139.77, 35.69]);
+    s.setPreparing(true);
+    expect(s.getState().preparing).toBe(true);
+    const searching = s.search();
+    expect(s.getState()).toMatchObject({ preparing: false, status: { kind: "loading" } });
+    await searching;
+    s.setPoint("destination", [139.76001, 35.68001]);
+    s.setPreparing(true);
+    await s.search();
+    expect(s.getState()).toMatchObject({ preparing: false, validationError: expect.stringContaining("近すぎ") });
+  });
+  it("a search started while another is loading supersedes it", async () => {
+    const pending: Array<ReturnType<typeof deferred<typeof mockRoutes[0]>>> = [];
+    const searchRoute = vi.fn(() => {
+      const d = deferred<typeof mockRoutes[0]>();
+      pending.push(d);
+      return d.promise;
+    });
+    const s = createRouteStore({ searchRoute } as unknown as ApiClient, vi.fn(() => new Promise<RouteAnalysis | null>(() => {})));
+    s.setPoint("origin", [139.76, 35.68], "current");
+    s.setPoint("destination", [139.77, 35.69]);
+    const first = s.search();
+    s.setPoint("destination", [139.78, 35.70]);
+    const second = s.search();
+    expect(searchRoute).toHaveBeenCalledTimes(2);
+    pending[1].resolve(mockRoutes[1] ?? mockRoutes[0]);
+    await second;
+    pending[0].resolve(mockRoutes[0]);
+    await first;
+    const status = s.getState().status;
+    expect(status.kind).toBe("success");
+    if (status.kind === "success") expect(status.applied.destination).toEqual([139.78, 35.70]);
+  });
+  it("asks for the destination first when nothing is set", async () => {
+    const s = store();
+    await s.search();
+    expect(s.getState().validationError).toContain("目的地");
+  });
+});

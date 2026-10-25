@@ -1,4 +1,4 @@
-/* Nature Ride: shared palette and layout tokens.
+/* CyclerHub: shared palette and layout tokens.
  * All floating UI (search bar, panel, menu, map buttons) uses these tokens so they look like one family.
  * Usage and contrast notes: docs/design-system.md.
  */
@@ -39,6 +39,8 @@
   --gutter: 16px;
   --row-height: 48px;
   --button-size: 44px;
+  /* 右下の「経路」ボタン。地図操作のボタンより大きくして主導線と分かるようにする。下部のシートはこの分を空ける。 */
+  --fab-size: 64px;
   --motion-duration: 230ms;
   --motion-ease: cubic-bezier(0.2, 0, 0, 1);
 }

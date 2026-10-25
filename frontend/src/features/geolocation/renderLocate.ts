@@ -1,5 +1,6 @@
 import "./locate.css";
 import { el } from "../../ui/dom";
+import type { LngLat } from "../../types/api";
 import type { MapController } from "../map/map";
 import { getCurrentLocation, type LocateFailure } from "./geolocation";
 
@@ -23,11 +24,33 @@ export interface LocateOptions {
   onStart?: () => void;
 }
 
+export interface Locator {
+  /** 通知欄。シェルが地図の上に置く。 */
+  notice: HTMLElement;
+  /**
+   * 現在地を1回取得して地図に表示する。利用者の操作（ボタン押下・「ここを目的地にする」など）から呼ぶこと。
+   * 失敗・キャンセル時は通知を出して null。
+   */
+  locate(options?: LocateRequest): Promise<LngLat | null>;
+}
+
+export interface LocateRequest {
+  /** 取得できたら現在地へ地図を移動する（既定 true）。 */
+  recenter?: boolean;
+  /**
+   * 取得中・成功の通知を出さず、検索パネルも閉じない（再検索のたびに現在地を取り直すときなど）。
+   * 失敗したときだけ通知する。
+   */
+  quiet?: boolean;
+  /** 失敗通知の「再試行」で行う操作。未指定なら現在地の取得だけをやり直す。 */
+  onRetry?: () => void;
+}
+
 /**
- * 現在地ボタンに「押したときだけ位置を1回取得して地図に表示する」動作を付け、通知欄を返す。
+ * 現在地ボタンに「押したときだけ位置を1回取得して地図に表示する」動作を付ける。
  * 位置は保存・送信・ログ出力しない。失敗しても地図の操作と地点選択は妨げない（通知は地図を覆わない）。
  */
-export function setupLocate(button: HTMLButtonElement, map: MapController, options: LocateOptions = {}): HTMLElement {
+export function setupLocate(button: HTMLButtonElement, map: MapController, options: LocateOptions = {}): Locator {
   const notice = el("div", { className: "locate-notice" });
   notice.hidden = true;
   // 進行中の要求の識別子。キャンセルや再試行で古い応答を捨てる。
@@ -65,36 +88,61 @@ export function setupLocate(button: HTMLButtonElement, map: MapController, optio
     notice.hidden = false;
   }
 
+  let resolveCancel: (() => void) | null = null;
+
   function cancel(): void {
+    resolveCancel?.();
     requestId += 1;
     setBusy(false);
     clearNotice();
   }
 
-  async function locate(): Promise<void> {
-    // 取得中の連打は無視する（キャンセルは通知欄のボタン）。
-    if (button.getAttribute("aria-busy") === "true") return;
-    options.onStart?.();
+  let pending: Promise<LngLat | null> | null = null;
+
+  function locate(request: LocateRequest = {}): Promise<LngLat | null> {
+    // 取得中の連打は同じ要求を待つ（キャンセルは通知欄のボタン）。
+    pending ??= run(request).finally(() => { pending = null; });
+    return pending;
+  }
+
+  async function run({ recenter = true, quiet = false, onRetry }: LocateRequest): Promise<LngLat | null> {
     const id = ++requestId;
     setBusy(true);
-    showNotice("現在地を取得しています…ブラウザーの許可確認が表示されたら「許可」を選んでください。", "status", [
-      ["キャンセル", cancel],
-    ]);
-    const result = await getCurrentLocation();
-    if (id !== requestId) return;
+    if (!quiet) {
+      options.onStart?.();
+      showNotice("現在地を取得しています…ブラウザーの許可確認が表示されたら「許可」を選んでください。", "status", [
+        ["キャンセル", cancel],
+      ]);
+    }
+    // キャンセルしたら応答を待たずに null を返す（待っている呼び出し側を止めない）。
+    const cancelled = new Promise<null>((resolve) => { resolveCancel = () => resolve(null); });
+    const result = await Promise.race([getCurrentLocation(), cancelled]);
+    resolveCancel = null;
+    if (!result || id !== requestId) return null;
     setBusy(false);
     if (result.ok) {
-      map.setCurrentLocation({ lngLat: result.lngLat, accuracyM: result.accuracyM }, true);
-      showNotice(`現在地を表示しました（精度 約${Math.round(result.accuracyM)} m）。`, "status");
-      dismissTimer = window.setTimeout(clearNotice, SUCCESS_DISMISS_MS);
-      return;
+      map.setCurrentLocation({ lngLat: result.lngLat, accuracyM: result.accuracyM }, recenter);
+      if (!quiet) {
+        showNotice(`現在地を表示しました（精度 約${Math.round(result.accuracyM)} m）。`, "status");
+        dismissTimer = window.setTimeout(clearNotice, SUCCESS_DISMISS_MS);
+      }
+      return result.lngLat;
     }
+    // 失敗は quiet でも必ず伝える。通知が検索パネルに隠れないよう、ここで閉じてもらう。
+    if (quiet) options.onStart?.();
     const actions: Array<[string, () => void]> = [];
-    if (RETRYABLE.has(result.reason)) actions.push(["再試行", () => void locate()]);
+    if (RETRYABLE.has(result.reason)) {
+      actions.push(["再試行", () => {
+        clearNotice();
+        if (onRetry) onRetry();
+        else void locate();
+      }]);
+    }
     actions.push(["閉じる", clearNotice]);
     showNotice(FAILURE_MESSAGE[result.reason], "alert", actions);
+    return null;
   }
 
   button.addEventListener("click", () => void locate());
-  return notice;
+  return { notice, locate };
 }

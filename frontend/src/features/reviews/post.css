@@ -2,7 +2,7 @@
 
 /* 入力項目が多いので、一覧シートより高さを取る。 */
 .review-sheet.post-sheet {
-  max-height: calc(var(--vvh) - var(--top-offset) - var(--bottom-offset) - var(--row-height) - var(--space-4) * 2);
+  max-height: calc(var(--vvh) - var(--top-offset) - var(--bottom-offset) - var(--fab-size) - var(--space-4) * 2);
 }
 
 .post-form { display: grid; gap: var(--space-4); }
