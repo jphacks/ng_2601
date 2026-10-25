@@ -11,6 +11,7 @@ import type { RoadInfoItem } from "../hazards/types";
 import { formatSegmentText, distanceOnLine, type RouteSelectionTarget, type SegmentFacts } from "../elevation/selection";
 import type { RouteGradientSegment } from "../elevation/gradientSegments";
 import { el } from "../../ui/dom";
+import { icon } from "../../ui/icon";
 import { renderState } from "../../ui/state";
 import { CATEGORY_GLYPH, CATEGORY_LABEL } from "../reviews/catalog";
 import type { ReviewPlace } from "../reviews/grouping";
@@ -96,6 +97,8 @@ export interface MapController {
   onViewportChange(listener: (viewport: Viewport) => void): void;
   /** 口コミのピンを置き換える。ピンの選択（クリック／Enter）で onSelect を呼ぶ。 */
   setReviews(places: ReviewPlace[], onSelect: (place: ReviewPlace) => void): void;
+  /** 地点・口コミパネルが示す選択地点。null で消す。レイヤー切替の対象外。 */
+  setSelectedPoint(point: LngLat | null): void;
   /** 口コミの投稿地点を示すマーカー。null で消す。 */
   setDraftPoint(point: LngLat | null): void;
   setLayerVisible(id: LayerId, visible: boolean): void;
@@ -194,6 +197,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
   let routeCursor: maplibregl.Marker | null = null;
   let reviewMarkers: maplibregl.Marker[] = [];
   let pickMarker: maplibregl.Marker | null = null;
+  let selectedPointMarker: maplibregl.Marker | null = null;
   let endpointMarkers: maplibregl.Marker[] = [];
   let draftMarker: maplibregl.Marker | null = null;
   let endpoints: Endpoints = { origin: null, destination: null };
@@ -504,6 +508,10 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
     if (map && currentMarker && !currentMarker.getElement().isConnected) showMarker(currentMarker, map);
   }
 
+  function syncSelectedPoint(): void {
+    if (map && selectedPointMarker && !selectedPointMarker.getElement().isConnected) showMarker(selectedPointMarker, map);
+  }
+
   /** 投稿地点も地図の作り直し後に載せ直す。 */
   function syncDraft(): void {
     if (map && draftMarker && !draftMarker.getElement().isConnected) showMarker(draftMarker, map);
@@ -587,6 +595,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
         syncVisibility();
         syncEndpoints();
         syncCurrentLocation();
+        syncSelectedPoint();
         applyRouteSelection();
         syncDraft();
         emitViewport();
@@ -802,6 +811,21 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
       );
       syncVisibility();
     },
+    setSelectedPoint(point) {
+      if (!point) {
+        if (selectedPointMarker) hideMarker(selectedPointMarker);
+        selectedPointMarker = null;
+        return;
+      }
+      if (!selectedPointMarker) {
+        const element = el("div", { className: "map-marker map-marker--selected-point" }, [icon("pin")]);
+        element.setAttribute("role", "img");
+        element.setAttribute("aria-label", "選択中の地点");
+        selectedPointMarker = new maplibregl.Marker({ element, anchor: "center" });
+      }
+      selectedPointMarker.setLngLat(point);
+      syncSelectedPoint();
+    },
     setDraftPoint(point) {
       if (draftMarker) hideMarker(draftMarker);
       draftMarker = point
@@ -833,6 +857,8 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
     resetNorth: () => void map?.resetNorth(),
     resize: () => map?.resize(),
     destroy() {
+      if (selectedPointMarker) hideMarker(selectedPointMarker);
+      selectedPointMarker = null;
       map?.remove();
       map = null;
       container.replaceChildren();

@@ -251,12 +251,14 @@ export function createReviewsFeature(options: ReviewsFeatureOptions): ReviewsFea
     // 別の地点・一覧⇔詳細の切り替えでは見出しへフォーカスを移す。
     const entering = !selection || selection.reviewId !== next.reviewId || selection.center !== next.center;
     selection = next;
+    map.setSelectedPoint(next.center);
     renderSheet(entering);
   }
 
   function close(): void {
     if (!selection) return;
     selection = null;
+    map.setSelectedPoint(null);
     sheet.classList.remove("is-open");
     sheet.inert = true;
     const target = returnFocus;
