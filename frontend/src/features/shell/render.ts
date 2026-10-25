@@ -476,6 +476,7 @@ export function renderShell(root: HTMLElement): void {
     scrim,
     drawer,
     login.dialog,
+    login.toast,
   );
   // MapLibre initializes while the shell is being assembled off-DOM; size it after insertion.
   mapController.resize();

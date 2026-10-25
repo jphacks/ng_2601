@@ -5,12 +5,14 @@ import type { AuthStore } from "./authState";
 
 export interface LoginScreen {
   dialog: HTMLDialogElement;
+  toast: HTMLElement;
   /** ログインできたら then を呼ぶ。 */
   open(then?: () => void): void;
 }
 
 export function createLoginScreen(auth: AuthStore, mock: boolean): LoginScreen {
   let then: (() => void) | undefined;
+  let toastTimer: number | undefined;
 
   const title = el("h2", { className: "login__title", text: "ログイン" });
   title.id = "login-title";
@@ -54,6 +56,9 @@ export function createLoginScreen(auth: AuthStore, mock: boolean): LoginScreen {
     note,
   ]);
   dialog.setAttribute("aria-labelledby", title.id);
+  const toast = el("div", { className: "login-toast" });
+  toast.setAttribute("role", "status");
+  toast.hidden = true;
   // Escape はダイアログ自身が閉じる。地図側の Escape 処理（検索カードを閉じるなど）まで届かせない。
   dialog.addEventListener("keydown", (e) => {
     if (e.key === "Escape") e.stopPropagation();
@@ -65,6 +70,10 @@ export function createLoginScreen(auth: AuthStore, mock: boolean): LoginScreen {
   function finish(name: string): void {
     auth.login({ name });
     dialog.close();
+    window.clearTimeout(toastTimer);
+    toast.textContent = `${name} でログインしました`;
+    toast.hidden = false;
+    toastTimer = window.setTimeout(() => (toast.hidden = true), 3000);
     const next = then;
     then = undefined;
     next?.();
@@ -72,6 +81,7 @@ export function createLoginScreen(auth: AuthStore, mock: boolean): LoginScreen {
 
   return {
     dialog,
+    toast,
     open(next) {
       then = next;
       form.reset();

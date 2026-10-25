@@ -60,6 +60,22 @@
   font-size: 16px; /* iOSのフォーカス時ズーム防止 */
 }
 
+.login-toast {
+  position: absolute;
+  z-index: 26;
+  top: calc(var(--top-offset) + var(--button-size) + var(--space-2));
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 2 * var(--gutter));
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-bar);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-floating);
+  font-size: 14px;
+}
+
 .login__note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--color-text-muted); }
 
 /* ドロワーのアカウント欄 */
