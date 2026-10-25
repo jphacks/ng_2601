@@ -15,8 +15,6 @@ export const BIKE_TYPE_ORDER = Object.keys(BIKE_TYPE_LABELS) as BikeType[];
 export interface ModeMeta<K extends keyof PreferenceModes> {
   /** 条件の見出し（検索条件の一覧にも使う） */
   title: string;
-  /** 選択肢の上に出す問いかけ。詳細パラメータだけが持つ。 */
-  question?: string;
   labels: Record<PreferenceModes[K], string>;
 }
 
@@ -31,26 +29,22 @@ export const MODE_META: { [K in keyof PreferenceModes]: ModeMeta<K> } = {
   },
   trafficMode: {
     title: "交通量の多い道路",
-    question: "交通量の多い道路をどの程度避けますか？",
     labels: { avoid: "極力避ける", balanced: "できれば避ける", direct: "気にしない" },
   },
   surfaceMode: {
     title: "未舗装路",
-    question: "砂利道や土の道を通ってもよいですか？",
     labels: { paved: "通りたくない", comfortable: "少しなら可", rough_ok: "多くても可" },
   },
   walkingMode: {
     title: "押し歩き区間",
-    question: "自転車を降りて押して歩く区間を通ってもよいですか？",
     labels: { never: "避けたい", short: "少しなら可", long: "多くても可" },
   },
 };
 
-/** 詳細パラメータの並びと見出し（坂道許容度は専用のスライダー）。避けたい度合いと、通ってよい道の条件を分けて並べる。 */
-export const DETAIL_MODE_GROUPS = [
-  { title: "ルートの優先条件", keys: ["trafficMode"] },
-  { title: "通行の許容条件", keys: ["surfaceMode", "walkingMode"] },
-] as const satisfies ReadonlyArray<{ title: string; keys: ReadonlyArray<keyof PreferenceModes> }>;
+/** 詳細パラメータの並び（坂道許容度は専用のスライダー）。 */
+export const DETAIL_MODE_KEYS = ["trafficMode", "surfaceMode", "walkingMode"] as const satisfies ReadonlyArray<
+  keyof PreferenceModes
+>;
 
 export function bikeTypeLabel(v: BikeType): string {
   return BIKE_TYPE_LABELS[v] ?? v;

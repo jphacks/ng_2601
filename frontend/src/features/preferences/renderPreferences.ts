@@ -4,7 +4,7 @@ import { el } from "../../ui/dom";
 import { renderState } from "../../ui/state";
 import type { RouteStore } from "../route/routeState";
 import { BIKE_TYPE_ICONS } from "./bikeIcons";
-import { BIKE_TYPE_ORDER, DETAIL_MODE_GROUPS, MODE_META, bikeTypeLabel, modeLabel } from "./labels";
+import { BIKE_TYPE_ORDER, DETAIL_MODE_KEYS, MODE_META, bikeTypeLabel, modeLabel } from "./labels";
 import { defaultsFor, isUnsaved, type PreferencesState, type PreferencesStore } from "./preferencesState";
 
 function textButton(label: string, className: string): HTMLButtonElement {
@@ -95,7 +95,7 @@ function stepSlider(
 
 /**
  * 詳細パラメータの3択。段階は離散値なのでつまみではなくラジオで選ぶ（矢印キーで移動、Tabで次の条件へ）。
- * 見出しを legend に、問いかけを説明として fieldset に結び付け、選んだ項目は背景・枠・太字・チェック記号で示す。
+ * 見出しを legend にし、選んだ項目は背景・枠・太字・チェック記号で示す。
  */
 function modeChoice(
   key: ModeKey,
@@ -106,14 +106,10 @@ function modeChoice(
   const labels = meta.labels as Record<string, string>;
   const choice = segments(`pref-${key}`, values, (v) => labels[v] ?? v, (v) => onChange(key, v));
   choice.root.classList.add("pref__choices");
-  const question = el("p", { className: "pref__question", text: meta.question ?? "" });
-  question.id = `pref-${key}-question`;
   const node = el("fieldset", { className: "route__fieldset pref__choice" }, [
     el("legend", { className: "route__field-label", text: meta.title }),
-    question,
     choice.root,
   ]);
-  node.setAttribute("aria-describedby", question.id);
   return {
     node,
     sync(draft, busy) {
@@ -166,26 +162,18 @@ export function renderPreferences(routeStore: RouteStore, prefs: PreferencesStor
     // --- 坂道許容度（BEの段階の順に並べた段階つまみ）と詳細パラメータ（3択。折りたたみ） ---
     const setDraft = (key: ModeKey, value: string) => routeStore.setDraft({ [key]: value });
     const hill = stepSlider("hillMode", options.modes.hillMode, setDraft);
-    const detailChoices: Array<ReturnType<typeof modeChoice>> = [];
-    const detailGroups = DETAIL_MODE_GROUPS.map((group) => {
-      const choices = group.keys.map((key) => modeChoice(key, options.modes[key], setDraft));
-      detailChoices.push(...choices);
-      return el("fieldset", { className: "route__fieldset pref__group" }, [
-        el("legend", { className: "pref__group-title", text: group.title }),
-        ...choices.map((c) => c.node),
-      ]);
-    });
+    const detailChoices = DETAIL_MODE_KEYS.map((key) => modeChoice(key, options.modes[key], setDraft));
     const modeControls = [hill, ...detailChoices];
     const details = el("details", { className: "pref__advanced" });
     details.append(el("summary", { className: "pref__summary", text: "詳細パラメータ" }));
     const detailBody = el("div", { className: "pref__advanced-body" }, [
       el("p", {
         className: "pref__note",
-        text: "選んだ条件は、経路を選ぶときの重み付けに使います。周辺の道路やデータによっては、条件どおりの経路にならないことがあります。",
+        text: "条件どおりの経路にならないこともあります。",
       }),
-      ...detailGroups,
+      ...detailChoices.map((c) => c.node),
     ]);
-    const reset = textButton("坂道・詳細を初期値に戻す", "route__button pref__reset");
+    const reset = textButton("坂道・詳細を戻す", "route__button pref__reset");
     reset.addEventListener("click", () => prefs.resetToDefaults());
     detailBody.append(reset);
     details.append(detailBody);
