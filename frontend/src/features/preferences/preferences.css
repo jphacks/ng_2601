@@ -1,6 +1,8 @@
 /* 車種・坂道許容度・詳細パラメータ。ラジオ/セグメントは route.css の .route__segment を共用する。 */
 .pref { display: grid; gap: var(--space-3); }
-.pref__body, .pref__controls { display: grid; gap: var(--space-3); }
+.pref__body { display: grid; gap: var(--space-3); }
+/* 区切り線は使わない。枠や線がすでに多く、線を足すと画面が重くなるため。 */
+.pref__controls { display: grid; gap: calc(var(--space-4) + var(--space-3)); }
 
 /* 車種は5つなので折り返して並べる。 */
 .pref__segments { flex-wrap: wrap; }
