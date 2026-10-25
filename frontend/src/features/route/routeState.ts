@@ -1,6 +1,7 @@
 import { toApiError, type ApiClient } from "../../api";
 import { haversineM } from "../../lib/geo";
 import type { LngLat, Route, RouteConditions } from "../../types/api";
+import { analyzeRoute, type ElevationState, type RouteAnalyzer } from "../elevation/analyze";
 
 /** 検索に使う車種と経路条件。 */
 export type SearchConditions = RouteConditions;
@@ -28,6 +29,7 @@ export interface RouteSearchState {
   /** 編集中の条件。検索するまで結果には影響しない。 */
   draft: SearchConditions;
   status: SearchStatus;
+  elevation: ElevationState;
   /** 検索前の入力検証エラー。次の操作で消える。 */
   validationError: string | null;
 }
@@ -86,20 +88,23 @@ export interface RouteStore {
   reset(): void;
   setDraft(patch: Partial<SearchConditions>): void;
   search(): Promise<void>;
+  retryElevation(): void;
 }
 
-export function createRouteStore(api: ApiClient): RouteStore {
+export function createRouteStore(api: ApiClient, analyzer: RouteAnalyzer = analyzeRoute): RouteStore {
   let state: RouteSearchState = {
     origin: null,
     destination: null,
     pickMode: null,
     draft: { ...FALLBACK_CONDITIONS },
     status: { kind: "idle" },
+    elevation: { kind: "idle" },
     validationError: null,
   };
   const listeners = new Set<(s: RouteSearchState) => void>();
   /** 古い応答が新しい検索結果を上書きしないための連番。 */
   let seq = 0;
+  let elevationController: AbortController | null = null;
 
   function update(patch: Partial<RouteSearchState>): void {
     state = { ...state, validationError: null, ...patch };
@@ -108,6 +113,35 @@ export function createRouteStore(api: ApiClient): RouteStore {
 
   /** 検索中に地点・結果の前提が変わったら、進行中の応答は捨てる。 */
   const invalidatePending = () => void seq++;
+
+  function cancelElevation(): void {
+    elevationController?.abort();
+    elevationController = null;
+  }
+
+  async function runElevation(route: Route): Promise<void> {
+    cancelElevation();
+    const controller = new AbortController();
+    elevationController = controller;
+    const current = () => elevationController === controller && !controller.signal.aborted;
+    const setElevation = (elevation: ElevationState) => {
+      // 解析の進捗通知で、利用者の入力検証メッセージを消さない。
+      if (current()) update({ elevation, validationError: state.validationError });
+    };
+    setElevation({ kind: "loading", done: 0, total: 0 });
+    try {
+      const analysis = await analyzer(route, {
+        signal: controller.signal,
+        onProgress: (done, total) => setElevation({ kind: "loading", done, total }),
+      });
+      if (analysis) setElevation({ kind: "ready", analysis });
+      else setElevation({ kind: "error", message: "標高解析が完了しませんでした。再試行してください。" });
+    } catch (error) {
+      setElevation({ kind: "error", message: error instanceof Error ? error.message : "標高を取得できませんでした。" });
+    } finally {
+      if (elevationController === controller) elevationController = null;
+    }
+  }
 
   return {
     getState: () => state,
@@ -135,10 +169,14 @@ export function createRouteStore(api: ApiClient): RouteStore {
     },
     reset() {
       invalidatePending();
-      update({ origin: null, destination: null, pickMode: null, status: { kind: "idle" } });
+      cancelElevation();
+      update({ origin: null, destination: null, pickMode: null, status: { kind: "idle" }, elevation: { kind: "idle" } });
     },
     setDraft(patch) {
       update({ draft: { ...state.draft, ...patch } });
+    },
+    retryElevation() {
+      if (state.status.kind === "success" && state.elevation.kind !== "loading") void runElevation(state.status.route);
     },
     async search() {
       if (state.status.kind === "loading") return;
@@ -153,12 +191,14 @@ export function createRouteStore(api: ApiClient): RouteStore {
       }
       const applied: AppliedSearch = { origin, destination, ...draft };
       const mine = ++seq;
+      cancelElevation();
       // 検索を始めた時点で古い経路は表示から外す。失敗しても古いルートが新しい結果に見えない。
-      update({ pickMode: null, status: { kind: "loading", applied } });
+      update({ pickMode: null, status: { kind: "loading", applied }, elevation: { kind: "idle" } });
       try {
         const route = await api.searchRoute({ origin, destination, ...draft });
         if (mine !== seq) return;
         update({ status: { kind: "success", applied, route } });
+        void runElevation(route);
       } catch (e) {
         if (mine !== seq) return;
         const err = toApiError(e);

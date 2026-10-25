@@ -98,6 +98,10 @@ button { cursor: pointer; }
   transition: transform var(--motion-duration) var(--motion-ease);
 }
 .search-card.is-open { transform: none; }
+/* 閉じた状態でもカードの箱は全幅・高さを持つため、バーとパネルの外側は地図へ操作を通す。
+   これをしないと、地図のクリック／タップがカードに吸われてルート区間を選べない（#9）。 */
+.search-card { pointer-events: none; }
+.search-card > .bar, .search-card > .panel { pointer-events: auto; }
 
 .bar {
   display: flex;
