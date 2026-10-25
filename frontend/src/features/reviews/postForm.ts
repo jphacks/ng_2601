@@ -43,7 +43,7 @@ const RETAINED = "入力した内容は残っています。";
 function submitErrorMessage(error: ApiError): string {
   switch (error.code) {
     case "unauthorized":
-      return `口コミの投稿にはログインが必要です（ログイン機能は未実装のため、実サーバーへは投稿できません）。${RETAINED}`;
+      return `ログインの期限が切れました。もう一度ログインしてから投稿してください。${RETAINED}`;
     case "invalid_request":
       return `入力内容が受け付けられませんでした。内容を確認してもう一度お試しください。${RETAINED}`;
     case "rate_limited":

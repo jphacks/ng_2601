@@ -22,6 +22,8 @@ export function createAuthStore(storage: UserStorage): AuthStore {
 
   function set(next: User | null): void {
     user = next;
+    // トークンを HttpOnly Cookie に置かないのは、BE がトークンを JSON で返し、refresh も Bearer で受けるため。
+    // Cookie にするなら BE と合わせて変える必要がある。
     try {
       if (next) storage.setItem(KEY, JSON.stringify(next));
       else storage.removeItem(KEY);

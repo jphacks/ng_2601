@@ -2,7 +2,8 @@ import "./shell.css";
 import { el } from "../../ui/dom";
 import { icon, type IconName } from "../../ui/icon";
 import { renderState } from "../../ui/state";
-import { api, isMockApi } from "../../api";
+import { api, apiBaseUrl, isMockApi } from "../../api";
+import { revokeSession } from "../../api/session";
 import { createHazardsFeature, type HazardsFeature } from "../hazards/hazardsFeature";
 import { setupLocate } from "../geolocation/renderLocate";
 import { renderLayerPanel } from "../map/layerPanel";
@@ -191,6 +192,7 @@ export function renderShell(root: HTMLElement): void {
     action.type = "button";
     action.addEventListener("click", () => {
       if (user) {
+        if (user.refreshToken) void revokeSession(apiBaseUrl, user.refreshToken);
         auth.logout();
         return;
       }

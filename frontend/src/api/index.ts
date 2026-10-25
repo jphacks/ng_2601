@@ -1,6 +1,7 @@
 import type { ApiClient } from "./client";
 import { createHttpClient } from "./http";
 import { createMockClient } from "./mock";
+import { createSessionRefresher } from "./session";
 import { auth } from "../features/auth";
 
 const useHttp = import.meta.env.VITE_API_MODE === "http";
@@ -12,7 +13,7 @@ export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost
 
 /** VITE_API_MODE=http のとき実API、それ以外はモック。 */
 export const api: ApiClient = useHttp
-  ? createHttpClient(apiBaseUrl, () => auth.getUser()?.accessToken ?? null)
+  ? createHttpClient(apiBaseUrl, () => auth.getUser()?.accessToken ?? null, createSessionRefresher(apiBaseUrl, auth))
   : createMockClient();
 
 export type { ApiClient } from "./client";
