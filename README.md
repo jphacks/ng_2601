@@ -85,6 +85,9 @@ Google アカウントでログインする画面を実装しました。ログ�
 - [経路 API](back/backend/app/main.py)で、BRouter の候補に道路規制・交通量を組み合わせて経路を選びます。
 - CoreS3 の[計測・送信プログラム](seams/M5StackS3/src/main.cpp)と[受信 API](back/backend/app/device_events.py)を実装しました。
 
+## デモ動画
+
+https://youtu.be/X4GLAS3fw6A
 
 ## 謝辞
 
