@@ -2,8 +2,6 @@
 .elevation__note { margin: 0; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 .elevation__note a { color: var(--color-primary); text-underline-offset: 3px; }
 .elevation__error { color: var(--color-warning); }
-.elevation__source { margin: 0; font-size: 12px; color: var(--color-text-muted); }
-.elevation__source a { color: inherit; text-underline-offset: 3px; }
 .elevation__chart-block { display: grid; gap: var(--space-2); min-width: 0; }
 .elevation__chart { display: block; width: 100%; height: auto; overflow: visible; }
 .elevation__hit { cursor: crosshair; }

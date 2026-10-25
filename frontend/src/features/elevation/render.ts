@@ -2,7 +2,6 @@ import "./elevation.css";
 import type { Route } from "../../types/api";
 import { el } from "../../ui/dom";
 import type { ElevationState } from "./analyze";
-import { GSI_PROVIDER } from "./dem/config";
 import { createProfileChart } from "./chart";
 import type { RouteLink } from "./link";
 import { formatDistance, formatDuration, formatElevation, formatGrade, UNKNOWN } from "./format";
@@ -69,19 +68,5 @@ export function renderAnalysis(route: Route, state: ElevationState, options: Ana
     button.addEventListener("click", options.retry);
     root.append(button);
   }
-
-  // 国土地理院の利用規約で、出典と「加工して作成」の明示が要る。
-  const note = el("p", { className: "elevation__source", text: "標高・勾配は推定値" });
-  if (analysis?.source === "mock" || (!analysis && import.meta.env.VITE_API_MODE !== "http")) {
-    note.append("（開発用モックの合成データ）");
-  } else {
-    const link = el("a", { text: "国土地理院 標高タイル" });
-    link.dataset.resultControl = "source";
-    link.href = GSI_PROVIDER.attributionUrl;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    note.append("（出典：", link, "を加工して作成）");
-  }
-  root.append(note);
   return root;
 }
