@@ -2,19 +2,20 @@ import "./shell.css";
 import { el } from "../../ui/dom";
 import { icon, type IconName } from "../../ui/icon";
 import { renderState } from "../../ui/state";
-import { api } from "../../api";
+import { api, isMockApi } from "../../api";
 import { createHazardsFeature, type HazardsFeature } from "../hazards/hazardsFeature";
 import { renderLayerPanel } from "../map/layerPanel";
 import { mountMap, type MapController } from "../map/map";
 import { ATTRIBUTION } from "../map/style";
+import { createReviewPostFeature, type ReviewPostFeature } from "../reviews/postForm";
 import { formatPoint, renderPickBanner, renderRouteView } from "../route/renderRoute";
 import { createPreferencesStore } from "../preferences/preferencesState";
 import { createRouteStore } from "../route/routeState";
 import { buildRouteGradientSegments, type RouteGradientSegment } from "../elevation/gradientSegments";
 import type { RouteAnalysis } from "../elevation/analyze";
 import { createRouteLink, type RouteLink } from "../elevation/link";
-import { mockReviewLocations, mockReviews } from "../../mocks/data";
 import type { Route } from "../../types/api";
+import { createReviewsFeature, type ReviewsFeature } from "../reviews/reviewsFeature";
 
 type ViewId = "route" | "settings" | "hazards" | "reviews" | "layers" | "help" | "about";
 
@@ -63,30 +64,59 @@ export function renderShell(root: HTMLElement): void {
   map.setAttribute("aria-label", "地図エリア");
   // 道路・危険情報は FE-09 で実APIクライアント（モック切替可）に接続済み。詳細カードは地図クリックで開く。
   let hazards: HazardsFeature | undefined;
+  let reviews: ReviewsFeature | undefined;
+  let reviewPost: ReviewPostFeature | undefined;
   // 地点指定モード中の地図タップだけを出発地／目的地として使う。
   // ルート区間のタップは標高グラフの選択位置へ送る（#9）。
   const mapController: MapController = mountMap(map, {
-    onPick: (lngLat) => routeStore.pick(lngLat),
-    onSelectRoadInfo: (id) => hazards?.select(id, "map"),
+    onPick: (lngLat) => {
+      if (routeStore.pick(lngLat) || reviewPost?.pick(lngLat)) return true;
+      reviews?.openNear(lngLat);
+      return true;
+    },
+    onSelectRoadInfo: (id) => {
+      if (id) {
+        reviews?.close();
+        reviewPost?.hide();
+      }
+      hazards?.select(id, "map");
+    },
     onSelectRouteSegment: (distanceM) => link.select(distanceM),
   });
   const link: RouteLink = createRouteLink(mapController);
   const routeView = renderRouteView(routeStore, prefsStore, link);
   void prefsStore.load();
-  // 口コミのAPI接続（#12）までは、モックを重ねて表示を確認できるようにする。
-  mapController.setReviews(
-    mockReviews.flatMap((review) => {
-      const lngLat = mockReviewLocations[review.id];
-      return lngLat ? [{ review, lngLat }] : [];
-    }),
-  );
   hazards = createHazardsFeature({
     map: mapController,
     client: api,
-    mock: import.meta.env.VITE_API_MODE !== "http",
+    mock: isMockApi,
     // スマホでは一覧パネルが詳細カードを覆うため、一覧から選んだら閉じて地図と詳細を見せる。
     onSelect: (fromList) => {
+      reviews?.close();
+      reviewPost?.hide();
       if (fromList && window.matchMedia("(max-width: 767px)").matches) closeSearch(false);
+    },
+  });
+  reviews = createReviewsFeature({
+    map: mapController,
+    client: api,
+    getRoadInfo: () => hazards?.getVisibleItems() ?? [],
+    onOpen: () => {
+      hazards?.closeDetail();
+      closeSearch(false);
+      reviewPost?.hide();
+    },
+    onPost: (at) => reviewPost?.start(at),
+  });
+  reviewPost = createReviewPostFeature({
+    map: mapController,
+    client: api,
+    onPosted: (review) => reviews?.showPosted(review),
+    onOpen: () => {
+      if (routeStore.getState().pickMode) routeStore.cancelPick();
+      hazards?.closeDetail();
+      closeSearch(false);
+      reviews?.close();
     },
   });
   const attributionLink = el("a", { text: ATTRIBUTION.label });
@@ -240,6 +270,8 @@ export function renderShell(root: HTMLElement): void {
       viewBody.replaceChildren(layerPanel);
     } else if (view === "hazards") {
       viewBody.replaceChildren(hazards!.panel);
+    } else if (view === "reviews") {
+      viewBody.replaceChildren(reviews!.listPanel);
     } else {
       viewBody.replaceChildren(renderState({ kind: "empty", message }));
     }
@@ -260,6 +292,9 @@ export function renderShell(root: HTMLElement): void {
       return;
     }
     searchOpen = true;
+    // 検索カードと口コミシートは同時に開かない。
+    reviews?.close();
+    reviewPost?.hide();
     card.classList.add("is-open");
     panel.inert = false;
     syncRoutePanel();
@@ -329,6 +364,7 @@ export function renderShell(root: HTMLElement): void {
   routeStore.subscribe((state) => {
     syncRoutePanel(state);
     const picking = state.pickMode !== null;
+    if (picking) reviewPost?.hide();
     mapController.setPicking(picking);
     mapController.setEndpoints({ origin: state.origin, destination: state.destination });
     origin.value = state.origin ? formatPoint(state.origin) : "";
@@ -355,8 +391,10 @@ export function renderShell(root: HTMLElement): void {
     // 指定中は地図を見せるためカードを閉じ、指定が終わったら経路ビューに戻す。
     // 閉じるだけだと下へ移動するアニメーション中に案内バナーと重なるので、指定中は隠す。
     card.hidden = picking;
-    if (picking) closeSearch(true);
-    else if (wasPicking) openSearch("route");
+    if (picking) {
+      reviews?.close();
+      closeSearch(true);
+    } else if (wasPicking) openSearch("route");
     wasPicking = picking;
   });
 
@@ -364,8 +402,9 @@ export function renderShell(root: HTMLElement): void {
     if (e.key === "Escape") {
       if (menuOpen) setMenu(false);
       else if (routeStore.getState().pickMode) routeStore.cancelPick();
+      else if (reviewPost?.handleEscape()) return;
       else if (searchOpen) closeSearch(false);
-      else hazards?.closeDetail();
+      else if (!hazards?.closeDetail()) reviews?.handleEscape();
       return;
     }
     if (e.key === "Tab" && menuOpen) {
@@ -388,7 +427,22 @@ export function renderShell(root: HTMLElement): void {
   syncViewport();
   renderView();
 
-  root.replaceChildren(map, attribution, hazards.card, menuButton, controls, renderPickBanner(routeStore), card, scrim, drawer);
+  root.replaceChildren(
+    map,
+    attribution,
+    hazards.card,
+    menuButton,
+    controls,
+    reviews.status,
+    reviews.sheet,
+    reviewPost.sheet,
+    reviewPost.banner,
+    reviewPost.status,
+    renderPickBanner(routeStore),
+    card,
+    scrim,
+    drawer,
+  );
   // MapLibre initializes while the shell is being assembled off-DOM; size it after insertion.
   mapController.resize();
 }

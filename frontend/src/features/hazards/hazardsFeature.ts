@@ -31,6 +31,8 @@ export interface HazardsFeature {
   select(id: string | null, source?: "map" | "list"): void;
   /** 詳細カードを閉じる。開いていたら true。 */
   closeDetail(): boolean;
+  /** 現在のフィルタと鮮度条件に合う道路情報（近隣の口コミシートでも使う）。 */
+  getVisibleItems(): readonly RoadInfoItem[];
   dispose(): void;
 }
 
@@ -138,6 +140,7 @@ export function createHazardsFeature({ map, client, mock, onSelect }: HazardsFea
     panel: panel.element,
     card,
     select,
+    getVisibleItems: () => map.isLayerVisible("hazards") ? applyFilter(normalized.items, filter, new Date()) : [],
     closeDetail() {
       if (!selectedId) return false;
       select(null);

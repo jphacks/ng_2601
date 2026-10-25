@@ -3,7 +3,7 @@ import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./map.css";
 import type { Feature, FeatureCollection, LineString } from "geojson";
-import type { BBox, LngLat, Review, Route } from "../../types/api";
+import type { BBox, LngLat, Route } from "../../types/api";
 import { CATEGORY_DEFS } from "../hazards/catalog";
 import { geometryBBox } from "../hazards/geometry";
 import { buildRoadInfoCollection } from "../hazards/mapCollection";
@@ -12,6 +12,8 @@ import { formatSegmentText, distanceOnLine, type RouteSelectionTarget, type Segm
 import type { RouteGradientSegment } from "../elevation/gradientSegments";
 import { el } from "../../ui/dom";
 import { renderState } from "../../ui/state";
+import { CATEGORY_GLYPH, CATEGORY_LABEL } from "../reviews/catalog";
+import type { ReviewPlace } from "../reviews/grouping";
 import { createMarker, hideMarker, showMarker, type MarkerSpec } from "./markers";
 import { BASEMAP_LEGEND_LABEL, BASEMAP_MAX_ZOOM, INITIAL_VIEW, createStyle } from "./style";
 
@@ -34,12 +36,6 @@ export const LAYER_DEFS: readonly LayerDef[] = [
   { id: "hazards", label: "道路・危険情報", legend: { shape: "dot", cssClass: "hazard", text: "危険情報" } },
   { id: "reviews", label: "口コミ", legend: { shape: "dot", cssClass: "review", text: "口コミ" } },
 ];
-
-/** 口コミは座標を持たないため、地図に置くときに位置を添える。 */
-export interface ReviewPin {
-  review: Review;
-  lngLat: LngLat;
-}
 
 export interface MapHandlers {
   /**
@@ -89,10 +85,15 @@ export interface MapController {
   focusRoadInfo(id: string): void;
   /** 表示領域が変わったとき（移動・ズーム終了時と初期表示時）。 */
   onViewportChange(listener: (viewport: Viewport) => void): void;
-  setReviews(pins: ReviewPin[]): void;
+  /** 口コミのピンを置き換える。ピンの選択（クリック／Enter）で onSelect を呼ぶ。 */
+  setReviews(places: ReviewPlace[], onSelect: (place: ReviewPlace) => void): void;
+  /** 口コミの投稿地点を示すマーカー。null で消す。 */
+  setDraftPoint(point: LngLat | null): void;
   setLayerVisible(id: LayerId, visible: boolean): void;
   isLayerVisible(id: LayerId): boolean;
   onLayersChange(listener: () => void): void;
+  /** 現在の表示範囲。地図が使えない間は null。 */
+  getBounds(): BBox | null;
   zoomIn(): void;
   zoomOut(): void;
   resetNorth(): void;
@@ -184,6 +185,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
   let reviewMarkers: maplibregl.Marker[] = [];
   let pickMarker: maplibregl.Marker | null = null;
   let endpointMarkers: maplibregl.Marker[] = [];
+  let draftMarker: maplibregl.Marker | null = null;
   let endpoints: Endpoints = { origin: null, destination: null };
   const visible: Record<LayerId, boolean> = { basemap: true, routes: true, hazards: true, reviews: true };
   const listeners: Array<() => void> = [];
@@ -373,6 +375,12 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
     }
   }
 
+  function currentBounds(): BBox | null {
+    if (!map || !loaded) return null;
+    const b = map.getBounds();
+    return [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
+  }
+
   function syncRoutes(): void {
     if (!map || !loaded) return;
     (map.getSource(ROUTE_SOURCE) as maplibregl.GeoJSONSource).setData(routeCollection());
@@ -480,6 +488,11 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
     for (const m of endpointMarkers) if (!m.getElement().isConnected) showMarker(m, map);
   }
 
+  /** 投稿地点も地図の作り直し後に載せ直す。 */
+  function syncDraft(): void {
+    if (map && draftMarker && !draftMarker.getElement().isConnected) showMarker(draftMarker, map);
+  }
+
   function replaceMarkers(old: maplibregl.Marker[], specs: MarkerSpec[]): maplibregl.Marker[] {
     for (const m of old) hideMarker(m);
     return specs.map(createMarker);
@@ -557,6 +570,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
         syncVisibility();
         syncEndpoints();
         applyRouteSelection();
+        syncDraft();
         emitViewport();
       });
       m.on("moveend", emitViewport);
@@ -730,21 +744,40 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
         map.fitBounds([[box[0], box[1]], [box[2], box[3]]], { padding: 80, maxZoom: 17 });
       }
     },
-    onViewportChange: (listener) => void viewportListeners.push(listener),
-    setReviews(pins) {
+    setReviews(places, onSelect) {
       reviewMarkers = replaceMarkers(
         reviewMarkers,
-        pins.map(({ review, lngLat }) => ({
-          id: review.id,
-          lngLat,
-          glyph: String(review.rating),
-          label: `評価${review.rating}の口コミ`,
-          title: `評価 ${review.rating} / 5`,
-          description: review.comment,
-          kind: "review",
-        })),
+        places.map((place) => {
+          const count = place.reviews.length;
+          const category = place.reviews[0].category;
+          return {
+            id: place.id,
+            lngLat: place.center,
+            glyph: count > 1 ? String(count) : CATEGORY_GLYPH[category],
+            label: count > 1 ? `口コミ${count}件` : `口コミ（${CATEGORY_LABEL[category]}）`,
+            title: "",
+            description: "",
+            kind: "review",
+            onSelect: () => onSelect(place),
+          };
+        }),
       );
       syncVisibility();
+    },
+    setDraftPoint(point) {
+      if (draftMarker) hideMarker(draftMarker);
+      draftMarker = point
+        ? createMarker({
+            id: "draft",
+            lngLat: point,
+            glyph: "投",
+            label: "口コミの投稿地点",
+            title: "口コミの投稿地点",
+            description: `緯度 ${point[1].toFixed(5)} / 経度 ${point[0].toFixed(5)}`,
+            kind: "draft",
+          })
+        : null;
+      syncDraft();
     },
     setLayerVisible(id, on) {
       visible[id] = on;
@@ -755,6 +788,8 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
     },
     isLayerVisible: (id) => visible[id],
     onLayersChange: (listener) => void listeners.push(listener),
+    getBounds: currentBounds,
+    onViewportChange: (listener) => void viewportListeners.push(listener),
     zoomIn: () => void map?.zoomIn(),
     zoomOut: () => void map?.zoomOut(),
     resetNorth: () => void map?.resetNorth(),

@@ -3,6 +3,7 @@ import type {
   Hazard,
   MapDataResponse,
   Review,
+  ReviewDraft,
   Route,
   RouteConditions,
   RouteSearchRequest,
@@ -17,7 +18,10 @@ export interface ApiClient {
   listHazards(routeId?: string): Promise<Hazard[]>;
   /** 表示領域の道路・危険情報（GET /v1/map-data）。信号が中断されたら AbortError を投げる。 */
   getMapData(bbox: BBox, opts?: MapDataOptions): Promise<MapDataResponse>;
-  listReviews(params?: { routeId?: string; hazardId?: string }): Promise<Review[]>;
+  /** bbox 内の口コミ。省略時は全域。 */
+  listReviews(params?: { bbox?: BBox }): Promise<Review[]>;
+  /** 口コミを投稿し、作成された口コミを返す。 */
+  createReview(draft: ReviewDraft): Promise<Review>;
   /** 車種・各条件の選択肢と、車種ごとの初期値。 */
   getRoutingOptions(): Promise<RoutingOptions>;
   /** 保存済みの車種・条件。未ログインなどで取得できない場合は code `unauthorized` の ApiError。 */

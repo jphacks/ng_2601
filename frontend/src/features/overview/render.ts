@@ -35,7 +35,7 @@ export async function renderOverview(root: HTMLElement): Promise<void> {
         ),
       ),
       list("危険情報", hazards.map((h) => `[${h.type}] ${h.description}`)),
-      list("口コミ", reviews.map((r) => `★${r.rating} ${r.comment}`)),
+      list("口コミ", reviews.map((r) => `[${r.rawCategory}] ${r.comment}`)),
       list("Preferences", [JSON.stringify(prefs)]),
     );
   } catch (e) {

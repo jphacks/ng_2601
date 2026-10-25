@@ -37,6 +37,9 @@ export interface Route {
 /** @provisional */
 export type HazardType = "steep_slope" | "stairs" | "construction" | "narrow_road" | "other";
 
+/** 情報源。official は公的な道路・規制情報、community はユーザー報告。 @provisional */
+export type HazardSource = "official" | "community";
+
 /** @provisional */
 export interface Hazard {
   id: string;
@@ -45,16 +48,34 @@ export interface Hazard {
   severity: 1 | 2 | 3;
   location: LngLat;
   description: string;
+  source: HazardSource;
 }
 
+/** FEの暫定カテゴリ。BEは任意の文字列を返すため、未知の値は other に落とす。 @provisional */
+export type ReviewCategory = "surface" | "slope" | "traffic" | "facility" | "other";
+
 /** @provisional */
+export type VerificationState = "unverified" | "corroborated" | "moderated";
+
+/** 地点に紐づくユーザー口コミ（BE PR #26 の observations を元にした暫定型）。 @provisional */
 export interface Review {
   id: string;
-  routeId?: string;
-  hazardId?: string;
-  rating: 1 | 2 | 3 | 4 | 5;
+  location: LngLat;
+  category: ReviewCategory;
+  /** BEが返したカテゴリ文字列（正規化前）。 */
+  rawCategory: string;
   comment: string;
   createdAt: string; // ISO 8601
+  /** 投稿者の表示名。BEが未提供の間は未設定。 */
+  authorName?: string;
+  verification?: VerificationState;
+}
+
+/** 口コミ投稿の入力（投稿地点・カテゴリ・本文）。 @provisional */
+export interface ReviewDraft {
+  location: LngLat;
+  category: ReviewCategory;
+  comment: string;
 }
 
 /** 車種。BEの`bike_type`（back/config/routing_catalog.json）に対応。 */

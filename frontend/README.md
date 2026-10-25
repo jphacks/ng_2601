@@ -17,6 +17,7 @@ npm run build      # 型チェック + 本番ビルド
 * `VITE_API_MODE=http`: `VITE_API_BASE_URL` のバックエンドを呼ぶ（`src/api/http.ts`）。経路検索は `POST /v1/routes`、道路・危険情報は `GET /v1/map-data`。
 
 モックの経路検索は、URLに `?mock=empty|error|timeout|slow` を付けると0件・通信エラー・タイムアウト・遅延を再現できる。
+口コミの投稿は `?mock=post-error|post-auth|post-slow` で失敗・要ログイン・遅延を再現できる（投稿した口コミは再読み込みまで一覧に残る）。
 
 標高解析は `?elevation=flat|hill|partial|missing|slow|error` で平坦・起伏・部分欠測・全欠測・遅延・通信失敗を再現できる（`mock` と併用可能）。モックでは外部DEMへ通信しない。HTTPモードでは検索成功後に国土地理院の標高タイルをブラウザから取得する。計算規則・出典・欠測表示は[ルート標高解析](docs/route-elevation.md)を参照。
 

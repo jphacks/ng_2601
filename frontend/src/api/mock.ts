@@ -12,7 +12,7 @@ import { bboxIntersects } from "../features/hazards/bbox";
 import { geometryBBox } from "../features/hazards/geometry";
 import { haversineM } from "../lib/geo";
 import { buildMockMapData } from "../mocks/mapData";
-import type { BBox, LngLat, Route, RouteConditions, RouteSearchRequest } from "../types/api";
+import type { BBox, LngLat, Review, Route, RouteConditions, RouteSearchRequest } from "../types/api";
 
 const delay = (ms = 150) => new Promise((r) => setTimeout(r, ms));
 
@@ -70,6 +70,9 @@ function inBBox<F extends { geometry: Parameters<typeof geometryBBox>[0] }>(feat
 export function createMockClient(): ApiClient {
   // 保存した設定は、ページを読み込み直すまでメモリ上に保持する（再取得して同じ値を確認できる）。
   let prefs: RouteConditions = { ...mockSavedConditions };
+  // 投稿された口コミを一覧へ反映できるよう、このクライアント内で保持する（再読み込みで消える）。
+  let reviews: Review[] = [...mockReviews];
+  let postedCount = 0;
 
   return {
     async searchRoute(req) {
@@ -119,11 +122,38 @@ export function createMockClient(): ApiClient {
         },
       };
     },
-    async listReviews({ routeId, hazardId } = {}) {
-      await delay();
-      return mockReviews.filter(
-        (r) => (!routeId || r.routeId === routeId) && (!hazardId || r.hazardId === hazardId),
+    async listReviews({ bbox } = {}) {
+      // 受入条件（0件・取得失敗・読込中）を手元で確認するため、URLの ?mock=empty|error|slow で再現する。
+      const scenario = new URLSearchParams(globalThis.location?.search).get("mock");
+      await delay(scenario === "slow" ? 2500 : 150);
+      if (scenario === "error") throw new ApiError(503, { code: "unavailable", message: "mock: 口コミを取得できません" });
+      if (scenario === "empty") return [];
+      return reviews.filter(
+        ({ location: [lng, lat] }) =>
+          !bbox || (lng >= bbox[0] && lng <= bbox[2] && lat >= bbox[1] && lat <= bbox[3]),
       );
+    },
+    /** URLの`?mock=post-error|post-auth|post-slow`で投稿の失敗・要ログイン・遅延を再現する。 */
+    async createReview(draft) {
+      const scenario = mockScenario();
+      await delay(scenario === "post-slow" ? 3000 : 600);
+      if (scenario === "post-error") {
+        throw new ApiError(503, { code: "http_error", message: "mock: 口コミを投稿できませんでした" });
+      }
+      if (scenario === "post-auth") {
+        throw new ApiError(401, { code: "unauthorized", message: "口コミの投稿にはログインが必要です。" });
+      }
+      const review: Review = {
+        id: `mock-posted-${++postedCount}`,
+        location: draft.location,
+        category: draft.category,
+        rawCategory: draft.category,
+        comment: draft.comment,
+        createdAt: new Date().toISOString(),
+        verification: "unverified",
+      };
+      reviews = [...reviews, review];
+      return review;
     },
     async getRoutingOptions() {
       await delay();
