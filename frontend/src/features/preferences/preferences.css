@@ -33,3 +33,4 @@
 .pref__status { margin: 0; font-size: 13px; color: var(--color-text-muted); overflow-wrap: anywhere; }
 .pref__status--warn { color: var(--color-warning); }
 .pref__save-button { justify-self: start; }
+.pref__current-summary { margin: 0; font-size: 14px; font-weight: 600; }

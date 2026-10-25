@@ -54,7 +54,7 @@ interface Controls {
 /**
  * 車種・坂道許容度・詳細パラメータの編集パネル(#10)。
  * 値の編集は routeStore の draft に反映するだけで、「この条件で再検索」を押すまで経路の結果は変わらない(#6)。
- * 再検索ボタンは経路ビュー側（パネル下部）に置く。
+ * 再検索ボタンは経路ビュー側（パネル下部）に、保存は「設定」タブ（renderPreferencesSave）に置く。
  */
 export function renderPreferences(routeStore: RouteStore, prefs: PreferencesStore): HTMLElement {
   const body = el("div", { className: "pref__body" });
@@ -166,7 +166,40 @@ export function renderPreferences(routeStore: RouteStore, prefs: PreferencesStor
     return { node, sync };
   }
 
-  // --- 保存 ---
+  function sync(): void {
+    const state = prefs.getState();
+    const { options } = state;
+    if (options.kind !== "ready") {
+      controls = null;
+      builtFor = null;
+      body.replaceChildren(
+        options.kind === "loading"
+          ? renderState({ kind: "loading", message: "設定を読み込み中…" })
+          : renderState({
+              kind: "error",
+              message: `設定の選択肢を取得できませんでした。（${options.message}）`,
+              onRetry: () => void prefs.load(),
+            }),
+      );
+      return;
+    }
+    if (!controls || builtFor !== options.options) {
+      controls = buildControls(options.options);
+      builtFor = options.options;
+      body.replaceChildren(controls.node);
+    }
+    controls.sync(state);
+  }
+
+  routeStore.subscribe(sync);
+  prefs.subscribe(sync);
+  sync();
+  return root;
+}
+
+/** 「設定」タブ。経路ビューで選んでいる車種・坂道許容度を次回からの初期値として保存する。 */
+export function renderPreferencesSave(routeStore: RouteStore, prefs: PreferencesStore): HTMLElement {
+  const current = el("p", { className: "pref__current-summary" });
   const status = el("p", { className: "pref__status" });
   status.setAttribute("role", "status");
   const saveButton = textButton("この設定を保存", "route__button pref__save-button");
@@ -188,29 +221,9 @@ export function renderPreferences(routeStore: RouteStore, prefs: PreferencesStor
 
   function sync(): void {
     const state = prefs.getState();
-    const { options } = state;
-    if (options.kind !== "ready") {
-      controls = null;
-      builtFor = null;
-      body.replaceChildren(
-        options.kind === "loading"
-          ? renderState({ kind: "loading", message: "設定を読み込み中…" })
-          : renderState({
-              kind: "error",
-              message: `設定の選択肢を取得できませんでした。（${options.message}）`,
-              onRetry: () => void prefs.load(),
-            }),
-      );
-      return;
-    }
-    if (!controls || builtFor !== options.options) {
-      controls = buildControls(options.options);
-      builtFor = options.options;
-      body.replaceChildren(controls.node, saveRow);
-    }
-    controls.sync(state);
-
-    const unsaved = isUnsaved(state, routeStore.getState().draft);
+    const { draft } = routeStore.getState();
+    current.textContent = `いまの条件：${bikeTypeLabel(draft.bikeType)}・坂道 ${modeLabel("hillMode", draft.hillMode)}`;
+    const unsaved = isUnsaved(state, draft);
     const msg = saveMessage(state, unsaved);
     status.textContent = msg.text;
     status.classList.toggle("pref__status--warn", msg.warn);
@@ -221,5 +234,9 @@ export function renderPreferences(routeStore: RouteStore, prefs: PreferencesStor
   routeStore.subscribe(sync);
   prefs.subscribe(sync);
   sync();
-  return root;
+  return el("section", { className: "pref" }, [
+    el("p", { className: "pref__status", text: "「経路」で選んだ車種と坂道許容度を、次回からの初期値として保存します。" }),
+    current,
+    saveRow,
+  ]);
 }

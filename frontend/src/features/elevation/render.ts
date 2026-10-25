@@ -17,8 +17,6 @@ function metrics(rows: Array<[string, string]>, className: string): HTMLElement 
 
 export interface AnalysisViewOptions {
   retry: () => void;
-  detailsOpen: boolean;
-  onDetailsToggle: (open: boolean) => void;
   /** グラフと地図の選択位置を共有する（#9）。 */
   link: RouteLink;
 }
@@ -26,42 +24,40 @@ export interface AnalysisViewOptions {
 export function renderAnalysis(route: Route, state: ElevationState, options: AnalysisViewOptions): HTMLElement {
   const analysis = state.kind === "ready" ? state.analysis : null;
   const summary = analysis?.summary;
-  const partial = !!summary?.missingCount;
   const usable = !!summary && summary.validDistance > 0;
-  const ascent = state.kind === "loading" ? "取得中" : usable ? formatElevation(summary!.ascent) : UNKNOWN;
+  const loadingText = "取得中";
+  const ascent = state.kind === "loading" ? loadingText : usable ? formatElevation(summary!.ascent) : UNKNOWN;
+  const steepest = state.kind === "loading" ? loadingText : formatGrade(summary?.steepestUphillPercent ?? null);
   const root = el("section", { className: "elevation" }, [
     metrics([
-      ["走行距離", formatDistance(route.distanceM)],
-      ["所要時間（目安）", formatDuration(route.durationSec)],
-      [partial ? "推定獲得標高※" : "推定獲得標高", ascent],
+      ["距離", formatDistance(route.distanceM)],
+      ["時間", formatDuration(route.durationSec)],
+      ["獲得標高", ascent],
+      ["最大上り", steepest],
     ], "route__summary"),
-    el("h3", { className: "route__heading", text: "標高プロファイル（推定）" }),
   ]);
-  const status = el("p", { className: "elevation__note" });
-  status.setAttribute("role", "status");
+
+  // 正常に取れたときは何も言わず、取得中・失敗・欠測のときだけ伝える。
+  let message = "";
   if (state.kind === "loading") {
-    status.textContent = `標高を取得中…${state.total ? ` ${Math.round(state.done / state.total * 100)}%` : ""}`;
+    message = `標高を取得中…${state.total ? ` ${Math.round(state.done / state.total * 100)}%` : ""}`;
   } else if (state.kind === "error") {
-    status.textContent = state.message;
-    status.classList.add("elevation__error");
-  } else if (summary) {
-    status.textContent = summary.validCount === 0 ? "標高データがありません。標高・勾配は不明です。"
-      : partial ? `取得不可 ${summary.missingCount} / ${analysis!.points.length} 点。※上下量・極値・区間勾配は取得できた区間のみ。全体平均勾配は不明です。`
-      : "標高データから算出した推定値です。";
-    if (analysis!.errorCount) status.textContent += ` うち通信・復号エラー ${analysis!.errorCount} 点。`;
-    if (summary.validCount > 0 && !usable) status.textContent += " 連続した有効区間がないため、獲得標高・下降量は不明です。";
-  } else {
-    status.textContent = "標高データは未取得です。";
+    message = state.message;
+  } else if (summary?.validCount === 0) {
+    message = "標高データがありません。";
+  } else if (summary?.missingCount) {
+    message = "一部の地点で標高を取得できませんでした。";
   }
-  root.append(status);
+  if (message) {
+    const status = el("p", { className: "elevation__note", text: message });
+    status.setAttribute("role", "status");
+    if (state.kind === "error") status.classList.add("elevation__error");
+    root.append(status);
+  }
+
   if (analysis && summary!.validCount > 0) {
-    const figure = el("figure", { className: "elevation__figure" });
     const chart = createProfileChart(analysis.points, { onSelect: (distanceM) => options.link.select(distanceM) });
-    figure.append(
-      chart.element,
-      el("figcaption", { className: "elevation__legend", text: "実線・点：推定標高 ／ 線の途切れ：取得不可 ／ 縦の破線：選択位置" }),
-    );
-    root.append(figure);
+    root.append(chart.element);
     options.link.attachChart(chart);
   } else {
     options.link.attachChart(null);
@@ -73,37 +69,19 @@ export function renderAnalysis(route: Route, state: ElevationState, options: Ana
     button.addEventListener("click", options.retry);
     root.append(button);
   }
-  const details = el("details", { className: "elevation__details" });
-  details.open = options.detailsOpen;
-  const toggle = el("summary", { text: "ルート詳細" });
-  toggle.dataset.resultControl = "details";
-  details.append(toggle, metrics([
-    ["推定下降量", usable ? formatElevation(summary!.descent) : UNKNOWN],
-    ["全体平均勾配", formatGrade(summary?.netGradePercent ?? null)],
-    ["最低標高", formatElevation(summary?.minElevation ?? null)],
-    ["最高標高", formatElevation(summary?.maxElevation ?? null)],
-    ["最大上り（100m区間）", formatGrade(summary?.steepestUphillPercent ?? null)],
-    ["最大下り（100m区間）", formatGrade(summary?.steepestDownhillPercent ?? null)],
-  ], "elevation__metrics"));
-  details.addEventListener("toggle", () => { if (details.isConnected) options.onDetailsToggle(details.open); });
-  root.append(details);
+
+  // 国土地理院の利用規約で、出典と「加工して作成」の明示が要る。
+  const note = el("p", { className: "elevation__source", text: "標高・勾配は推定値" });
   if (analysis?.source === "mock" || (!analysis && import.meta.env.VITE_API_MODE !== "http")) {
-    root.append(el("p", { className: "elevation__note", text: "開発用モックの合成データです。実際の標高・勾配ではありません。" }));
+    note.append("（開発用モックの合成データ）");
   } else {
-    const link = el("a", { text: "出典：国土地理院 標高タイル" });
+    const link = el("a", { text: "国土地理院 標高タイル" });
     link.dataset.resultControl = "source";
     link.href = GSI_PROVIDER.attributionUrl;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
-    root.append(el("p", { className: "elevation__note" }, [link]), el("p", {
-      className: "elevation__note",
-      text: "国土地理院の標高タイルを加工して算出した推定値です。地表面の標高であり、橋・トンネル等の路面高と一致しない場合があります。",
-    }));
+    note.append("（出典：", link, "を加工して作成）");
   }
-  const spacing = analysis ? `約${Math.round(analysis.spacingM)}m間隔・${analysis.points.length}点（${analysis.levelLabels.join("・") || "標高取得不可"}）。` : "";
-  root.append(el("p", {
-    className: "elevation__note",
-    text: `${spacing}上下量は1m未満の揺れを除外。全体平均勾配は「終点−始点」の標高差÷経路座標から求めた距離（＋上り／−下り）で、途中の上下を表しません。グラフの距離も経路座標から求めるため、走行距離と差が生じる場合があります。`,
-  }));
+  root.append(note);
   return root;
 }

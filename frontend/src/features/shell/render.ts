@@ -11,6 +11,7 @@ import { ATTRIBUTION } from "../map/style";
 import { createReviewPostFeature, type ReviewPostFeature } from "../reviews/postForm";
 import { formatPoint, renderPickBanner, renderRouteView } from "../route/renderRoute";
 import { createPreferencesStore } from "../preferences/preferencesState";
+import { renderPreferencesSave } from "../preferences/renderPreferences";
 import { createRouteStore } from "../route/routeState";
 import { buildRouteGradientSegments, type RouteGradientSegment } from "../elevation/gradientSegments";
 import type { RouteAnalysis } from "../elevation/analyze";
@@ -56,6 +57,7 @@ export function renderShell(root: HTMLElement): void {
   let view: ViewId = "route";
   // レイヤーパネルと経路ビューは1つだけ作って使い回す（再訪のたびにリスナーを増やさない）。
   let layerPanel: HTMLElement | undefined;
+  let settingsPanel: HTMLElement | undefined;
   const routeStore = createRouteStore(api);
   const prefsStore = createPreferencesStore(api, routeStore);
 
@@ -246,6 +248,8 @@ export function renderShell(root: HTMLElement): void {
   function renderView(): void {
     const def = ALL_VIEWS.find((v) => v.id === view)!;
     viewTitle.textContent = def.label;
+    // タブで選んだ画面はタブ名と同じ見出しになるので出さない。
+    viewTitle.hidden = tabs.has(view);
     for (const [id, t] of tabs) {
       const selected = id === view;
       t.setAttribute("aria-selected", String(selected));
@@ -259,11 +263,12 @@ export function renderShell(root: HTMLElement): void {
         ? "使い方は準備中です。"
         : view === "about"
           ? "Nature Ride — 自然の中を走る自転車ルート。"
-          : view === "settings"
-          ? "車種と坂道許容度は、「経路」タブの「検索条件」で設定できます。"
           : `${def.label}は準備中です（${def.issue}で実装予定）。`;
     if (view === "route") {
       viewBody.replaceChildren(routeView);
+    } else if (view === "settings") {
+      settingsPanel ??= renderPreferencesSave(routeStore, prefsStore);
+      viewBody.replaceChildren(settingsPanel);
     } else if (view === "layers") {
       layerPanel ??= renderLayerPanel(mapController);
       viewBody.replaceChildren(layerPanel);
