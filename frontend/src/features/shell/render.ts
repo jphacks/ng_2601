@@ -171,7 +171,9 @@ export function renderShell(root: HTMLElement): void {
       setMenu(false, false);
       login.open();
     });
-    account.replaceChildren(el("span", { className: "drawer__account-name", text: user?.name ?? "" }), action);
+    account.classList.toggle("drawer__account--guest", !user);
+    if (user) account.replaceChildren(el("span", { className: "drawer__account-name", text: user.name }), action);
+    else account.replaceChildren(action);
   }
   auth.subscribe(() => {
     const focused = account.contains(document.activeElement);

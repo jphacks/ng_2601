@@ -296,7 +296,14 @@ button { cursor: pointer; }
   transition: transform var(--motion-duration) var(--motion-ease), visibility 0s linear var(--motion-duration);
 }
 .drawer.is-open { transform: none; visibility: visible; transition-delay: 0s; }
-.drawer__title { margin: 0 0 var(--space-4); font-size: 18px; color: var(--color-primary); }
+.drawer__title {
+  display: flex;
+  align-items: center;
+  min-height: var(--button-size);
+  margin: 0 0 var(--space-4);
+  font-size: 18px;
+  color: var(--color-primary);
+}
 .drawer__list { margin: 0; padding: 0; list-style: none; }
 .drawer__item {
   width: 100%;

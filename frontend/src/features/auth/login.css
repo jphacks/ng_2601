@@ -84,4 +84,11 @@
   color: var(--color-primary);
   font-weight: 600;
 }
-.drawer__account-button--primary { background: var(--color-primary); color: var(--color-surface); }
+.drawer__account--guest { padding: 0; background: none; }
+.drawer__account-button--primary {
+  flex: 1;
+  min-height: var(--row-height);
+  background: var(--color-primary);
+  color: var(--color-surface);
+  font-size: 15px;
+}
