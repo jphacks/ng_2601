@@ -173,7 +173,7 @@ export function renderPreferences(routeStore: RouteStore, prefs: PreferencesStor
       }),
       ...detailChoices.map((c) => c.node),
     ]);
-    const reset = textButton("初期値に戻す", "route__button pref__reset");
+    const reset = textButton("坂道・詳細を戻す", "route__button pref__reset");
     reset.addEventListener("click", () => prefs.resetToDefaults());
     detailBody.append(reset);
     details.append(detailBody);
