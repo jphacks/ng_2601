@@ -44,5 +44,5 @@ Send CoreS3 IMU bump/roughness candidates with GPS time and position to CyclerHu
 ## References
 
 - [Firmware setup](../../../seams/README.md)
-- [Backend API](../../../back/docs/device-surface.md)
+- [Backend API](../../../back/docs/api.md#experimental-cores3-road-surface-measurements)
 - [Frontend API contract](../api-contract.md)

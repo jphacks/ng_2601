@@ -190,7 +190,7 @@ export function createHttpClient(
         throw new ApiError(502, { code: "invalid_response", message: "口コミの応答形式が不正です" });
       }
     },
-    // 投稿はBE PR #26 の POST /v1/observations（要Bearer認証。FEのログインは未実装のため実BEでは401になり得る）。
+    // 投稿は POST /v1/observations（要Bearer認証）。ログイン後のアクセストークンを送る。
     createReview: async (draft) => {
       const body = await request<unknown>("POST", "/v1/observations", toObservationRequest(draft), {
         timeoutMs: POST_TIMEOUT_MS,

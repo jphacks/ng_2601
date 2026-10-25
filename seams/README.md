@@ -26,4 +26,4 @@ Events are written to the CoreS3's **internal flash** queue before upload and re
 
 For HTTPS uploads, the firmware sets its clock from GPS time or network time before verifying the server certificate. If neither time source is available, events remain queued until a valid time is obtained.
 
-The bump/roughness thresholds are prototype values in `src/main.cpp`. Bicycle mounting, tire pressure, speed, and GPS reception all affect results. Validate against known locations before treating map points as road conditions. Real-device GPS, Wi-Fi, and ride testing are still required.
+The bump/roughness thresholds are prototype values in `src/main.cpp`. Data collection on the physical CoreS3 has been confirmed. Bicycle mounting, tire pressure, speed, and GPS reception all affect results. Detection accuracy and on-road behavior have not yet been validated; check against known locations before treating map points as road conditions.

@@ -32,18 +32,18 @@ def test_restriction_ignores_other_vehicle_classes(tmp_path):
 
 
 def test_composite_status_and_hits_preserve_source_identity(tmp_path):
-    source = tmp_path / "mlit.geojson"
+    source = tmp_path / "jartic.geojson"
     source.write_text(
-        """{"type":"FeatureCollection","metadata":{"authority":"MLIT","source_kind":"temporary_disruption","retrieved_at":"2026-10-24T00:00:00+00:00"},"features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[136.0,35.0]},"properties":{"id":"mlit-1","source":"MLIT road disaster information","enforcement":"block","vehicle_classes":["ordinary_bicycle"]}}]}"""
+        """{"type":"FeatureCollection","metadata":{"authority":"JARTIC","source_kind":"traffic_regulation","retrieved_at":"2026-10-24T00:00:00+00:00"},"features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[136.0,35.0]},"properties":{"id":"jartic-1","source":"JARTIC traffic regulation","enforcement":"block","vehicle_classes":["ordinary_bicycle"]}}]}"""
     )
-    provider = CompositeRestrictionProvider.from_paths({"mlit": source, "jartic": None})
+    provider = CompositeRestrictionProvider.from_paths({"jartic": source})
     route = {"features": [{"geometry": {"type": "LineString", "coordinates": [[135.9, 35.0], [136.1, 35.0]]}}]}
 
     hits = provider.active_hits(route, "ordinary_bicycle", datetime(2026, 10, 24, 9, 0))
 
-    assert hits[0].source_id == "mlit"
-    assert hits[0].authority == "MLIT"
-    assert provider.status()["sources"]["mlit"]["feature_count"] == 1
+    assert hits[0].source_id == "jartic"
+    assert hits[0].authority == "JARTIC"
+    assert provider.status()["sources"]["jartic"]["feature_count"] == 1
 
 
 def test_features_in_bbox_checks_geometry_not_only_feature_envelope(tmp_path):

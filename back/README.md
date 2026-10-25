@@ -13,7 +13,7 @@ The setup script validates the protected Docker-compatible environment, verifies
 
 Run `./scripts/setup.sh` when recovering a laptop or after changing the dependency location. Run `./scripts/launch.sh` whenever you want the local service; it calls setup first, builds only when its fingerprint detects missing or changed inputs, and then starts the containers.
 
-To inspect or update external data, see [external-data.md](docs/external-data.md).
+For configuration and operating steps, see [environment.md](docs/environment.md). For data sources and routing roles, see [external-data.md](docs/external-data.md).
 
 Request a route:
 
@@ -52,18 +52,16 @@ Inside Compose, the backend refers to BRouter as `http://brouter:17777`. BRouter
 
 The catalog and `.brf` file have different roles. The catalog's `bike_types` entries are the user-facing mobility profiles (`city`, `electric_assist`, `road`, `gravel`, and `mamachari`). Their `brouter_profile` field selects the BRouter implementation. All currently use the parameterized `brouter_extension/profiles/japan_bicycle.brf`; their physical differences are supplied as request parameters from each catalog entry. Add a separate `.brf` file only when the routing logic itself differs, rather than copying the file for every bicycle type.
 
-The JARTIC and MLIT restriction providers are loaded from their normalized
-GeoJSON files when those files exist. Traffic volume and NPA accident snapshots
+The JARTIC restriction provider is loaded from its normalized
+GeoJSON file when it exists. Traffic volume and NPA accident snapshots
 are separate route-context providers. Restrictions can discard a candidate
 only when an imported record is an explicit hard block; traffic can rank
 alternatives only with adequate coverage; accident history and database-backed
 observations are returned as context and do not alter routing. When restrictions
 or traffic are enabled, the backend asks BRouter for up to three alternatives.
 
-[restriction-sources.md](docs/restriction-sources.md) records the governmental source choices, their routing roles, and the next safe JARTIC mappers.
+[external-data.md](docs/external-data.md) records the governmental source choices, their routing roles, refresh procedures, and the next safe JARTIC mappers.
 
 [database-schema.md](docs/database-schema.md) describes the PostgreSQL/PostGIS schema, Google sign-in and Google SMTP magic-link fallback, and the boundary between database data and local external-data snapshots.
 
 [api.md](docs/api.md) is the backend API contract. The frontend is in the sibling `../frontend/` directory.
-
-[validation.md](docs/validation.md) records the final backend audit and remaining deployment checks.

@@ -63,7 +63,6 @@ Keep these outside PostgreSQL:
 | Source | Local path | Database use |
 | --- | --- | --- |
 | JARTIC regulation overlay | `data/normalized/restrictions/jartic.geojson` | Route restriction provider reads snapshot |
-| MLIT disruption overlay | `data/normalized/restrictions/mlit.geojson` | Route restriction provider reads snapshot |
 | NPA accident history | `data/normalized/context/npa_accidents.geojson` | Route-context aggregate provider reads snapshot |
 | MLIT/JARTIC traffic cache | `data/normalized/context/traffic_volume.geojson` | Traffic provider scores candidates when coverage is sufficient |
 

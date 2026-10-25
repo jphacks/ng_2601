@@ -1,4 +1,6 @@
-# Environment Setup
+# Environment setup
+
+For the backend's API and data sources, see [api.md](api.md) and [external-data.md](external-data.md).
 Set the directory as follows:
 ```txt
 .
@@ -53,27 +55,40 @@ curl --fail http://localhost:8080/health # for confirmation
 
 ### Authentication configuration
 
-The backend reads secrets from `backend/.env` through Compose's `env_file`. `setup.sh` creates that file from the checked-in `backend/.env.example` when it is missing. Replace its development placeholders before exposing the service, and do not commit `backend/.env`.
+From `back/`, copy the example and edit the local file:
 
-For email sign-in with SMTP AUTH, set `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_SECURITY=auto`, `SMTP_AUTH_MODE=required`, the complete Google account in `SMTP_USERNAME`, its app-password in `SMTP_PASSWORD`, and the approved visible `SMTP_SENDER`. `auto` uses STARTTLS on port 587 and implicit TLS on port 465; if a 587 server does not advertise STARTTLS, the test/client retries port 465. It never falls back to plaintext. The sender must be an address or alias that the authenticated account is allowed to use.
+```sh
+cp backend/.env.example backend/.env
+```
 
-Google Workspace's separate `smtp-relay.gmail.com` service may be configured for source-IP authentication. In that mode the server intentionally does not advertise SMTP AUTH, so a username and app-password cannot work. After the Workspace administrator has allowlisted the deployment's source IP and approved the sender, set `SMTP_AUTH_MODE=auto` (or `none`) and keep TLS enabled; the client will send without a `LOGIN` command only when the relay omits AUTH. Do not use this mode with an arbitrary SMTP host.
+`setup.sh` also copies the example when `.env` is absent. Keep `.env` out of Git. Set `SESSION_SECRET` to at least 32 random characters before starting. Add credentials only for the features you use:
 
-If Google closes the connection at `EHLO` with a `421` response, inspect the complete SMTP response and the deployment IP reputation or relay allowlist. Set `SMTP_HELO_NAME` to the laptop's public fully qualified hostname when the default local hostname is not accepted. A `421` response is a temporary server or policy rejection; it is not evidence that SMTP AUTH is unavailable, so the client will not send a message after a failed `EHLO`.
+| Feature | Add to `backend/.env` |
+| --- | --- |
+| Google sign-in | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and the exact registered `GOOGLE_CALLBACK_URL`; set `FRONTEND_ORIGIN` to the browser's origin. |
+| Email magic links | `SMTP_USERNAME` (full account), `SMTP_PASSWORD` (app password), and an approved `SMTP_SENDER`. The example's Gmail host, port 587, TLS, and required authentication are defaults; change them for your provider. |
+| Workspace IP-authorized SMTP relay | Set the approved relay host and sender, TLS, and `SMTP_AUTH_MODE=auto` or `none` only after its source IP is allowlisted. |
+| Moderation API | Set a long random `MODERATOR_API_TOKEN`. |
+| CoreS3 uploads | Set a separate long random `DEVICE_INGEST_TOKEN`. |
 
-Google sign-in can remain on dummy values for local development. Before enabling it, set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and the exact registered `GOOGLE_CALLBACK_URL`. Set `FRONTEND_ORIGIN` to the browser origin that receives the sign-in response. Use long random values for `SESSION_SECRET` and `MODERATOR_API_TOKEN` before exposing the laptop through Cloudflare Tunnel.
+`SMTP_TEST_RECEIVER` is used only by the manual provider check; magic links go to the requesting user. See [.env.example](../backend/.env.example) for all available keys and defaults.
 
-To exercise the providers from the host, run `python3 scripts/auth/check_auth_providers.py`. With real Google credentials, it prints the authorization URL, lets the operator complete the interactive login, and replays the callback using the script's state cookie. If OAuth is unavailable or fails, it sends one labelled relay test message to `SMTP_TEST_RECEIVER`. The receiver is only a test destination; normal magic-link requests always send to the email address supplied by the caller. Use `--smtp-only` to test SMTP without opening Google, or `--open-browser` to launch the authorization URL automatically.
-
-The moderator token is checked only by the backend moderation endpoint; it is not stored in PostgreSQL or sent to the frontend.
-
-
-## Tests
+## Tests / Checks
 ```bash
 cd backend
 uv run --python 3.12 --dev pytest tests -q
 ```
-These are safe automated unit tests and do not contact Google or send email. The manual provider smoke test is separate: run `python3 scripts/auth/check_auth_providers.py` from `back` when you intentionally want to open OAuth or send one message to `SMTP_TEST_RECEIVER`. `uv` is only needed for development tests since the runtime backend dependencies are installed inside the Docker image.
+Run this from `back/` to check configured authentication providers manually:
+
+```sh
+python3 scripts/auth/check_auth_providers.py
+```
+
+The script opens a Google authorization flow when credentials are configured. If OAuth is unavailable or fails, it sends one labelled email to `SMTP_TEST_RECEIVER`; use `--smtp-only` to check only email. Set the receiver before that check. Automated tests do not contact Google or send email. `uv` is needed for development tests; Docker installs runtime dependencies in its image.
+
+For repeatable integration checks, start `db` and `brouter`, build the backend image, then run `./scripts/db/check_integration.sh` from `back/`. It creates and drops a disposable `cyclerhub_audit_*` database and does not bind a host port. SMTP delivery and Google's remote exchange are intercepted in that harness; use the separate provider smoke test for live email or authorization.
+
+Run `./scripts/db/migrate.sh` when upgrading an existing database volume. Compose initialization runs only when a new volume is created.
 
 ## Tunnel
 
@@ -101,32 +116,3 @@ rm -rf backend/.venv backend/.pytest_cache
 
 find backend scripts -type d -name __pycache__ -prune -exec rm -rf {} +
 ```
-
-## Verified local deployment notes (2026-10-25)
-
-The local SMTP test succeeded using `SMTP_PORT=465`, `SMTP_SECURITY=ssl`, and
-`SMTP_AUTH_MODE=required`, with certificate/hostname verification. Port 587
-timed out on this environment. These are deployment settings: the example
-retains the standard STARTTLS/auto defaults; use 465/ssl when 587 is blocked.
-Google OAuth still has dummy credentials and cannot complete a real login.
-`DEVICE_INGEST_TOKEN` is optional and currently blank; device uploads return
-503 until it is configured, even though the surface map layer is readable.
-
-`docker compose up` currently cannot bind host port 8080 because another local
-service owns it. Stop the conflicting service yourself or choose a different
-host port in a local Compose override; update the frontend API URL and Google
-registered callback together. The integration harness does not bind a host port.
-
-Run `./scripts/db/migrate.sh` when upgrading an existing volume. Compose's
-initialization directory only runs on a new database volume. The migration
-runner handles 002–004 and records versions in `schema_migrations`; a fresh
-Compose initialization also creates all tables before the runner is needed.
-
-For repeatable integration checks, start `db` and `brouter`, build the backend
-image, then run `./scripts/db/check_integration.sh` from `back/`. It creates a
-disposable `cyclerhub_audit_*` database, applies all migrations, runs the manual
-API harness using the mounted current application code, and drops that database
-on exit. It never binds a host port. The harness intercepts SMTP delivery and
-Google's remote exchange; use the separate provider smoke test for real email
-or Google authorization. It also uses generated test session/moderator/device
-tokens, so tests do not alter the deployed credentials.

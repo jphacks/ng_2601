@@ -42,7 +42,6 @@ moderator_tokens = ModeratorTokenVerifier(os.getenv("MODERATOR_API_TOKEN", ""))
 restriction_provider = CompositeRestrictionProvider.from_paths(
     {
         "jartic": os.getenv("JARTIC_RESTRICTIONS_PATH", os.getenv("RESTRICTIONS_PATH")),
-        "mlit": os.getenv("MLIT_RESTRICTIONS_PATH"),
     }
 )
 accident_provider = AccidentHistoryProvider(os.getenv("NPA_ACCIDENTS_PATH"), "npa_accident_history")
