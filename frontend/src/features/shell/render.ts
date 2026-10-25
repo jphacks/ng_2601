@@ -3,12 +3,13 @@ import { el } from "../../ui/dom";
 import { icon, type IconName } from "../../ui/icon";
 import { renderState } from "../../ui/state";
 import { api } from "../../api";
+import { createHazardsFeature, type HazardsFeature } from "../hazards/hazardsFeature";
 import { renderLayerPanel } from "../map/layerPanel";
 import { mountMap, type MapController } from "../map/map";
 import { ATTRIBUTION } from "../map/style";
 import { formatPoint, renderPickBanner, renderRouteView } from "../route/renderRoute";
 import { createRouteStore } from "../route/routeState";
-import { mockHazards, mockReviewLocations, mockReviews } from "../../mocks/data";
+import { mockReviewLocations, mockReviews } from "../../mocks/data";
 import type { Route } from "../../types/api";
 
 type ViewId = "route" | "settings" | "hazards" | "reviews" | "layers" | "help" | "about";
@@ -56,16 +57,29 @@ export function renderShell(root: HTMLElement): void {
   const map = el("div", { className: "map" });
   map.setAttribute("role", "region");
   map.setAttribute("aria-label", "地図エリア");
+  // 道路・危険情報は FE-09 で実APIクライアント（モック切替可）に接続済み。詳細カードは地図クリックで開く。
+  let hazards: HazardsFeature | undefined;
   // 地点指定モード中の地図タップだけを出発地／目的地として使う。
-  const mapController: MapController = mountMap(map, { onPick: (lngLat) => routeStore.pick(lngLat) });
-  // 危険情報・口コミのAPI接続（#11/#12）までは、モックを重ねて表示を確認できるようにする。
-  mapController.setHazards(mockHazards);
+  const mapController: MapController = mountMap(map, {
+    onPick: (lngLat) => routeStore.pick(lngLat),
+    onSelectRoadInfo: (id) => hazards?.select(id, "map"),
+  });
+  // 口コミのAPI接続（#12）までは、モックを重ねて表示を確認できるようにする。
   mapController.setReviews(
     mockReviews.flatMap((review) => {
       const lngLat = mockReviewLocations[review.id];
       return lngLat ? [{ review, lngLat }] : [];
     }),
   );
+  hazards = createHazardsFeature({
+    map: mapController,
+    client: api,
+    mock: import.meta.env.VITE_API_MODE !== "http",
+    // スマホでは一覧パネルが詳細カードを覆うため、一覧から選んだら閉じて地図と詳細を見せる。
+    onSelect: (fromList) => {
+      if (fromList && window.matchMedia("(max-width: 767px)").matches) closeSearch(false);
+    },
+  });
   const attributionLink = el("a", { text: ATTRIBUTION.label });
   attributionLink.href = ATTRIBUTION.url;
   attributionLink.target = "_blank";
@@ -207,6 +221,8 @@ export function renderShell(root: HTMLElement): void {
     } else if (view === "layers") {
       layerPanel ??= renderLayerPanel(mapController);
       viewBody.replaceChildren(layerPanel);
+    } else if (view === "hazards") {
+      viewBody.replaceChildren(hazards!.panel);
     } else {
       viewBody.replaceChildren(renderState({ kind: "empty", message }));
     }
@@ -307,6 +323,7 @@ export function renderShell(root: HTMLElement): void {
       if (menuOpen) setMenu(false);
       else if (routeStore.getState().pickMode) routeStore.cancelPick();
       else if (searchOpen) closeSearch(false);
+      else hazards?.closeDetail();
       return;
     }
     if (e.key === "Tab" && menuOpen) {
@@ -329,5 +346,5 @@ export function renderShell(root: HTMLElement): void {
   syncViewport();
   renderView();
 
-  root.replaceChildren(map, attribution, menuButton, controls, renderPickBanner(routeStore), card, scrim, drawer);
+  root.replaceChildren(map, attribution, hazards.card, menuButton, controls, renderPickBanner(routeStore), card, scrim, drawer);
 }

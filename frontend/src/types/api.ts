@@ -1,3 +1,5 @@
+import type { FeatureCollection, Geometry, Point } from "geojson";
+
 // 暫定API型。バックエンドのAPI確定後にここを差し替える（各型に @provisional を付与）。
 
 /** [経度, 緯度] (GeoJSON順) */
@@ -82,4 +84,97 @@ export interface ApiErrorBody {
   code: string;
   message: string;
   details?: unknown;
+}
+
+/** [minLon, minLat, maxLon, maxLat] */
+export type BBox = [minLon: number, minLat: number, maxLon: number, maxLat: number];
+
+// --- GET /v1/map-data（BE担当共有のスニペット。リポジトリ未取り込みのため全て @provisional） ---------
+// キー欠落（undefined）は「欠測」、null は「提供元が不明と明示」として区別して扱う。
+
+/** @provisional 提供元ごとの状態。enabled=false はデータ提供なし（0件＝安全ではない）。 */
+export interface SourceStatus {
+  enabled: boolean;
+  feature_count?: number;
+  source_id?: string;
+  metadata?: {
+    retrieved_at?: string | null;
+    generated_at?: string | null;
+    window?: unknown;
+    coverage?: string | null;
+    source?: string;
+    authority?: string;
+    [key: string]: unknown;
+  };
+  /** restrictions のみ。提供元（jartic / mlit 等）ごとの状態。 */
+  sources?: Record<string, SourceStatus>;
+}
+
+/** @provisional back/backend/app/restrictions.py が読むキー。全て欠落し得る。 */
+export interface RestrictionProps {
+  id?: string;
+  name?: string | null;
+  source?: string | null;
+  enforcement?: string | null;
+  authority?: string | null;
+  source_kind?: string | null;
+  observed_at?: string | null;
+  retrieved_at?: string | null;
+  confidence?: string | null;
+  vehicle_classes?: string[];
+  /** 0=月 … 6=日 (Python weekday) */
+  days?: number[];
+  /** "HH:MM" */
+  start_time?: string | null;
+  end_time?: string | null;
+}
+
+/** @provisional */
+export interface AccidentProps {
+  bicycle_involved?: boolean;
+  fatal_or_serious?: boolean;
+  [key: string]: unknown;
+}
+
+/** @provisional */
+export interface TrafficProps {
+  vehicle_count?: number;
+  [key: string]: unknown;
+}
+
+export type ObservationTemporalKind = "permanent" | "time_of_day" | "date_range" | "temporary" | "trend";
+export type ObservationStatus = "active" | "resolved" | "withdrawn" | "expired";
+export type ObservationVerification = "unverified" | "corroborated" | "moderated";
+
+/**
+ * @provisional `_observation_features` の実装は未確認。observations テーブル
+ * (back/docs/database-schema.mmd) の列名と同名と仮定している。実レスポンス確認後に差し替える。
+ */
+export interface ObservationProps {
+  id: string;
+  /** 値の一覧は未確認。未知の値は「その他」として扱う。 */
+  category?: string | null;
+  temporal_kind?: ObservationTemporalKind | null;
+  observed_at?: string | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  expires_at?: string | null;
+  status?: ObservationStatus | null;
+  verification_state?: ObservationVerification | null;
+  description?: string | null;
+  updated_at?: string | null;
+}
+
+type Collection<G extends Geometry, P> = FeatureCollection<G, P>;
+
+/** @provisional */
+export interface MapDataResponse {
+  restrictions: Collection<Geometry, RestrictionProps> & { source_status: SourceStatus };
+  route_context: {
+    accidents: Collection<Geometry, AccidentProps> & { source_status: SourceStatus };
+    traffic: Collection<Geometry, TrafficProps> & { source_status: SourceStatus };
+  };
+  observations: Collection<Point, ObservationProps> & {
+    source: { source_id: string; authority: string; routing_effect: string };
+  };
 }

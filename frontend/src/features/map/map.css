@@ -59,3 +59,11 @@
 .legend__swatch--dot { width: 14px; height: 14px; border-radius: 50%; }
 .legend__swatch--hazard { background: var(--color-warning); }
 .legend__swatch--review { background: var(--color-primary); }
+.legend__item--sub { margin-left: var(--space-4); }
+.legend__swatch--cat-danger { background: var(--color-category-danger); }
+.legend__swatch--cat-convenience { background: var(--color-category-convenience); }
+.legend__swatch--cat-terrain { background: var(--color-category-terrain); }
+.legend__swatch--cat-facility { background: var(--color-category-facility); }
+.legend__swatch--line-dashed, .legend__swatch--line-dotted { width: 24px; height: 0; border-top: 4px var(--color-text-muted); }
+.legend__swatch--line-dashed { border-top-style: dashed; }
+.legend__swatch--line-dotted { border-top-style: dotted; }
