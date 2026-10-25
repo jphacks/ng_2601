@@ -17,6 +17,7 @@ from starlette.concurrency import run_in_threadpool
 from .auth import AuthService, ModeratorTokenVerifier, build_auth_router
 from .catalog import CatalogError, RoutingCatalog
 from .context import NoUserPreferenceStore, PostgresUserPreferenceStore
+from .device_events import build_device_router, surface_features_in_bbox
 from .route_context import AccidentHistoryProvider, TrafficProvider
 from .restrictions import CompositeRestrictionProvider
 
@@ -54,6 +55,7 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 app.include_router(build_auth_router(auth_service))
+app.include_router(build_device_router(DATABASE_URL, os.getenv("DEVICE_INGEST_TOKEN", "")))
 
 
 @app.on_event("startup")
@@ -659,6 +661,7 @@ def map_data(
     restriction_features = restriction_provider.features_in_bbox(bbox, evaluated_at, layer_limit)
     accident_features = accident_provider.features_in_bbox(bbox, layer_limit)
     traffic_features = traffic_provider.features_in_bbox(bbox, layer_limit)
+    surface_features, surface_truncated = surface_features_in_bbox(DATABASE_URL, bbox, limit)
     observation_features, observations_truncated = _observation_features(bbox, None, limit)
     return {
         "restrictions": {
@@ -679,6 +682,17 @@ def map_data(
                 "features": traffic_features[:limit],
                 "truncated": len(traffic_features) > limit,
                 "source_status": traffic_provider.status(),
+            },
+            "surface": {
+                "type": "FeatureCollection",
+                "features": surface_features,
+                "truncated": surface_truncated,
+                "source_status": {
+                    "enabled": bool(DATABASE_URL),
+                    "source_id": "cores3_surface_v1",
+                    "authority": "device_measurement",
+                    "experimental": True,
+                },
             },
         },
         "observations": {

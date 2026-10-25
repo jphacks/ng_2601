@@ -1,5 +1,5 @@
 import type { Feature, Geometry } from "geojson";
-import type { MapDataResponse, ObservationProps, RestrictionProps, SourceStatus } from "../../types/api";
+import type { MapDataResponse, ObservationProps, RestrictionProps, SourceStatus, SurfaceProps } from "../../types/api";
 import { classifyObservation, ORIGIN_DEFAULTS, ORIGIN_LABEL } from "./catalog";
 import { representativePoint } from "./geometry";
 import type { ItemStatus, Origin, RoadInfoItem, SourceAvailability, Stamp, Temporality, Verification } from "./types";
@@ -175,6 +175,33 @@ function normalizeObservation(
   };
 }
 
+function normalizeSurface(feature: Feature<Geometry, SurfaceProps>, makeId: IdMaker): RoadInfoItem | null {
+  const geometry = feature.geometry;
+  const position = geometry && representativePoint(geometry);
+  if (!geometry || !position) return null;
+  const p = feature.properties ?? {};
+  const bump = p.kind === "bump";
+  return {
+    id: makeId("surface", text(p.id), geometry),
+    origin: "surface",
+    infoClass: "measurement",
+    category: bump ? "danger" : "terrain",
+    kindLabel: bump ? "段差候補" : "路面の振動候補",
+    title: bump ? "振動を検出した地点" : "路面の振動が続いた地点",
+    description: typeof p.peak_delta_g === "number" ? `最大変動: ${p.peak_delta_g.toFixed(2)} G` : undefined,
+    geometry,
+    position,
+    temporality: "permanent",
+    updatedAt: stampOf(p.observed_at),
+    retrievedAt: { state: "missing" },
+    startsAt: { state: "missing" },
+    expiresAt: { state: "missing" },
+    source: { name: "CoreS3 実測", authority: "device_measurement", kind: "sensor" },
+    verification: "unverified",
+    notes: ["センサーによる試験的な推定です。段差や路面状態の確認済み情報ではありません。"],
+  };
+}
+
 export interface NormalizedMapData {
   items: RoadInfoItem[];
   sources: SourceAvailability[];
@@ -213,11 +240,13 @@ export function normalizeMapData(data: MapDataResponse): NormalizedMapData {
 
   const accidents = data.route_context?.accidents;
   const traffic = data.route_context?.traffic;
+  const surface = data.route_context?.surface;
   const observations = data.observations;
 
   for (const f of data.restrictions?.features ?? []) push(normalizeRestriction(f, makeId));
   for (const f of accidents?.features ?? []) push(normalizeStatistics("accident", f, accidents.source_status, makeId));
   for (const f of traffic?.features ?? []) push(normalizeStatistics("traffic", f, traffic.source_status, makeId));
+  for (const f of surface?.features ?? []) push(normalizeSurface(f, makeId));
   const observationSource = {
     authority: observations?.source?.authority ?? "community",
   };
@@ -229,6 +258,7 @@ export function normalizeMapData(data: MapDataResponse): NormalizedMapData {
   }
   if (accidents?.source_status) sources.push(...sourceRows("accident", ORIGIN_LABEL.accident, accidents.source_status));
   if (traffic?.source_status) sources.push(...sourceRows("traffic", ORIGIN_LABEL.traffic, traffic.source_status));
+  if (surface?.source_status) sources.push(...sourceRows("surface", ORIGIN_LABEL.surface, surface.source_status));
   if (observations) {
     sources.push({
       key: "observation",

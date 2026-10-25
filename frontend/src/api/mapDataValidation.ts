@@ -33,5 +33,9 @@ export function assertMapData(data: unknown): MapDataResponse {
       throw invalid(`道路情報の応答が不正です（${key} の source_status.sources に不正な提供元があります）。`);
     }
   }
+  if (data.route_context.surface !== undefined) {
+    const surface = requireCollection(data.route_context.surface, "route_context.surface");
+    if (!isObject(surface.source_status)) throw invalid("道路情報の応答が不正です（surface に source_status がありません）。");
+  }
   return data as unknown as MapDataResponse;
 }
