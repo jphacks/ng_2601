@@ -3,11 +3,12 @@ import { createMapDataLoader, type MapDataLoader, type MapDataState } from "../.
 import { el } from "../../ui/dom";
 import { icon } from "../../ui/icon";
 import type { MapController } from "../map/map";
+import { CATEGORY_DEFS } from "./catalog";
 import { renderDetailContent } from "./detailCard";
 import { applyFilter, countByCategory, createDefaultFilter } from "./filter";
 import { normalizeMapData, type NormalizedMapData } from "./normalize";
 import { renderHazardPanel } from "./panel";
-import type { RoadInfoItem } from "./types";
+import type { RoadCategory, RoadInfoItem } from "./types";
 
 /** observations の最大取得件数（BEの上限は500、既定200）。 */
 const LIMIT = 200;
@@ -28,6 +29,8 @@ export interface HazardsFeature {
   panel: HTMLElement;
   /** 地図上の詳細カード。シェルが地図の上に配置する。 */
   card: HTMLElement;
+  /** 地図の上に常に出すカテゴリのチェック。「道路情報」タブのカテゴリと同じフィルタを操作する。 */
+  mapFilter: HTMLElement;
   select(id: string | null, source?: "map" | "list"): void;
   /** 詳細カードを閉じる。開いていたら true。 */
   closeDetail(): boolean;
@@ -64,6 +67,33 @@ export function createHazardsFeature({ map, client, mock, onSelect }: HazardsFea
     onShowLayer: () => map.setLayerVisible("hazards", true),
   });
 
+  // --- map filter chips ----------------------------------------------------
+  const chipInputs = new Map<RoadCategory, HTMLInputElement>();
+  const mapFilter = el("div", { className: "hazard-chips" });
+  mapFilter.setAttribute("role", "group");
+  mapFilter.setAttribute("aria-label", "地図に表示する道路情報");
+  for (const def of CATEGORY_DEFS) {
+    const input = el("input");
+    input.type = "checkbox";
+    input.addEventListener("change", () => {
+      if (input.checked) filter.categories.add(def.id);
+      else filter.categories.delete(def.id);
+      // レイヤーがOFFだとチェックしても地図に出ないので、選んだらONにする。
+      if (input.checked && !map.isLayerVisible("hazards")) map.setLayerVisible("hazards", true);
+      else refresh();
+    });
+    chipInputs.set(def.id, input);
+    const swatch = el("span", { className: `hazard-swatch hazard-swatch--${def.id}` });
+    swatch.setAttribute("aria-hidden", "true");
+    mapFilter.append(el("label", { className: "hazard-chip" }, [input, swatch, el("span", { text: def.label })]));
+  }
+
+  function syncChips(): void {
+    const layerOn = map.isLayerVisible("hazards");
+    mapFilter.classList.toggle("is-layer-off", !layerOn);
+    for (const [id, input] of chipInputs) input.checked = layerOn && filter.categories.has(id);
+  }
+
   function renderCard(visible: readonly RoadInfoItem[], now: Date): void {
     const item = selectedId ? visible.find((i) => i.id === selectedId) : undefined;
     card.hidden = !item;
@@ -99,6 +129,7 @@ export function createHazardsFeature({ map, client, mock, onSelect }: HazardsFea
       limit: LIMIT,
     });
     renderCard(visible, now);
+    syncChips();
   }
 
   function select(id: string | null, source: "map" | "list" = "map"): void {
@@ -139,6 +170,7 @@ export function createHazardsFeature({ map, client, mock, onSelect }: HazardsFea
   return {
     panel: panel.element,
     card,
+    mapFilter,
     select,
     getVisibleItems: () => map.isLayerVisible("hazards") ? applyFilter(normalized.items, filter, new Date()) : [],
     closeDetail() {

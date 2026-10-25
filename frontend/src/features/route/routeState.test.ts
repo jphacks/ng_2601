@@ -98,3 +98,26 @@ describe("route and elevation lifecycle", () => {
     expect(store.getState().validationError).toBe(error);
   });
 });
+
+describe("origin defaults", () => {
+  const store = () => createRouteStore({ searchRoute: vi.fn(async () => mockRoutes[0]) } as unknown as ApiClient);
+  it("picking only a destination ends picking and leaves the origin to the caller", () => {
+    const s = store();
+    s.startPick("destination"); s.pick([139.77, 35.69]);
+    expect(s.getState()).toMatchObject({ destination: [139.77, 35.69], origin: null, pickMode: null });
+  });
+  it("records whether the origin is the current location", () => {
+    const s = store();
+    s.setPoint("origin", [139.76, 35.68], "current");
+    expect(s.getState().originSource).toBe("current");
+    s.startPick("origin"); s.pick([139.75, 35.67]);
+    expect(s.getState()).toMatchObject({ originSource: "map", pickMode: "destination" });
+    s.clearPoint("origin");
+    expect(s.getState().originSource).toBeNull();
+  });
+  it("asks for the destination first when nothing is set", async () => {
+    const s = store();
+    await s.search();
+    expect(s.getState().validationError).toContain("目的地");
+  });
+});

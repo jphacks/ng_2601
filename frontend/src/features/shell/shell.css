@@ -215,6 +215,20 @@ button { cursor: pointer; }
   border-radius: var(--radius-row);
   box-shadow: none;
 }
+/* 出発地（既定は現在地）と目的地。経路ビューの上部にだけ出す。 */
+.points { flex: none; display: grid; gap: var(--space-2); }
+.row__label { flex: none; font-size: 13px; font-weight: 600; color: var(--color-primary); }
+.row__action {
+  flex: none;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-bar);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-size: 13px;
+}
+.row__action:hover { background: var(--color-hover); }
 
 .tabs {
   flex: none;

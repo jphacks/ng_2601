@@ -10,6 +10,7 @@ import { renderPreferences } from "../preferences/renderPreferences";
 import {
   isStale,
   type AppliedSearch,
+  type OriginSource,
   type PickMode,
   type RouteSearchState,
   type RouteStore,
@@ -26,6 +27,11 @@ const POINT_LABEL: Record<PickMode, string> = { origin: "出発地", destination
 
 export function formatPoint(p: LngLat | null, empty = "未指定"): string {
   return p ? `緯度 ${p[1].toFixed(5)} / 経度 ${p[0].toFixed(5)}` : empty;
+}
+
+/** 出発地の表示。現在地から決めたときは座標ではなく「現在地」と出す。 */
+export function formatOrigin(p: LngLat | null, source: OriginSource | null, empty = "未指定"): string {
+  return p && source === "current" ? "現在地" : formatPoint(p, empty);
 }
 
 function textButton(label: string, className = "route__button"): HTMLButtonElement {
@@ -83,36 +89,7 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore, link
   });
 
   // --- conditions pane (built once; values are synced in place so focus is kept) ---
-  const pointViews = new Map<PickMode, { value: HTMLElement; pick: HTMLButtonElement; clear: HTMLButtonElement }>();
-  const pointRows: HTMLElement[] = [];
-  for (const mode of ["origin", "destination"] as const) {
-    const label = POINT_LABEL[mode];
-    const value = el("span", { className: "route__point-value" });
-    const pick = textButton("地図で指定");
-    pick.setAttribute("aria-label", `${label}を地図で指定`);
-    pick.addEventListener("click", () => store.startPick(mode));
-    const clear = textButton("クリア");
-    clear.setAttribute("aria-label", `${label}をクリア`);
-    clear.addEventListener("click", () => store.clearPoint(mode));
-    pointViews.set(mode, { value, pick, clear });
-    pointRows.push(
-      el("div", { className: "route__point" }, [
-        el("span", { className: "route__point-label", text: label }),
-        value,
-        el("span", { className: "route__actions" }, [pick, clear]),
-      ]),
-    );
-  }
-  const swap = textButton("出発地と目的地を入れ替え");
-  swap.addEventListener("click", () => store.swap());
-  const initialPoints = store.getState();
-  let pointsWereComplete = initialPoints.origin !== null && initialPoints.destination !== null;
-  const pointDetails = el("details", { className: "route__points" }, [
-    el("summary", { text: "出発地・目的地" }),
-    el("div", { className: "route__point-editor" }, [...pointRows, swap]),
-  ]);
-  pointDetails.open = !pointsWereComplete;
-
+  // 出発地・目的地は検索カード上部と地図で決める。ここには車種と走り方の条件だけを置く。
   const submit = textButton("経路を検索", "route__submit");
   submit.addEventListener("click", () => void store.search());
   const validation = el("p", { className: "route__validation" });
@@ -122,7 +99,6 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore, link
   // 車種・坂道許容度・詳細パラメータ(#10)。縦に長くなるので、検索ボタンはパネル下部に固定して常に押せるようにする。
   const submitBar = el("div", { className: "route__submit-bar" }, [validation, submit]);
   const conditionsPane = el("div", { className: "route__pane route__pane--conditions" }, [
-    pointDetails,
     renderPreferences(store, prefs),
     submitBar,
   ]);
@@ -151,7 +127,7 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore, link
 
   function appliedList(applied: AppliedSearch): HTMLElement {
     const rows: Array<[string, string]> = [
-      ["出発地", formatPoint(applied.origin)],
+      ["出発地", formatOrigin(applied.origin, applied.originSource)],
       ["目的地", formatPoint(applied.destination)],
       ["車種", bikeTypeLabel(applied.bikeType)],
       ["坂道許容度", modeLabel("hillMode", applied.hillMode)],
@@ -170,12 +146,12 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore, link
 
   function endpoints(applied: AppliedSearch): HTMLElement {
     const rows = ([
-      ["出発地", applied.origin],
-      ["目的地", applied.destination],
-    ] as const).map(([label, point]) =>
+      ["出発地", formatOrigin(applied.origin, applied.originSource)],
+      ["目的地", formatPoint(applied.destination)],
+    ] as const).map(([label, value]) =>
       el("div", { className: "route__endpoint" }, [
         el("span", { className: "route__endpoint-label", text: label }),
-        el("span", { className: "route__endpoint-value", text: formatPoint(point) }),
+        el("span", { className: "route__endpoint-value", text: value }),
       ]),
     );
     const section = el("section", { className: "route__endpoints" }, rows);
@@ -189,7 +165,7 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore, link
     const { status } = state;
     if (status.kind === "idle") {
       resultPane.replaceChildren(
-        renderState({ kind: "empty", message: "出発地と目的地を指定して検索すると、ルートがここに表示されます。" }),
+        renderState({ kind: "empty", message: "地図をタップして「ここを目的地にする」を選ぶと、現在地からのルートがここに表示されます。" }),
       );
       return;
     }
@@ -239,17 +215,6 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore, link
 
   function syncConditions(state: RouteSearchState): void {
     const loading = state.status.kind === "loading";
-    const pointsComplete = state.origin !== null && state.destination !== null;
-    if (!pointsComplete) pointDetails.open = true;
-    else if (!pointsWereComplete) pointDetails.open = false;
-    pointsWereComplete = pointsComplete;
-    for (const [mode, v] of pointViews) {
-      const p = state[mode];
-      v.value.textContent = formatPoint(p);
-      v.pick.disabled = loading;
-      v.clear.disabled = loading || p === null;
-    }
-    swap.disabled = loading || (!state.origin && !state.destination);
     validation.textContent = state.validationError ?? "";
     validation.hidden = state.validationError === null;
     submit.textContent = state.status.kind === "idle" ? "経路を検索" : "この条件で再検索";

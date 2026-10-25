@@ -143,6 +143,68 @@
 }
 .reviews-status .state { padding: var(--space-2) var(--space-3); }
 
+/* 地点シート先頭の経路導線。 */
+.review-route-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.review-route-actions__primary, .review-route-actions__secondary {
+  min-height: var(--button-size);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-bar);
+  font-weight: 600;
+}
+.review-route-actions__primary {
+  flex: 1 1 auto;
+  border: 0;
+  background: var(--color-primary);
+  color: var(--color-surface);
+}
+.review-route-actions__primary:hover { background: color-mix(in srgb, var(--color-primary) 88%, var(--color-text)); }
+.review-route-actions__secondary {
+  border: 1px solid var(--color-primary);
+  background: var(--color-surface);
+  color: var(--color-primary);
+}
+.review-route-actions__secondary:hover { background: var(--color-hover); }
+
+/* 「口コミ」タブの並び替え・絞り込み（たたんだ状態は1行）。 */
+.reviews-filter {
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+}
+.reviews-filter__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.reviews-filter__current {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reviews-filter__body { display: grid; gap: var(--space-3); padding: 0 var(--space-3) var(--space-3); }
+.reviews-filter__group { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); min-width: 0; margin: 0; padding: 0; border: 0; }
+.reviews-filter__legend { width: 100%; padding: 0; margin-bottom: var(--space-1); font-size: 13px; font-weight: 600; }
+.reviews-filter__option { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 36px; font-size: 14px; }
+.reviews-filter__keyword {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-row);
+  background: var(--color-surface);
+  font-size: 16px; /* 16px未満だとiOSがフォーカス時にズームする */
+}
+
 @media (prefers-reduced-motion: reduce) {
   .review-sheet { transition: none; }
 }

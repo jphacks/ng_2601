@@ -35,6 +35,53 @@ function segments<T extends string>(
   return { root, inputs };
 }
 
+type ModeKey = keyof PreferenceModes;
+
+/**
+ * 段階を左から順に並べたつまみ。つまみの下に各段階の名前を並べ、見出しの右に現在の値を出す。
+ * キーボードでは矢印キーで1段ずつ動かせる。
+ */
+function stepSlider(
+  key: ModeKey,
+  values: readonly string[],
+  onChange: (key: ModeKey, value: string) => void,
+): { node: HTMLElement; sync(draft: PreferenceModes, busy: boolean): void } {
+  const title = MODE_META[key].title;
+  const slider = el("input", { className: "pref__slider" });
+  slider.type = "range";
+  slider.id = `pref-${key}`;
+  slider.min = "0";
+  slider.max = String(Math.max(values.length - 1, 0));
+  slider.step = "1";
+  slider.addEventListener("input", () => {
+    const v = values[Number(slider.value)];
+    if (v) onChange(key, v);
+  });
+  const label = el("label", { className: "route__field-label", text: title });
+  label.htmlFor = slider.id;
+  const current = el("span", { className: "pref__current" });
+  const ticks = el("div", { className: "pref__ticks" });
+  ticks.style.setProperty("--steps", String(values.length));
+  ticks.setAttribute("aria-hidden", "true");
+  for (const v of values) ticks.append(el("span", { text: (MODE_META[key].labels as Record<string, string>)[v] ?? v }));
+  const node = el("div", { className: "route__field" }, [
+    el("div", { className: "pref__head" }, [label, current]),
+    slider,
+    ticks,
+  ]);
+  return {
+    node,
+    sync(draft, busy) {
+      const value = draft[key];
+      slider.value = String(Math.max(values.indexOf(value), 0));
+      slider.disabled = busy;
+      const text = modeLabel(key, value);
+      slider.setAttribute("aria-valuetext", `${title}: ${text}`);
+      current.textContent = text;
+    },
+  };
+}
+
 interface Controls {
   node: HTMLElement;
   sync(state: PreferencesState): void;
@@ -64,59 +111,20 @@ export function renderPreferences(routeStore: RouteStore, prefs: PreferencesStor
       bike.root,
     ]);
 
-    // --- 坂道許容度（BEの段階の順に並べたスライダー） ---
-    const hillValues = options.modes.hillMode;
-    const slider = el("input", { className: "pref__slider" });
-    slider.type = "range";
-    slider.id = "pref-hill-mode";
-    slider.min = "0";
-    slider.max = String(hillValues.length - 1);
-    slider.step = "1";
-    slider.addEventListener("input", () => {
-      const v = hillValues[Number(slider.value)];
-      if (v) routeStore.setDraft({ hillMode: v });
-    });
-    const hillLabel = el("label", { className: "route__field-label", text: MODE_META.hillMode.title });
-    hillLabel.htmlFor = slider.id;
-    const hillCurrent = el("span", { className: "pref__current" });
-    const hillRange = el("div", { className: "pref__range-ends" }, [
-      el("span", { text: "坂道を避ける" }),
-      el("span", { text: "坂道を許容する" }),
-    ]);
-    hillRange.setAttribute("aria-hidden", "true");
-    const hillField = el("div", { className: "route__field" }, [
-      el("div", { className: "pref__head" }, [hillLabel, hillCurrent]),
-      slider,
-      hillRange,
-    ]);
-
-    // --- 詳細パラメータ（折りたたみ） ---
-    const detailSets = new Map<(typeof DETAIL_MODE_KEYS)[number], Map<string, HTMLInputElement>>();
+    // --- 坂道許容度と詳細パラメータ（BEの段階の順に並べた段階つまみ。詳細は折りたたみ） ---
+    const setDraft = (key: ModeKey, value: string) => routeStore.setDraft({ [key]: value });
+    const hill = stepSlider("hillMode", options.modes.hillMode, setDraft);
+    const detailSliders = DETAIL_MODE_KEYS.map((key) => stepSlider(key, options.modes[key], setDraft));
+    const sliders = [hill, ...detailSliders];
     const details = el("details", { className: "pref__advanced" });
     details.append(el("summary", { className: "pref__summary", text: "詳細パラメータ" }));
-    const detailBody = el("div", { className: "pref__advanced-body" });
-    for (const key of DETAIL_MODE_KEYS) {
-      const values: readonly string[] = options.modes[key];
-      const seg = segments<string>(
-        `pref-${key}`,
-        values,
-        (v) => (MODE_META[key].labels as Record<string, string>)[v] ?? v,
-        (v) => routeStore.setDraft({ [key]: v }),
-      );
-      detailSets.set(key, seg.inputs);
-      detailBody.append(
-        el("fieldset", { className: "route__fieldset" }, [
-          el("legend", { className: "route__field-label", text: MODE_META[key].title }),
-          seg.root,
-        ]),
-      );
-    }
+    const detailBody = el("div", { className: "pref__advanced-body" }, detailSliders.map((s) => s.node));
     const reset = textButton("坂道・詳細を初期値に戻す", "route__button pref__reset");
     reset.addEventListener("click", () => prefs.resetToDefaults());
     detailBody.append(reset);
     details.append(detailBody);
 
-    const node = el("div", { className: "pref__controls" }, [bikeSet, hillField, details]);
+    const node = el("div", { className: "pref__controls" }, [bikeSet, hill.node, details]);
 
     function sync(state: PreferencesState): void {
       const { draft, status } = routeStore.getState();
@@ -125,17 +133,7 @@ export function renderPreferences(routeStore: RouteStore, prefs: PreferencesStor
         input.checked = b === draft.bikeType;
         input.disabled = busy;
       }
-      slider.value = String(Math.max(hillValues.indexOf(draft.hillMode), 0));
-      slider.disabled = busy;
-      const hillText = modeLabel("hillMode", draft.hillMode);
-      slider.setAttribute("aria-valuetext", `坂道を${hillText}`);
-      hillCurrent.textContent = hillText;
-      for (const [key, inputs] of detailSets) {
-        for (const [v, input] of inputs) {
-          input.checked = v === draft[key];
-          input.disabled = busy;
-        }
-      }
+      for (const slider of sliders) slider.sync(draft, busy);
       const defaults = defaultsFor(state, draft.bikeType);
       reset.disabled =
         busy ||

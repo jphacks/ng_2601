@@ -9,6 +9,7 @@ export type SearchConditions = RouteConditions;
 /** 検索結果に実際に適用された条件。編集中の条件(draft)とは別に保持する。 */
 export interface AppliedSearch extends SearchConditions {
   origin: LngLat;
+  originSource: OriginSource;
   destination: LngLat;
 }
 
@@ -21,8 +22,13 @@ export type SearchStatus =
 
 export type PickMode = "origin" | "destination";
 
+/** 出発地の決め方。current は端末の現在地（表示は「現在地」）。 */
+export type OriginSource = "current" | "map";
+
 export interface RouteSearchState {
   origin: LngLat | null;
+  /** origin が null の間は null。 */
+  originSource: OriginSource | null;
   destination: LngLat | null;
   /** 地図タップで指定中の地点。null は指定モードではない。 */
   pickMode: PickMode | null;
@@ -82,6 +88,8 @@ export interface RouteStore {
   cancelPick(): void;
   /** 地図タップ。指定モード中なら地点として採用して true（他のクリック処理は不要）。 */
   pick(lngLat: LngLat): boolean;
+  /** 地点を直接決める（地図の地点シートや現在地から）。指定モードは終わる。 */
+  setPoint(which: PickMode, lngLat: LngLat, source?: OriginSource): void;
   clearPoint(which: PickMode): void;
   swap(): void;
   /** 地点と結果をすべて消す。 */
@@ -94,6 +102,7 @@ export interface RouteStore {
 export function createRouteStore(api: ApiClient, analyzer: RouteAnalyzer = analyzeRoute): RouteStore {
   let state: RouteSearchState = {
     origin: null,
+    originSource: null,
     destination: null,
     pickMode: null,
     draft: { ...FALLBACK_CONDITIONS },
@@ -154,23 +163,32 @@ export function createRouteStore(api: ApiClient, analyzer: RouteAnalyzer = analy
     pick(lngLat) {
       const mode = state.pickMode;
       if (!mode) return false;
-      const origin = mode === "origin" ? lngLat : state.origin;
-      const destination = mode === "destination" ? lngLat : state.destination;
-      // 片方だけ未指定なら続けてもう片方を指定させる。
-      const next: PickMode | null = !origin ? "origin" : !destination ? "destination" : null;
-      update({ origin, destination, pickMode: next });
+      if (mode === "origin") {
+        // 出発地を決めたら、目的地が未指定なら続けて指定させる。
+        update({ origin: lngLat, originSource: "map", pickMode: state.destination ? null : "destination" });
+      } else {
+        // 出発地が未指定でも続けて指定させない。既定の現在地で埋めるのは呼び出し側。
+        update({ destination: lngLat, pickMode: null });
+      }
       return true;
     },
+    setPoint(which, lngLat, source = "map") {
+      update(which === "origin" ? { origin: lngLat, originSource: source, pickMode: null } : { destination: lngLat, pickMode: null });
+    },
     clearPoint(which) {
-      update(which === "origin" ? { origin: null } : { destination: null });
+      update(which === "origin" ? { origin: null, originSource: null } : { destination: null });
     },
     swap() {
-      update({ origin: state.destination, destination: state.origin });
+      update({
+        origin: state.destination,
+        originSource: state.destination ? "map" : null,
+        destination: state.origin,
+      });
     },
     reset() {
       invalidatePending();
       cancelElevation();
-      update({ origin: null, destination: null, pickMode: null, status: { kind: "idle" }, elevation: { kind: "idle" } });
+      update({ origin: null, originSource: null, destination: null, pickMode: null, status: { kind: "idle" }, elevation: { kind: "idle" } });
     },
     setDraft(patch) {
       update({ draft: { ...state.draft, ...patch } });
@@ -180,16 +198,20 @@ export function createRouteStore(api: ApiClient, analyzer: RouteAnalyzer = analy
     },
     async search() {
       if (state.status.kind === "loading") return;
-      const { origin, destination, draft } = state;
-      if (!origin || !destination) {
-        update({ validationError: "出発地と目的地を地図で指定してください。" });
+      const { origin, originSource, destination, draft } = state;
+      if (!destination) {
+        update({ validationError: "目的地を地図で指定してください。" });
+        return;
+      }
+      if (!origin) {
+        update({ validationError: "出発地が未指定です。現在地を取得するか、地図で指定してください。" });
         return;
       }
       if (haversineM(origin, destination) < MIN_DISTANCE_M) {
         update({ validationError: "出発地と目的地が近すぎます。離れた地点を指定してください。" });
         return;
       }
-      const applied: AppliedSearch = { origin, destination, ...draft };
+      const applied: AppliedSearch = { origin, originSource: originSource ?? "map", destination, ...draft };
       const mine = ++seq;
       cancelElevation();
       // 検索を始めた時点で古い経路は表示から外す。失敗しても古いルートが新しい結果に見えない。

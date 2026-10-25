@@ -1,5 +1,6 @@
 import "./locate.css";
 import { el } from "../../ui/dom";
+import type { LngLat } from "../../types/api";
 import type { MapController } from "../map/map";
 import { getCurrentLocation, type LocateFailure } from "./geolocation";
 
@@ -23,11 +24,21 @@ export interface LocateOptions {
   onStart?: () => void;
 }
 
+export interface Locator {
+  /** 通知欄。シェルが地図の上に置く。 */
+  notice: HTMLElement;
+  /**
+   * 現在地を1回取得して地図に表示する。利用者の操作（ボタン押下・「ここを目的地にする」など）から呼ぶこと。
+   * 失敗・キャンセル時は通知を出して null。
+   */
+  locate(options?: { recenter?: boolean }): Promise<LngLat | null>;
+}
+
 /**
- * 現在地ボタンに「押したときだけ位置を1回取得して地図に表示する」動作を付け、通知欄を返す。
+ * 現在地ボタンに「押したときだけ位置を1回取得して地図に表示する」動作を付ける。
  * 位置は保存・送信・ログ出力しない。失敗しても地図の操作と地点選択は妨げない（通知は地図を覆わない）。
  */
-export function setupLocate(button: HTMLButtonElement, map: MapController, options: LocateOptions = {}): HTMLElement {
+export function setupLocate(button: HTMLButtonElement, map: MapController, options: LocateOptions = {}): Locator {
   const notice = el("div", { className: "locate-notice" });
   notice.hidden = true;
   // 進行中の要求の識別子。キャンセルや再試行で古い応答を捨てる。
@@ -65,36 +76,49 @@ export function setupLocate(button: HTMLButtonElement, map: MapController, optio
     notice.hidden = false;
   }
 
+  let resolveCancel: (() => void) | null = null;
+
   function cancel(): void {
+    resolveCancel?.();
     requestId += 1;
     setBusy(false);
     clearNotice();
   }
 
-  async function locate(): Promise<void> {
-    // 取得中の連打は無視する（キャンセルは通知欄のボタン）。
-    if (button.getAttribute("aria-busy") === "true") return;
+  let pending: Promise<LngLat | null> | null = null;
+
+  function locate({ recenter = true } = {}): Promise<LngLat | null> {
+    // 取得中の連打は同じ要求を待つ（キャンセルは通知欄のボタン）。
+    pending ??= run(recenter).finally(() => { pending = null; });
+    return pending;
+  }
+
+  async function run(recenter: boolean): Promise<LngLat | null> {
     options.onStart?.();
     const id = ++requestId;
     setBusy(true);
     showNotice("現在地を取得しています…ブラウザーの許可確認が表示されたら「許可」を選んでください。", "status", [
       ["キャンセル", cancel],
     ]);
-    const result = await getCurrentLocation();
-    if (id !== requestId) return;
+    // キャンセルしたら応答を待たずに null を返す（待っている呼び出し側を止めない）。
+    const cancelled = new Promise<null>((resolve) => { resolveCancel = () => resolve(null); });
+    const result = await Promise.race([getCurrentLocation(), cancelled]);
+    resolveCancel = null;
+    if (!result || id !== requestId) return null;
     setBusy(false);
     if (result.ok) {
-      map.setCurrentLocation({ lngLat: result.lngLat, accuracyM: result.accuracyM }, true);
+      map.setCurrentLocation({ lngLat: result.lngLat, accuracyM: result.accuracyM }, recenter);
       showNotice(`現在地を表示しました（精度 約${Math.round(result.accuracyM)} m）。`, "status");
       dismissTimer = window.setTimeout(clearNotice, SUCCESS_DISMISS_MS);
-      return;
+      return result.lngLat;
     }
     const actions: Array<[string, () => void]> = [];
     if (RETRYABLE.has(result.reason)) actions.push(["再試行", () => void locate()]);
     actions.push(["閉じる", clearNotice]);
     showNotice(FAILURE_MESSAGE[result.reason], "alert", actions);
+    return null;
   }
 
   button.addEventListener("click", () => void locate());
-  return notice;
+  return { notice, locate };
 }

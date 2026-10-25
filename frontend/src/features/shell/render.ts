@@ -9,7 +9,7 @@ import { renderLayerPanel } from "../map/layerPanel";
 import { mountMap, type MapController } from "../map/map";
 import { ATTRIBUTION } from "../map/style";
 import { createReviewPostFeature, type ReviewPostFeature } from "../reviews/postForm";
-import { formatPoint, renderPickBanner, renderRouteView } from "../route/renderRoute";
+import { formatOrigin, formatPoint, renderPickBanner, renderRouteView } from "../route/renderRoute";
 import { createPreferencesStore } from "../preferences/preferencesState";
 import { createRouteStore } from "../route/routeState";
 import { buildRouteGradientSegments, type RouteGradientSegment } from "../elevation/gradientSegments";
@@ -40,7 +40,9 @@ const EXTRA_VIEWS: ViewDef[] = [
 ];
 const ALL_VIEWS = [...TAB_VIEWS, ...EXTRA_VIEWS];
 
-const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const APP_NAME = "CyclerHub";
+
+const FOCUSABLE ='a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 function button(label: string, className: string, name: IconName): HTMLButtonElement {
   const b = el("button", { className }, [icon(name)]);
@@ -71,7 +73,11 @@ export function renderShell(root: HTMLElement): void {
   // ルート区間のタップは標高グラフの選択位置へ送る（#9）。
   const mapController: MapController = mountMap(map, {
     onPick: (lngLat) => {
-      if (routeStore.pick(lngLat) || reviewPost?.pick(lngLat)) return true;
+      if (routeStore.pick(lngLat)) {
+        void completeRoute();
+        return true;
+      }
+      if (reviewPost?.pick(lngLat)) return true;
       reviews?.openNear(lngLat);
       return true;
     },
@@ -98,6 +104,8 @@ export function renderShell(root: HTMLElement): void {
       if (fromList && window.matchMedia("(max-width: 767px)").matches) closeSearch(false);
     },
   });
+  // 道路情報のカテゴリは地図画面に常に出す（「道路情報」タブのチェックと連動）。
+  const mapFilter = hazards.mapFilter;
   reviews = createReviewsFeature({
     map: mapController,
     client: api,
@@ -108,6 +116,17 @@ export function renderShell(root: HTMLElement): void {
       reviewPost?.hide();
     },
     onPost: (at) => reviewPost?.start(at),
+    onSetDestination: (at) => {
+      reviews?.close();
+      routeStore.setPoint("destination", at);
+      void completeRoute();
+    },
+    onSetOrigin: (at) => {
+      reviews?.close();
+      routeStore.setPoint("origin", at, "map");
+      if (routeStore.getState().destination) void completeRoute();
+      else routeStore.startPick("destination");
+    },
   });
   reviewPost = createReviewPostFeature({
     map: mapController,
@@ -138,17 +157,21 @@ export function renderShell(root: HTMLElement): void {
   drawer.inert = true;
   const drawerClose = button("メニューを閉じる", "float-button drawer__close", "close");
   const drawerItems = el("ul", { className: "drawer__list" });
-  for (const id of ["settings", "help", "about"] as const) {
-    const def = ALL_VIEWS.find((v) => v.id === id)!;
-    const item = el("button", { className: "drawer__item", text: def.label });
+  function drawerItem(label: string, run: () => void): void {
+    const item = el("button", { className: "drawer__item", text: label });
     item.type = "button";
     item.addEventListener("click", () => {
       setMenu(false, false);
-      openSearch(id);
+      run();
     });
     drawerItems.append(el("li", {}, [item]));
   }
-  drawer.append(el("h2", { className: "drawer__title", text: "Nature Ride" }), drawerItems, drawerClose);
+  // 口コミの投稿はよく使うので、設定を経由せずメニューから直接始められるようにする。
+  drawerItem("口コミを投稿", () => reviewPost?.start(null));
+  for (const id of ["settings", "help", "about"] as const) {
+    drawerItem(ALL_VIEWS.find((v) => v.id === id)!.label, () => openSearch(id));
+  }
+  drawer.append(el("h2", { className: "drawer__title", text: APP_NAME }), drawerItems, drawerClose);
 
   // --- map controls (right) ---------------------------------------------
   const layersButton = button("地図レイヤー", "float-button", "layers");
@@ -161,15 +184,16 @@ export function renderShell(root: HTMLElement): void {
   zoomOut.addEventListener("click", () => mapController.zoomOut());
   // 現在地は押したときだけ取得する（features/geolocation）。検索パネルが通知と地図を覆わないよう閉じる。
   const locate = button("現在地を表示", "float-button", "locate");
-  const locateNotice = setupLocate(locate, mapController, { onStart: () => closeSearch(false) });
+  const locator = setupLocate(locate, mapController, { onStart: () => closeSearch(false) });
   const controls = el("div", { className: "map-controls" }, [layersButton, compass, locate, zoomIn, zoomOut]);
 
   // --- search card: one DOM instance, only its position/size changes ----
   // 住所検索（ジオコーディング）は未対応のため、目的地・出発地は地図で指定した地点を表示するだけの読み取り専用。
+  // 出発地は既定で現在地。利用者は地図をタップして目的地だけ決めればよい。
   const input = el("input", { className: "bar__input" });
   input.type = "text";
   input.readOnly = true;
-  input.placeholder = "どこへ行く？";
+  input.placeholder = "どこへ行く？（地図をタップ）";
   input.setAttribute("aria-label", "目的地");
   input.autocomplete = "off";
   const barClose = button("検索を閉じる", "bar__close", "close");
@@ -180,20 +204,37 @@ export function renderShell(root: HTMLElement): void {
     barClose,
   ]);
 
-  const origin = el("input", { className: "row__input" });
-  origin.type = "text";
-  origin.readOnly = true;
-  origin.placeholder = "出発地（タップして地図で指定）";
-  origin.setAttribute("aria-label", "出発地");
-  origin.autocomplete = "off";
-  origin.addEventListener("click", () => routeStore.startPick("origin"));
-  origin.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") routeStore.startPick("origin");
-  });
-  const originRow = el("label", { className: "row" }, [
-    el("span", { className: "row__icon" }, [icon("pin")]),
-    origin,
-  ]);
+  function pointRow(
+    mode: "origin" | "destination",
+    label: string,
+    placeholder: string,
+    name: IconName,
+  ): { row: HTMLElement; input: HTMLInputElement } {
+    const input = el("input", { className: "row__input" });
+    input.type = "text";
+    input.readOnly = true;
+    input.placeholder = placeholder;
+    input.setAttribute("aria-label", `${label}（タップして地図で指定）`);
+    input.autocomplete = "off";
+    input.addEventListener("click", () => routeStore.startPick(mode));
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") routeStore.startPick(mode);
+    });
+    const row = el("label", { className: "row" }, [
+      el("span", { className: "row__icon" }, [icon(name)]),
+      el("span", { className: "row__label", text: label }),
+      input,
+    ]);
+    return { row, input };
+  }
+  const { row: originField, input: origin } = pointRow("origin", "出発地", "現在地", "locate");
+  // 地図で指定した出発地を、既定の現在地へ戻す。
+  const useCurrent = el("button", { className: "row__action", text: "現在地" });
+  useCurrent.type = "button";
+  useCurrent.addEventListener("click", () => void useCurrentAsOrigin());
+  originField.append(useCurrent);
+  const { row: destinationField, input: destination } = pointRow("destination", "目的地", "地図で指定", "pin");
+  const originRow = el("div", { className: "points" }, [originField, destinationField]);
 
   const tablist = el("div", { className: "tabs" });
   tablist.setAttribute("role", "tablist");
@@ -258,7 +299,7 @@ export function renderShell(root: HTMLElement): void {
       view === "help"
         ? "使い方は準備中です。"
         : view === "about"
-          ? "Nature Ride — 自然の中を走る自転車ルート。"
+          ? `${APP_NAME} — 自転車のためのルート検索と、道路情報・口コミの共有。`
           : view === "settings"
           ? "車種と坂道許容度は、「経路」タブの「検索条件」で設定できます。"
           : `${def.label}は準備中です（${def.issue}で実装予定）。`;
@@ -275,6 +316,35 @@ export function renderShell(root: HTMLElement): void {
       viewBody.replaceChildren(renderState({ kind: "empty", message }));
     }
     syncRoutePanel();
+  }
+
+  /** 現在地を取得して出発地にする。取得できなければ false（通知は locator が出す）。 */
+  async function useCurrentAsOrigin(): Promise<boolean> {
+    const here = await locator.locate({ recenter: false });
+    if (!here) return false;
+    routeStore.setPoint("origin", here, "current");
+    return true;
+  }
+
+  /**
+   * 目的地が決まったら、出発地が未指定なら現在地で埋めて検索する。
+   * 現在地を使えないときは、出発地を地図で指定してもらう（指定後にもう一度ここへ来る）。
+   */
+  async function completeRoute(): Promise<void> {
+    const before = routeStore.getState();
+    if (before.pickMode || !before.destination) return;
+    if (!before.origin) {
+      const ok = await useCurrentAsOrigin();
+      const now = routeStore.getState();
+      // 取得を待つ間に利用者が別の操作をしていたら、それを優先する。
+      if (now.pickMode || !now.destination || now.destination !== before.destination) return;
+      if (!ok && !now.origin) {
+        routeStore.startPick("origin");
+        return;
+      }
+    }
+    openSearch("route");
+    void routeStore.search();
   }
 
   function setView(id: ViewId): void {
@@ -366,8 +436,12 @@ export function renderShell(root: HTMLElement): void {
     if (picking) reviewPost?.hide();
     mapController.setPicking(picking);
     mapController.setEndpoints({ origin: state.origin, destination: state.destination });
-    origin.value = state.origin ? formatPoint(state.origin) : "";
-    input.value = state.destination ? formatPoint(state.destination) : "";
+    origin.value = state.origin ? formatOrigin(state.origin, state.originSource) : "";
+    // 未指定のときは既定の「現在地」が表示されているので、地図で指定したときだけ戻すボタンを出す。
+    useCurrent.hidden = state.originSource !== "map";
+    destination.value = state.destination ? formatPoint(state.destination) : "";
+    input.value = destination.value;
+    mapFilter.hidden = picking;
 
     // 結果が成功のときだけ経路を描く。検索中・空・失敗で古い経路を残さない。
     const route = state.status.kind === "success" ? state.status.route : null;
@@ -430,6 +504,7 @@ export function renderShell(root: HTMLElement): void {
     map,
     attribution,
     hazards.card,
+    mapFilter,
     menuButton,
     controls,
     reviews.status,
@@ -438,7 +513,7 @@ export function renderShell(root: HTMLElement): void {
     reviewPost.banner,
     reviewPost.status,
     renderPickBanner(routeStore),
-    locateNotice,
+    locator.notice,
     card,
     scrim,
     drawer,
