@@ -4,7 +4,7 @@ import { el } from "../../ui/dom";
 import { renderState } from "../../ui/state";
 import type { RouteStore } from "../route/routeState";
 import { BIKE_TYPE_ICONS } from "./bikeIcons";
-import { BIKE_TYPE_ORDER, DETAIL_MODE_KEYS, MODE_META, bikeTypeLabel, modeLabel } from "./labels";
+import { BIKE_TYPE_ORDER, DETAIL_MODE_GROUPS, MODE_META, bikeTypeLabel, modeLabel } from "./labels";
 import { defaultsFor, isUnsaved, type PreferencesState, type PreferencesStore } from "./preferencesState";
 
 function textButton(label: string, className: string): HTMLButtonElement {
@@ -93,6 +93,38 @@ function stepSlider(
   };
 }
 
+/**
+ * 詳細パラメータの3択。段階は離散値なのでつまみではなくラジオで選ぶ（矢印キーで移動、Tabで次の条件へ）。
+ * 見出しを legend に、問いかけを説明として fieldset に結び付け、選んだ項目は背景・枠・太字・チェック記号で示す。
+ */
+function modeChoice(
+  key: ModeKey,
+  values: readonly string[],
+  onChange: (key: ModeKey, value: string) => void,
+): { node: HTMLElement; sync(draft: PreferenceModes, busy: boolean): void } {
+  const meta = MODE_META[key];
+  const labels = meta.labels as Record<string, string>;
+  const choice = segments(`pref-${key}`, values, (v) => labels[v] ?? v, (v) => onChange(key, v));
+  choice.root.classList.add("pref__choices");
+  const question = el("p", { className: "pref__question", text: meta.question ?? "" });
+  question.id = `pref-${key}-question`;
+  const node = el("fieldset", { className: "route__fieldset pref__choice" }, [
+    el("legend", { className: "route__field-label", text: meta.title }),
+    question,
+    choice.root,
+  ]);
+  node.setAttribute("aria-describedby", question.id);
+  return {
+    node,
+    sync(draft, busy) {
+      for (const [v, input] of choice.inputs) {
+        input.checked = v === draft[key];
+        input.disabled = busy;
+      }
+    },
+  };
+}
+
 interface Controls {
   node: HTMLElement;
   sync(state: PreferencesState): void;
@@ -131,14 +163,28 @@ export function renderPreferences(routeStore: RouteStore, prefs: PreferencesStor
       bike.root,
     ]);
 
-    // --- 坂道許容度と詳細パラメータ（BEの段階の順に並べた段階つまみ。詳細は折りたたみ） ---
+    // --- 坂道許容度（BEの段階の順に並べた段階つまみ）と詳細パラメータ（3択。折りたたみ） ---
     const setDraft = (key: ModeKey, value: string) => routeStore.setDraft({ [key]: value });
     const hill = stepSlider("hillMode", options.modes.hillMode, setDraft);
-    const detailSliders = DETAIL_MODE_KEYS.map((key) => stepSlider(key, options.modes[key], setDraft));
-    const sliders = [hill, ...detailSliders];
+    const detailChoices: Array<ReturnType<typeof modeChoice>> = [];
+    const detailGroups = DETAIL_MODE_GROUPS.map((group) => {
+      const choices = group.keys.map((key) => modeChoice(key, options.modes[key], setDraft));
+      detailChoices.push(...choices);
+      return el("fieldset", { className: "route__fieldset pref__group" }, [
+        el("legend", { className: "pref__group-title", text: group.title }),
+        ...choices.map((c) => c.node),
+      ]);
+    });
+    const modeControls = [hill, ...detailChoices];
     const details = el("details", { className: "pref__advanced" });
     details.append(el("summary", { className: "pref__summary", text: "詳細パラメータ" }));
-    const detailBody = el("div", { className: "pref__advanced-body" }, detailSliders.map((s) => s.node));
+    const detailBody = el("div", { className: "pref__advanced-body" }, [
+      el("p", {
+        className: "pref__note",
+        text: "選んだ条件は、経路を選ぶときの重み付けに使います。周辺の道路やデータによっては、条件どおりの経路にならないことがあります。",
+      }),
+      ...detailGroups,
+    ]);
     const reset = textButton("坂道・詳細を初期値に戻す", "route__button pref__reset");
     reset.addEventListener("click", () => prefs.resetToDefaults());
     detailBody.append(reset);
@@ -154,7 +200,7 @@ export function renderPreferences(routeStore: RouteStore, prefs: PreferencesStor
         input.disabled = busy;
       }
       bikeCurrent.textContent = bikeTypeLabel(draft.bikeType);
-      for (const slider of sliders) slider.sync(draft, busy);
+      for (const control of modeControls) control.sync(draft, busy);
       const defaults = defaultsFor(state, draft.bikeType);
       reset.disabled =
         busy ||
