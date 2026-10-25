@@ -205,7 +205,11 @@ export function renderShell(root: HTMLElement): void {
   routeButton.setAttribute("aria-label", "経路を開く");
   routeButton.setAttribute("aria-expanded", "false");
   routeButton.setAttribute("aria-controls", "search-panel");
-  routeButton.addEventListener("click", () => openSearch("route"));
+  // 目的地が決まっていれば、選び直しではなく結果を見たいはずなのでパネルを開くだけにする。
+  routeButton.addEventListener("click", () => {
+    if (routeStore.getState().destination) openSearch("route");
+    else routeStore.startPick("destination");
+  });
 
   // --- search card: one DOM instance, only its position/size changes ----
   const panelClose = button("パネルを閉じる", "panel__close", "close");
