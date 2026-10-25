@@ -19,10 +19,6 @@ __pycache__/
 # CyclerHub-back generated build marker
 /back/.cyclerhub-back-build-fingerprint
 
-# Upstream BRouter checkout. setup.sh recovers this external dependency; keep
-# it out of ordinary commits until a gitlink is explicitly recorded.
-/back/submodule/brouter/
-
 # Downloaded BRouter extension data; routing data is fetched locally
 /back/brouter_extension/segments/
 

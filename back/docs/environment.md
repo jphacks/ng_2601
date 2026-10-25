@@ -21,7 +21,7 @@ cd back
 
 `back/scripts/setup.sh`:
 - Validates the protected prerequisites
-- Verifies or clones the unmodified BRouter repository at `back/submodule/brouter`
+- Verifies the initialized BRouter submodule at `back/submodule/brouter`; initialize it first with `git submodule update --init --recursive`
 - Creates data directories
 - Downloads the current Japan RD5 set when no tile is present. set `DOWNLOAD_ROUTING_DATA=0` to validate without downloading.
 
