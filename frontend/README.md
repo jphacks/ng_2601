@@ -30,6 +30,8 @@ git submodule update --init --recursive   # BRouter。未初期化だと setup.s
 # frontend/ で
 VITE_API_MODE=http npm run dev
 ```
+* Windows の cmd・PowerShell では `VITE_API_MODE=http npm run dev` の書き方が使えない。`.env.local` に `VITE_API_MODE=http` を書いて `npm run dev` で起動する（どの OS でも同じ）。
+* 以前に `.env.example` を `.env.local` へコピーした人は、`VITE_API_BASE_URL=http://localhost:8000` が残っている。バックエンドは 8080 で起動するので、`http://localhost:8080` に直すかその行を消す。
 * `backend/.env.example` の `SESSION_SECRET` は26文字の仮の値で、バックエンドは32文字未満だと起動しない（`launch.sh` のヘルスチェックが失敗する）。`openssl rand -hex 32` などで作った値に置き換える。
 * バックエンドの CORS は `FRONTEND_ORIGIN`（既定 `http://localhost:5173`）だけを許可する。Vite が別のポートで起動したら、`back/backend/.env` に `CORS_ALLOW_ORIGINS=http://localhost:5173,http://localhost:5174` のように並べて書き、`launch.sh` で起動し直す。
 * 地図の初期表示は東京駅付近。シードを見るには、ズーム12以上のまま名古屋駅付近へ地図を動かす。
