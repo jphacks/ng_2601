@@ -89,7 +89,7 @@ export function createLoginScreen(auth: AuthStore, mock: boolean): LoginScreen {
   function finish(user: User): void {
     auth.login(user);
     dialog.close();
-    showToast(`${user.name} でログインしました`);
+    showToast("ログインしました");
     const next = then;
     then = undefined;
     next?.();

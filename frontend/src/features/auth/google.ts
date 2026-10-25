@@ -16,6 +16,14 @@ export async function finishGoogleLogin(search: string): Promise<User> {
   // BE を別オリジンのまま呼ばないのは、state の Cookie が送られないため（Vite のプロキシで同じオリジンにする）。
   const res = await fetch(`${apiBaseUrl}/v1/auth/google/callback${search}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const { session } = (await res.json()) as { session: { access_token: string; refresh_token: string } };
-  return { name: "Google アカウント", accessToken: session.access_token, refreshToken: session.refresh_token };
+  const { session, picture } = (await res.json()) as {
+    session: { access_token: string; refresh_token: string };
+    picture?: string | null;
+  };
+  return {
+    name: "Google アカウント",
+    picture: picture ?? undefined,
+    accessToken: session.access_token,
+    refreshToken: session.refresh_token,
+  };
 }

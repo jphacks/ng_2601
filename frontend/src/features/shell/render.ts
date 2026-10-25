@@ -155,6 +155,9 @@ export function renderShell(root: HTMLElement): void {
     drawerItems.append(el("li", {}, [item]));
   }
   const account = el("div", { className: "drawer__account" });
+  const avatar = el("span", { className: "drawer__avatar" });
+  avatar.setAttribute("role", "img");
+  avatar.setAttribute("aria-label", "ログイン中のアカウント");
   function renderAccount(): void {
     const user = auth.getUser();
     const action = el("button", {
@@ -170,9 +173,18 @@ export function renderShell(root: HTMLElement): void {
       setMenu(false, false);
       login.open();
     });
-    account.classList.toggle("drawer__account--guest", !user);
-    if (user) account.replaceChildren(el("span", { className: "drawer__account-name", text: user.name }), action);
-    else account.replaceChildren(action);
+    account.replaceChildren(action);
+    avatar.hidden = !user;
+    if (user?.picture) {
+      const img = el("img");
+      img.src = user.picture;
+      img.alt = "";
+      // Referer を付けたままにしないのは、Google のプロフィール画像が読み込めないことがあるため。
+      img.referrerPolicy = "no-referrer";
+      avatar.replaceChildren(img);
+    } else {
+      avatar.replaceChildren(icon("user"));
+    }
   }
   auth.subscribe(() => {
     const focused = account.contains(document.activeElement);
@@ -181,7 +193,7 @@ export function renderShell(root: HTMLElement): void {
     void prefsStore.load();
   });
   renderAccount();
-  drawer.append(el("h2", { className: "drawer__title", text: "Nature Ride" }), account, drawerItems, drawerClose);
+  drawer.append(el("h2", { className: "drawer__title", text: "Nature Ride" }), account, drawerItems, avatar, drawerClose);
 
   // --- map controls (right) ---------------------------------------------
   const layersButton = button("地図レイヤー", "float-button", "layers");

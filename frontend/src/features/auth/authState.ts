@@ -1,5 +1,6 @@
 export interface User {
   name: string;
+  picture?: string;
   accessToken?: string;
   refreshToken?: string;
 }
