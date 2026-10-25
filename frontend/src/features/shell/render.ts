@@ -2,7 +2,8 @@ import "./shell.css";
 import { el } from "../../ui/dom";
 import { icon, type IconName } from "../../ui/icon";
 import { renderState } from "../../ui/state";
-import { api, isMockApi } from "../../api";
+import { api, apiBaseUrl, isMockApi } from "../../api";
+import { revokeSession } from "../../api/session";
 import { createHazardsFeature, type HazardsFeature } from "../hazards/hazardsFeature";
 import { setupLocate } from "../geolocation/renderLocate";
 import { renderLayerPanel } from "../map/layerPanel";
@@ -18,6 +19,8 @@ import type { RouteAnalysis } from "../elevation/analyze";
 import { createRouteLink, type RouteLink } from "../elevation/link";
 import type { Route } from "../../types/api";
 import { createReviewsFeature, type ReviewsFeature } from "../reviews/reviewsFeature";
+import { auth } from "../auth";
+import { createLoginScreen } from "../auth/loginScreen";
 
 type ViewId = "route" | "settings" | "hazards" | "reviews" | "layers" | "help" | "about";
 
@@ -62,6 +65,11 @@ export function renderShell(root: HTMLElement): void {
   let settingsPanel: HTMLElement | undefined;
   const routeStore = createRouteStore(api);
   const prefsStore = createPreferencesStore(api, routeStore);
+  const login = createLoginScreen(auth, isMockApi);
+  const startPost = (at: Parameters<ReviewPostFeature["start"]>[0]): void => {
+    if (auth.getUser()) reviewPost?.start(at);
+    else login.open(() => reviewPost?.start(at));
+  };
 
   // --- map area ---------------------------------------------------------
   const map = el("div", { className: "map" });
@@ -117,7 +125,7 @@ export function renderShell(root: HTMLElement): void {
       closeSearch(false);
       reviewPost?.hide();
     },
-    onPost: (at) => reviewPost?.start(at),
+    onPost: (at) => startPost(at),
     onSetDestination: (at) => {
       reviews?.close();
       routeStore.setPoint("destination", at);
@@ -171,12 +179,52 @@ export function renderShell(root: HTMLElement): void {
     });
     drawerItems.append(el("li", {}, [item]));
   }
+  const account = el("div", { className: "drawer__account" });
+  const avatar = el("span", { className: "drawer__avatar" });
+  avatar.setAttribute("role", "img");
+  avatar.setAttribute("aria-label", "ログイン中のアカウント");
+  function renderAccount(): void {
+    const user = auth.getUser();
+    const action = el("button", {
+      className: user ? "drawer__account-button" : "drawer__account-button drawer__account-button--primary",
+      text: user ? "ログアウト" : "ログイン",
+    });
+    action.type = "button";
+    action.addEventListener("click", () => {
+      if (user) {
+        if (user.refreshToken) void revokeSession(apiBaseUrl, user.refreshToken);
+        auth.logout();
+        return;
+      }
+      setMenu(false, false);
+      login.open();
+    });
+    account.replaceChildren(action);
+    avatar.hidden = !user;
+    if (user?.picture) {
+      const img = el("img");
+      img.src = user.picture;
+      img.alt = "";
+      // Referer を付けたままにしないのは、Google のプロフィール画像が読み込めないことがあるため。
+      img.referrerPolicy = "no-referrer";
+      avatar.replaceChildren(img);
+    } else {
+      avatar.replaceChildren(icon("user"));
+    }
+  }
+  auth.subscribe(() => {
+    const focused = account.contains(document.activeElement);
+    renderAccount();
+    if (focused) account.querySelector("button")?.focus();
+    void prefsStore.load();
+  });
+  renderAccount();
   // 口コミの投稿はよく使うので、設定を経由せずメニューから直接始められるようにする。
-  drawerItem("口コミを投稿", () => reviewPost?.start(null));
+  drawerItem("口コミを投稿", () => startPost(null));
   for (const id of ["settings", "help", "about"] as const) {
     drawerItem(ALL_VIEWS.find((v) => v.id === id)!.label, () => openSearch(id));
   }
-  drawer.append(el("h2", { className: "drawer__title", text: APP_NAME }), drawerItems, drawerClose);
+  drawer.append(el("h2", { className: "drawer__title", text: APP_NAME }), account, drawerItems, avatar, drawerClose);
 
   // --- map controls (right) ---------------------------------------------
   const layersButton = button("地図レイヤー", "float-button", "layers");
@@ -614,6 +662,8 @@ export function renderShell(root: HTMLElement): void {
     card,
     scrim,
     drawer,
+    login.dialog,
+    login.toast,
   );
   // MapLibre initializes while the shell is being assembled off-DOM; size it after insertion.
   mapController.resize();

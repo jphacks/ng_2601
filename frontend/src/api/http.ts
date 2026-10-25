@@ -62,9 +62,24 @@ function mapDataError(status: number, parsed: unknown): ApiErrorBody {
 }
 
 // エンドポイントは暫定。経路検索・設定以外はバックエンド確定後に合わせる。
-// getAccessToken: ログイン済みのときアクセストークンを返す。認証UIは未実装（#23）のため現状は未指定。
-export function createHttpClient(baseUrl: string, getAccessToken?: () => string | null): ApiClient {
-  async function request<T>(
+// getAccessToken: ログイン済みのときアクセストークンを返す。
+// refreshSession: 401 のときトークンを取り直す。取り直せたら同じ呼び出しを1回だけやり直す。
+export function createHttpClient(
+  baseUrl: string,
+  getAccessToken?: () => string | null,
+  refreshSession?: () => Promise<boolean>,
+): ApiClient {
+  async function request<T>(...args: Parameters<typeof send>): Promise<T> {
+    try {
+      return await send<T>(...args);
+    } catch (e) {
+      if (!(e instanceof ApiError && e.status === 401 && getAccessToken?.() && refreshSession)) throw e;
+      if (!(await refreshSession())) throw e;
+      return send<T>(...args);
+    }
+  }
+
+  async function send<T>(
     method: string,
     path: string,
     body?: unknown,
