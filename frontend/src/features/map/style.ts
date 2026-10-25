@@ -19,10 +19,10 @@ export const ATTRIBUTION = {
 /** 名古屋駅周辺（シードとモックデータの範囲） */
 export const INITIAL_VIEW = { center: [136.8816, 35.1709] as [number, number], zoom: 15 };
 
-// 店などのPOI、一方通行の矢印、道路番号、3D建物、線路の縞、広域の陰影は、自転車の情報を重ねると邪魔になる。
-const HIDDEN_LAYER = /^(poi_r|road_one_way|highway-shield|road_shield|building-3d|road_area_pattern|natural_earth)|_hatching$/;
+// 店やバス停などのPOI、一方通行の矢印、道路番号、3D建物、線路の縞、広域の陰影は、自転車の情報を重ねると邪魔になる。
+const HIDDEN_LAYER = /^(poi_|road_one_way|highway-shield|road_shield|building-3d|road_area_pattern|natural_earth)|_hatching$/;
 
-/** Google マップのように、道・駅・地名だけが目に入る地図にする。 */
+/** Google マップのように、道・線路・地名だけが目に入る地図にする。 */
 export function simplifyStyle(_previous: StyleSpecification | undefined, next: StyleSpecification): StyleSpecification {
   return {
     ...next,
