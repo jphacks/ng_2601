@@ -55,8 +55,18 @@ export function renderPickBanner(store: RouteStore): HTMLElement {
   return banner;
 }
 
+export interface RouteViewOptions {
+  /** 「経路を検索」「この条件で再検索」。現在地の取り直しなどを挟むため、検索の実行は呼び出し側に任せる。 */
+  onSearch?: () => void;
+}
+
 /** 「経路」ビュー本体。検索条件とルート結果の2つのサブタブ。link は標高グラフと地図の選択位置を共有する。 */
-export function renderRouteView(store: RouteStore, prefs: PreferencesStore, link: RouteLink): HTMLElement {
+export function renderRouteView(
+  store: RouteStore,
+  prefs: PreferencesStore,
+  link: RouteLink,
+  { onSearch = () => void store.search() }: RouteViewOptions = {},
+): HTMLElement {
   let tab: SubTab = "result";
   let detailsOpen = false;
 
@@ -91,7 +101,7 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore, link
   // --- conditions pane (built once; values are synced in place so focus is kept) ---
   // 出発地・目的地は検索カード上部と地図で決める。ここには車種と走り方の条件だけを置く。
   const submit = textButton("経路を検索", "route__submit");
-  submit.addEventListener("click", () => void store.search());
+  submit.addEventListener("click", onSearch);
   const validation = el("p", { className: "route__validation" });
   validation.setAttribute("role", "alert");
   validation.hidden = true;

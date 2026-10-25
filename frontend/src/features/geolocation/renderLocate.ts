@@ -31,7 +31,19 @@ export interface Locator {
    * 現在地を1回取得して地図に表示する。利用者の操作（ボタン押下・「ここを目的地にする」など）から呼ぶこと。
    * 失敗・キャンセル時は通知を出して null。
    */
-  locate(options?: { recenter?: boolean }): Promise<LngLat | null>;
+  locate(options?: LocateRequest): Promise<LngLat | null>;
+}
+
+export interface LocateRequest {
+  /** 取得できたら現在地へ地図を移動する（既定 true）。 */
+  recenter?: boolean;
+  /**
+   * 取得中・成功の通知を出さず、検索パネルも閉じない（再検索のたびに現在地を取り直すときなど）。
+   * 失敗したときだけ通知する。
+   */
+  quiet?: boolean;
+  /** 失敗通知の「再試行」で行う操作。未指定なら現在地の取得だけをやり直す。 */
+  onRetry?: () => void;
 }
 
 /**
@@ -87,19 +99,21 @@ export function setupLocate(button: HTMLButtonElement, map: MapController, optio
 
   let pending: Promise<LngLat | null> | null = null;
 
-  function locate({ recenter = true } = {}): Promise<LngLat | null> {
+  function locate(request: LocateRequest = {}): Promise<LngLat | null> {
     // 取得中の連打は同じ要求を待つ（キャンセルは通知欄のボタン）。
-    pending ??= run(recenter).finally(() => { pending = null; });
+    pending ??= run(request).finally(() => { pending = null; });
     return pending;
   }
 
-  async function run(recenter: boolean): Promise<LngLat | null> {
-    options.onStart?.();
+  async function run({ recenter = true, quiet = false, onRetry }: LocateRequest): Promise<LngLat | null> {
     const id = ++requestId;
     setBusy(true);
-    showNotice("現在地を取得しています…ブラウザーの許可確認が表示されたら「許可」を選んでください。", "status", [
-      ["キャンセル", cancel],
-    ]);
+    if (!quiet) {
+      options.onStart?.();
+      showNotice("現在地を取得しています…ブラウザーの許可確認が表示されたら「許可」を選んでください。", "status", [
+        ["キャンセル", cancel],
+      ]);
+    }
     // キャンセルしたら応答を待たずに null を返す（待っている呼び出し側を止めない）。
     const cancelled = new Promise<null>((resolve) => { resolveCancel = () => resolve(null); });
     const result = await Promise.race([getCurrentLocation(), cancelled]);
@@ -108,12 +122,22 @@ export function setupLocate(button: HTMLButtonElement, map: MapController, optio
     setBusy(false);
     if (result.ok) {
       map.setCurrentLocation({ lngLat: result.lngLat, accuracyM: result.accuracyM }, recenter);
-      showNotice(`現在地を表示しました（精度 約${Math.round(result.accuracyM)} m）。`, "status");
-      dismissTimer = window.setTimeout(clearNotice, SUCCESS_DISMISS_MS);
+      if (!quiet) {
+        showNotice(`現在地を表示しました（精度 約${Math.round(result.accuracyM)} m）。`, "status");
+        dismissTimer = window.setTimeout(clearNotice, SUCCESS_DISMISS_MS);
+      }
       return result.lngLat;
     }
+    // 失敗は quiet でも必ず伝える。通知が検索パネルに隠れないよう、ここで閉じてもらう。
+    if (quiet) options.onStart?.();
     const actions: Array<[string, () => void]> = [];
-    if (RETRYABLE.has(result.reason)) actions.push(["再試行", () => void locate()]);
+    if (RETRYABLE.has(result.reason)) {
+      actions.push(["再試行", () => {
+        clearNotice();
+        if (onRetry) onRetry();
+        else void locate();
+      }]);
+    }
     actions.push(["閉じる", clearNotice]);
     showNotice(FAILURE_MESSAGE[result.reason], "alert", actions);
     return null;

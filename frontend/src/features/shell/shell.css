@@ -229,6 +229,9 @@ button { cursor: pointer; }
   font-size: 13px;
 }
 .row__action:hover { background: var(--color-hover); }
+/* 結果表示中は地図とグラフを広く見せるため、出発地・目的地の行を詰める。 */
+.search-card--route-results .points { gap: var(--space-1); }
+.search-card--route-results .points .row { height: 40px; }
 
 .tabs {
   flex: none;

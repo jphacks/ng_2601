@@ -74,7 +74,7 @@ export function renderShell(root: HTMLElement): void {
   const mapController: MapController = mountMap(map, {
     onPick: (lngLat) => {
       if (routeStore.pick(lngLat)) {
-        void completeRoute();
+        void searchRoute();
         return true;
       }
       if (reviewPost?.pick(lngLat)) return true;
@@ -91,7 +91,7 @@ export function renderShell(root: HTMLElement): void {
     onSelectRouteSegment: (distanceM) => link.select(distanceM),
   });
   const link: RouteLink = createRouteLink(mapController);
-  const routeView = renderRouteView(routeStore, prefsStore, link);
+  const routeView = renderRouteView(routeStore, prefsStore, link, { onSearch: () => void searchRoute() });
   void prefsStore.load();
   hazards = createHazardsFeature({
     map: mapController,
@@ -119,12 +119,12 @@ export function renderShell(root: HTMLElement): void {
     onSetDestination: (at) => {
       reviews?.close();
       routeStore.setPoint("destination", at);
-      void completeRoute();
+      void searchRoute();
     },
     onSetOrigin: (at) => {
       reviews?.close();
       routeStore.setPoint("origin", at, "map");
-      if (routeStore.getState().destination) void completeRoute();
+      if (routeStore.getState().destination) void searchRoute();
       else routeStore.startPick("destination");
     },
   });
@@ -231,7 +231,12 @@ export function renderShell(root: HTMLElement): void {
   // 地図で指定した出発地を、既定の現在地へ戻す。
   const useCurrent = el("button", { className: "row__action", text: "現在地" });
   useCurrent.type = "button";
-  useCurrent.addEventListener("click", () => void useCurrentAsOrigin());
+  useCurrent.addEventListener("click", async () => {
+    const here = await locator.locate({ recenter: false });
+    if (!here) return;
+    routeStore.setPoint("origin", here, "current");
+    if (routeStore.getState().destination) void searchRoute();
+  });
   originField.append(useCurrent);
   const { row: destinationField, input: destination } = pointRow("destination", "目的地", "地図で指定", "pin");
   const originRow = el("div", { className: "points" }, [originField, destinationField]);
@@ -281,7 +286,8 @@ export function renderShell(root: HTMLElement): void {
     const showRouteResults = searchOpen && view === "route" && state.status.kind !== "idle";
     card.classList.toggle("search-card--route-results", showRouteResults);
     bar.hidden = showRouteResults;
-    originRow.hidden = view !== "route" || showRouteResults;
+    // 結果表示中も出発地・目的地を出し、そこから変更・現在地への戻し・再検索ができるようにする。
+    originRow.hidden = view !== "route";
   }
 
   function renderView(): void {
@@ -318,30 +324,41 @@ export function renderShell(root: HTMLElement): void {
     syncRoutePanel();
   }
 
-  /** 現在地を取得して出発地にする。取得できなければ false（通知は locator が出す）。 */
-  async function useCurrentAsOrigin(): Promise<boolean> {
-    const here = await locator.locate({ recenter: false });
+  /**
+   * 出発地が現在地（または未指定）なら、検索の直前に現在地を取り直す。移動しながら使っても前の位置で検索しない。
+   * 取得中の案内は初回（未指定）だけ出す。取得できなければ false（失敗の通知は locator が出す）。
+   */
+  async function refreshCurrentOrigin(): Promise<boolean> {
+    const { origin, originSource } = routeStore.getState();
+    if (origin && originSource !== "current") return true;
+    const here = await locator.locate({ recenter: false, quiet: origin !== null, onRetry: () => void searchRoute() });
     if (!here) return false;
+    // 取得を待つ間に地図で出発地を選んでいたら、そちらを優先する。
+    const now = routeStore.getState();
+    if (now.origin && now.originSource !== "current") return true;
     routeStore.setPoint("origin", here, "current");
     return true;
   }
 
   /**
-   * 目的地が決まったら、出発地が未指定なら現在地で埋めて検索する。
-   * 現在地を使えないときは、出発地を地図で指定してもらう（指定後にもう一度ここへ来る）。
+   * 経路を検索する。目的地の決定・出発地の変更・「この条件で再検索」はすべてここを通る。
+   * 出発地が現在地なら取り直してから検索する。初回で現在地を使えないときは、出発地を地図で指定してもらう
+   * （指定後にもう一度ここへ来る）。再検索で取り直せないときは、古い位置で検索せず失敗の通知だけ出す。
    */
-  async function completeRoute(): Promise<void> {
+  async function searchRoute(): Promise<void> {
     const before = routeStore.getState();
-    if (before.pickMode || !before.destination) return;
-    if (!before.origin) {
-      const ok = await useCurrentAsOrigin();
-      const now = routeStore.getState();
-      // 取得を待つ間に利用者が別の操作をしていたら、それを優先する。
-      if (now.pickMode || !now.destination || now.destination !== before.destination) return;
-      if (!ok && !now.origin) {
-        routeStore.startPick("origin");
-        return;
-      }
+    if (before.pickMode) return;
+    if (!before.destination) {
+      void routeStore.search(); // 「目的地を地図で指定してください」を出す
+      return;
+    }
+    const ok = await refreshCurrentOrigin();
+    const now = routeStore.getState();
+    // 取得を待つ間に利用者が別の操作をしていたら、それを優先する。
+    if (now.pickMode || now.destination !== before.destination) return;
+    if (!ok) {
+      if (!now.origin) routeStore.startPick("origin");
+      return;
     }
     openSearch("route");
     void routeStore.search();
