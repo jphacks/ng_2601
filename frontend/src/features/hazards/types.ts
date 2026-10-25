@@ -5,9 +5,9 @@ import type { LngLat } from "../../types/api";
 export type RoadCategory = "danger" | "convenience" | "terrain" | "facility";
 
 /** 公的規制／統計／ユーザー報告。ユーザー投稿と公的情報を区別して扱う。 */
-export type InfoClass = "official" | "statistics" | "community";
+export type InfoClass = "official" | "statistics" | "community" | "measurement";
 
-export type Origin = "restriction" | "accident" | "traffic" | "observation";
+export type Origin = "restriction" | "accident" | "traffic" | "observation" | "surface";
 
 /** permanent=恒常、scheduled=曜日・時間帯で繰り返す恒常情報、temporary=期間限定。 */
 export type Temporality = "permanent" | "scheduled" | "temporary";

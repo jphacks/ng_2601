@@ -70,3 +70,7 @@ Issue #7では、依頼者の指定したPoC方式に合わせ、検索経路の
 2. 選定した正本を更新し、型・HTTP client・モック・BE・利用箇所を追従させる。片側の変更だけで接続済みとしない。
 3. 型チェック・ビルド、入力／正常応答／エラー／欠測、可能ならFE・BE結合を検証する。実行コマンド・結果・接続未検証をPRに残す。
 4. この索引と[アーキテクチャ](architecture.md)の影響範囲を更新し、重要な設計判断は[ADR](decisions/README.md)、交代に必要な作業状態は[Handoff](handoffs/README.md)へ残す。
+
+## CoreS3 路面計測（試験実装）
+
+[`back/backend/app/device_events.py`](../../back/backend/app/device_events.py) の `POST /v1/device-events` は専用トークンを使う機器向け入力です。詳細は [`back/docs/device-surface.md`](../../back/docs/device-surface.md) を参照してください。`GET /v1/map-data` には任意の `route_context.surface` が追加され、FEは「機器による計測」として表示します。既存の提供元は必須のままです。路面の段差・振動は未確認の候補で、経路の重み付けには使いません。BE/FE担当者のレビューと実機検証は未完了です。

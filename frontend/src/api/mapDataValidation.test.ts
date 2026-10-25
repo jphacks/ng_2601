@@ -54,4 +54,10 @@ describe("assertMapData", () => {
     expect(() => assertMapData(null)).toThrowError(ApiError);
     expect(() => assertMapData("x")).toThrowError(ApiError);
   });
+
+  it("任意の CoreS3 レイヤーがある場合は提供状況を必要とする", () => {
+    const data = buildMockMapData();
+    (data.route_context as unknown as Record<string, unknown>).surface = { type: "FeatureCollection", features: [] };
+    expect(() => assertMapData(data)).toThrowError(/surface に source_status/);
+  });
 });

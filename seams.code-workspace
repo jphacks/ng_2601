@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "seams"
+		},
+		{
+			"name": "M5StackS3",
+			"path": "seams/M5StackS3"
+		}
+	],
+	"settings": {}
+}

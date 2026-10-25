@@ -184,6 +184,18 @@ export interface TrafficProps {
   [key: string]: unknown;
 }
 
+/** CoreS3 sensor event; an experimental measurement, not a verified road report. */
+export interface SurfaceProps {
+  id?: string;
+  kind?: "bump" | "roughness";
+  observed_at?: string;
+  peak_delta_g?: number;
+  rms_g?: number;
+  gps_hdop?: number;
+  source_id?: string;
+  verification_state?: "unverified";
+}
+
 export type ObservationTemporalKind = "permanent" | "time_of_day" | "date_range" | "temporary" | "trend";
 export type ObservationStatus = "active" | "resolved" | "withdrawn" | "expired";
 export type ObservationVerification = "unverified" | "corroborated" | "moderated";
@@ -214,6 +226,7 @@ export interface MapDataResponse {
   route_context: {
     accidents: Collection<Geometry, AccidentProps> & { source_status: SourceStatus };
     traffic: Collection<Geometry, TrafficProps> & { source_status: SourceStatus };
+    surface?: Collection<Point, SurfaceProps> & { source_status: SourceStatus };
   };
   observations: Collection<Point, ObservationProps> & {
     source: { source_id: string; authority: string; routing_effect: string };
