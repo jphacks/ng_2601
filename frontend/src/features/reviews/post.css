@@ -9,7 +9,6 @@
 .post-form__field { display: grid; gap: var(--space-2); margin: 0; padding: 0; border: 0; min-width: 0; }
 .post-form__label { padding: 0; font-size: 13px; font-weight: 600; }
 .post-form__location { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
-.post-form__value { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
 
 .post-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .post-chip {
