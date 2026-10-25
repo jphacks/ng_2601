@@ -114,7 +114,7 @@ with TestClient(m.app) as client:
     with TestClient(m.app) as foreign:
         check(foreign,'GET',f'/v1/auth/google/callback?code=audit&state={state}',expected=400)
     async def fake_google(code):
-        return m.auth_service._session(other)
+        return m.auth_service._session(other), None
     with patch.object(m.auth_service,'google_login',side_effect=fake_google):
         check(client,'GET',f'/v1/auth/google/callback?code=audit&state={state}')
         check(client,'GET',f'/v1/auth/google/callback?code=audit&state={state}',expected=400)

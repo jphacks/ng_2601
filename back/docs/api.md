@@ -177,7 +177,7 @@ All authentication routes are under `/v1/auth`.
 | `POST /magic-link/request` | Public. Requests a rate-limited email link. |
 | `POST /magic-link/consume` | Exchanges a valid single-use link for a session. |
 | `GET /google` | Creates a Google authorization URL and an HttpOnly OAuth-state cookie. |
-| `GET /google/callback` | Validates the state cookie, exchanges the code, and returns a session. |
+| `GET /google/callback` | Validates the state cookie, exchanges the code, and returns a session and the Google profile `picture` URL (or `null`). |
 | `POST /refresh` | Rotates a refresh token. |
 | `POST /logout` | Revokes the presented refresh token. |
 | `GET /me` | Returns the authenticated user's default bike and preferences. |

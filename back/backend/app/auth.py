@@ -90,6 +90,7 @@ class PreferenceUpdate(BaseModel):
 class GoogleCallbackResponse(BaseModel):
     session: SessionResponse
     provider: str = "google"
+    picture: str | None = None
 
 
 class AuthService:
@@ -301,7 +302,7 @@ class AuthService:
             )
         return self._session(str(user_id))
 
-    async def google_login(self, code: str) -> SessionResponse:
+    async def google_login(self, code: str) -> tuple[SessionResponse, str | None]:
         if not self.google_client_secret or self.google_client_id.startswith("dummy"):
             raise HTTPException(status_code=503, detail="Google OAuth is not configured")
         async with httpx.AsyncClient(timeout=15) as client:
@@ -331,7 +332,9 @@ class AuthService:
         email = str(profile.get("email", "")).strip().lower()
         if not subject or not email or not profile.get("email_verified", False):
             raise HTTPException(status_code=400, detail="Google account email is not verified")
-        return await run_in_threadpool(self._google_identity_session, subject, email, profile.get("name"))
+        session = await run_in_threadpool(self._google_identity_session, subject, email, profile.get("name"))
+        picture = profile.get("picture")
+        return session, picture if isinstance(picture, str) else None
 
     def _google_identity_session(self, subject: str, email: str, display_name: Any) -> SessionResponse:
         now = _now()
@@ -471,7 +474,8 @@ def build_auth_router(service: AuthService) -> APIRouter:
     async def google_callback(request: Request, response: Response, code: str = Query(min_length=1), state: str = Query(min_length=1)) -> GoogleCallbackResponse:
         service.consume_oauth_state(state, request.cookies.get("cyclerhub_oauth"))
         response.delete_cookie("cyclerhub_oauth")
-        return GoogleCallbackResponse(session=await service.google_login(code))
+        session, picture = await service.google_login(code)
+        return GoogleCallbackResponse(session=session, picture=picture)
 
     @router.post("/refresh", response_model=SessionResponse)
     def refresh(authorization: str | None = Header(default=None)) -> SessionResponse:
