@@ -160,6 +160,9 @@ def try_smtp() -> None:
         security = "ssl"
     tls_context = ssl.create_default_context()
 
+    class SMTPGreetingError(smtplib.SMTPResponseException):
+        pass
+
     def send_once(mode: str, target_port: int) -> None:
         if mode == "ssl":
             with smtplib.SMTP_SSL(
@@ -179,7 +182,7 @@ def try_smtp() -> None:
     def smtp_ehlo(smtp: smtplib.SMTP) -> None:
         code, response = smtp.ehlo()
         if code != 250:
-            raise smtplib.SMTPResponseException(code, response)
+            raise SMTPGreetingError(code, response)
 
     def smtp_authenticate(smtp: smtplib.SMTP) -> None:
         if auth_mode == "none":
@@ -194,8 +197,10 @@ def try_smtp() -> None:
 
     try:
         send_once(security, port)
-    except (smtplib.SMTPNotSupportedError, smtplib.SMTPResponseException) as error:
-        retryable_response = not isinstance(error, smtplib.SMTPResponseException) or 400 <= error.smtp_code < 500
+    except (smtplib.SMTPNotSupportedError, smtplib.SMTPResponseException, SMTPGreetingError) as error:
+        retryable_response = not isinstance(error, SMTPGreetingError) and (
+            not isinstance(error, smtplib.SMTPResponseException) or 400 <= error.smtp_code < 500
+        )
         if security == "auto" and port == 587 and retryable_response:
             if isinstance(error, smtplib.SMTPResponseException):
                 print(f"SMTP port 587 rejected the session with {error.smtp_code}; retrying encrypted SMTP on port 465.")

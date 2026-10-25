@@ -146,7 +146,7 @@ class AuthService:
             # 465 is encrypted and safe; silently falling back to plaintext is
             # never acceptable when SMTP AUTH credentials are present.
             retryable_response = not isinstance(error, smtplib.SMTPResponseException) or (
-                400 <= error.smtp_code < 500
+                400 <= error.smtp_code < 500 and error.smtp_code != 421
             )
             if security == "auto" and self.smtp_port == 587 and retryable_response:
                 send_once("ssl", self.smtp_host, 465)
