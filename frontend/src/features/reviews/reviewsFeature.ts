@@ -6,7 +6,17 @@ import { icon } from "../../ui/icon";
 import { renderState } from "../../ui/state";
 import type { RoadInfoItem } from "../hazards/types";
 import type { MapController } from "../map/map";
+import { CATEGORY_LABEL } from "./catalog";
 import { groupReviews, PICK_RADIUS_M, sortNewestFirst, within, type ReviewPlace } from "./grouping";
+import {
+  ALL_CATEGORIES,
+  createDefaultListFilter,
+  filterAndSortReviews,
+  isFiltering,
+  SORT_LABEL,
+  summarizeListFilter,
+  type ReviewSort,
+} from "./listFilter";
 import { hazardCard, reviewDetail, reviewItem } from "./view";
 
 /** 表示範囲の外側も少し先読みして、わずかなパンで取得し直さないようにする。 */
@@ -23,6 +33,10 @@ export interface ReviewsFeatureOptions {
   onOpen?: () => void;
   /** 口コミの投稿を始める。地点が分からない（一覧から）ときは null。 */
   onPost?: (at: LngLat | null) => void;
+  /** 地点シートの「ここを目的地にする」。 */
+  onSetDestination?: (at: LngLat) => void;
+  /** 地点シートの「ここを出発地にする」。 */
+  onSetOrigin?: (at: LngLat) => void;
 }
 
 export interface ReviewsFeature {
@@ -78,7 +92,7 @@ function iconButton(label: string, className: string, name: "back" | "close"): H
 }
 
 export function createReviewsFeature(options: ReviewsFeatureOptions): ReviewsFeature {
-  const { map, client, getRoadInfo, onOpen, onPost } = options;
+  const { map, client, getRoadInfo, onOpen, onPost, onSetDestination, onSetOrigin } = options;
 
   let reviews: Review[] = [];
   let load: LoadState = "idle";
@@ -113,10 +127,72 @@ export function createReviewsFeature(options: ReviewsFeatureOptions): ReviewsFea
   const listPost = postButton("口コミを投稿");
   listPost.addEventListener("click", () => onPost?.(null));
   const listSummary = el("p", { className: "reviews-list__summary" });
+  const listFilter = createDefaultListFilter();
+  const filterSummary = el("span", { className: "reviews-filter__current" });
   const listPanel = el("div", { className: "reviews-list" }, [
     el("div", { className: "reviews-actions" }, [listSummary, listPost]),
+    renderListFilter(),
     listContent,
   ]);
+
+  /** 並び替え・絞り込み。最初はたたんでおき、要約だけ見せる。入力要素は作り直さない。 */
+  function renderListFilter(): HTMLElement {
+    const onChange = () => renderList();
+    const sortGroup = el("fieldset", { className: "reviews-filter__group" }, [
+      el("legend", { className: "reviews-filter__legend", text: "並び替え" }),
+    ]);
+    for (const sort of Object.keys(SORT_LABEL) as ReviewSort[]) {
+      const input = el("input");
+      input.type = "radio";
+      input.name = "reviews-sort";
+      input.checked = listFilter.sort === sort;
+      input.addEventListener("change", () => {
+        if (!input.checked) return;
+        listFilter.sort = sort;
+        onChange();
+      });
+      sortGroup.append(el("label", { className: "reviews-filter__option" }, [input, el("span", { text: SORT_LABEL[sort] })]));
+    }
+    const categoryGroup = el("fieldset", { className: "reviews-filter__group" }, [
+      el("legend", { className: "reviews-filter__legend", text: "カテゴリ" }),
+    ]);
+    for (const category of ALL_CATEGORIES) {
+      const input = el("input");
+      input.type = "checkbox";
+      input.checked = listFilter.categories.has(category);
+      input.addEventListener("change", () => {
+        if (input.checked) listFilter.categories.add(category);
+        else listFilter.categories.delete(category);
+        onChange();
+      });
+      categoryGroup.append(
+        el("label", { className: "reviews-filter__option" }, [input, el("span", { text: CATEGORY_LABEL[category] })]),
+      );
+    }
+    const keyword = el("input", { className: "reviews-filter__keyword" });
+    keyword.type = "search";
+    keyword.id = "reviews-filter-keyword";
+    keyword.placeholder = "コメントを検索";
+    keyword.autocomplete = "off";
+    keyword.addEventListener("input", () => {
+      listFilter.keyword = keyword.value;
+      onChange();
+    });
+    const keywordLabel = el("label", { className: "reviews-filter__legend", text: "キーワード" });
+    keywordLabel.htmlFor = keyword.id;
+    const details = el("details", { className: "reviews-filter" }, [
+      el("summary", { className: "reviews-filter__summary" }, [
+        el("span", { text: "並び替え・絞り込み" }),
+        filterSummary,
+      ]),
+      el("div", { className: "reviews-filter__body" }, [
+        sortGroup,
+        categoryGroup,
+        el("div", { className: "reviews-filter__group" }, [keywordLabel, keyword]),
+      ]),
+    ]);
+    return details;
+  }
 
   // --- data ------------------------------------------------------------
   function retry(): void {
@@ -241,6 +317,25 @@ export function createReviewsFeature(options: ReviewsFeatureOptions): ReviewsFea
     ]);
   }
 
+  /** 経路探索の導線。地図をタップした人の多くは目的地を決めたいので、シートの先頭に置く。 */
+  function routeActions(here: LngLat): HTMLElement[] {
+    if (!onSetDestination && !onSetOrigin) return [];
+    const row = el("div", { className: "review-route-actions" });
+    if (onSetDestination) {
+      const b = el("button", { className: "review-route-actions__primary", text: "ここを目的地にする" });
+      b.type = "button";
+      b.addEventListener("click", () => onSetDestination(here));
+      row.append(b);
+    }
+    if (onSetOrigin) {
+      const b = el("button", { className: "review-route-actions__secondary", text: "ここを出発地にする" });
+      b.type = "button";
+      b.addEventListener("click", () => onSetOrigin(here));
+      row.append(b);
+    }
+    return [row];
+  }
+
   function renderSheet(focusTitle: boolean): void {
     if (!selection) return;
     const detail = selection.reviewId ? reviews.find((r) => r.id === selection!.reviewId) : undefined;
@@ -249,12 +344,17 @@ export function createReviewsFeature(options: ReviewsFeatureOptions): ReviewsFea
       title.textContent = "口コミの詳細";
       body.replaceChildren(reviewDetail(detail));
     } else {
-      title.textContent = "この地点の口コミ・道路情報";
+      title.textContent = "この地点";
       const hazards = hazardSection();
       const here = selection.center;
       const post = postButton("この地点に口コミを投稿");
       post.addEventListener("click", () => onPost?.(here));
-      body.replaceChildren(userSection(), ...(onPost ? [post] : []), ...(hazards ? [hazards] : []));
+      body.replaceChildren(
+        ...routeActions(here),
+        userSection(),
+        ...(onPost ? [post] : []),
+        ...(hazards ? [hazards] : []),
+      );
     }
     sheet.inert = false;
     sheet.classList.add("is-open");
@@ -276,7 +376,8 @@ export function createReviewsFeature(options: ReviewsFeatureOptions): ReviewsFea
   }
 
   function renderList(): void {
-    listSummary.textContent = loadedOnce && reviews.length > 0 ? `表示中の範囲 ${reviews.length}件` : "";
+    filterSummary.textContent = summarizeListFilter(listFilter);
+    listSummary.textContent = "";
     if (!loadedOnce) {
       listContent.replaceChildren(
         load === "error"
@@ -289,12 +390,18 @@ export function createReviewsFeature(options: ReviewsFeatureOptions): ReviewsFea
       listContent.replaceChildren(renderState({ kind: "empty", message: "表示中の範囲に口コミはありません。" }));
       return;
     }
+    const shown = filterAndSortReviews(reviews, listFilter);
+    listSummary.textContent = isFiltering(listFilter)
+      ? `表示中の範囲 ${reviews.length}件中 ${shown.length}件`
+      : `表示中の範囲 ${reviews.length}件`;
     listContent.replaceChildren(
-      el(
-        "ul",
-        { className: "review-list" },
-        reviews.map((review) => reviewItem(review, () => openReview(review.id))),
-      ),
+      shown.length === 0
+        ? renderState({ kind: "empty", message: "条件に合う口コミはありません。" })
+        : el(
+            "ul",
+            { className: "review-list" },
+            shown.map((review) => reviewItem(review, () => openReview(review.id))),
+          ),
     );
   }
 

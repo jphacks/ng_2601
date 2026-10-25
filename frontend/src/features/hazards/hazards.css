@@ -99,7 +99,7 @@
   z-index: 15;
   left: var(--left-offset);
   right: var(--right-offset);
-  bottom: calc(var(--bottom-offset) + var(--row-height) + var(--space-3));
+  bottom: calc(var(--bottom-offset) + var(--fab-size) + var(--space-3));
   max-height: 45dvh;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -113,7 +113,7 @@
   .hazard-card {
     left: auto;
     right: calc(var(--right-offset) + var(--button-size) + var(--space-3));
-    /* 検索バー（展開時は上部に全幅）の下に置く。 */
+    /* 上部のカテゴリチップの下に置く。 */
     top: calc(var(--top-offset) + var(--row-height) + var(--space-2));
     bottom: auto;
     width: 360px;
@@ -152,3 +152,40 @@
 .hazard-detail__when { margin: 0; font-size: 13px; font-weight: 600; }
 .hazard-detail__cautions { margin: 0; padding-left: var(--space-4); font-size: 12px; color: var(--color-warning); }
 .hazard-detail__notes { margin: 0; padding-left: var(--space-4); font-size: 12px; color: var(--color-text-muted); }
+
+/* 地図上のカテゴリチップ。メニューボタンの右に1行で並べ、入りきらない幅では横にスクロールする。 */
+.hazard-chips {
+  position: absolute;
+  z-index: 10;
+  top: var(--top-offset);
+  left: calc(var(--left-offset) + var(--button-size) + var(--space-2));
+  right: var(--right-offset);
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  pointer-events: none;
+}
+.hazard-chips::-webkit-scrollbar { display: none; }
+.hazard-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--button-size);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-bar);
+  background: var(--color-surface-floating);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--shadow-floating);
+  font-size: 14px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.hazard-chip input { position: absolute; opacity: 0; pointer-events: none; }
+.hazard-chip:has(input:focus-visible) { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.hazard-chip:has(input:checked) { background: var(--color-selected); border-color: var(--color-selected); font-weight: 600; }
+.hazard-chip:not(:has(input:checked)) .hazard-swatch { opacity: 0.35; }
+.hazard-chips.is-layer-off .hazard-chip { color: var(--color-text-muted); }
+

@@ -2,14 +2,13 @@
 
 /* 入力項目が多いので、一覧シートより高さを取る。 */
 .review-sheet.post-sheet {
-  max-height: calc(var(--vvh) - var(--top-offset) - var(--bottom-offset) - var(--row-height) - var(--space-4) * 2);
+  max-height: calc(var(--vvh) - var(--top-offset) - var(--bottom-offset) - var(--fab-size) - var(--space-4) * 2);
 }
 
 .post-form { display: grid; gap: var(--space-4); }
 .post-form__field { display: grid; gap: var(--space-2); margin: 0; padding: 0; border: 0; min-width: 0; }
 .post-form__label { padding: 0; font-size: 13px; font-weight: 600; }
 .post-form__location { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
-.post-form__value { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
 
 .post-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .post-chip {

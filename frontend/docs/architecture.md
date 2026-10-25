@@ -34,11 +34,11 @@
 | フロントエンド | 地点・設定入力、地図と検索結果・標高・道路情報・口コミの表示、読み込み／空／失敗状態を扱う | `src/features/shell/`、`map/`、`route/`、`elevation/`、`hazards/`、`reviews/`、`preferences/`に実装。実API利用は`VITE_API_MODE=http`で選択できる。ログイン画面とアクセストークン保持は未実装のため、認証が必要な操作は実BEでは401になる |
 | FE開発・通信基盤 | Vite + TypeScript、UIライブラリなし。画面はApiClient経由でモック／HTTPを切り替える | [PR #16](https://github.com/jphacks/ng_2601/pull/16)でマージ済み。`frontend/src/features/`、`frontend/src/ui/`、`frontend/src/api/`、`frontend/src/types/`、`frontend/src/mocks/`に分離 |
 | バックエンド | FEから経路探索、地図データ、観測、設定を受け付け、外部データの出典を返す | `back/backend/app/main.py` と `auth.py` に実装。`POST /v1/routes`、`GET /v1/map-data`、`GET/POST /v1/observations`、`GET /v1/routing-options`、`/v1/auth/me*`などの正本は[`back/docs/api.md`](../../back/docs/api.md)。FEとの実サーバー結合テストは未実施 |
-| 地図表示 | MapLibreで地点選択、ルート・道路情報・口コミのレイヤー表示、帰属表示 | `features/map/` と `features/hazards/`、`features/reviews/`に実装。モック／HTTPを切り替え、HTTPモードでは表示領域のbboxを`GET /v1/map-data`へ送る。実データの結合・モバイル実機は未検証 |
-| 現在地表示 | 利用者の操作で現在地を1回取得して表示。拒否・タイムアウト・非対応でも地図と手動の地点指定は使える。位置は保存・送信しない | `features/geolocation/`に実装。仕様と制約は[geolocation.md](geolocation.md) |
+| 地図表示 | MapLibreで地点選択、ルート・道路情報・口コミのレイヤー表示、帰属表示 | `features/map/` と `features/hazards/`、`features/reviews/`に実装。ベースマップはOpenFreeMap Libertyのベクタータイルから、POI・道路番号・一方通行矢印などを除いて日本語ラベルにしたもの（`map/style.ts`）、帰属は「OpenFreeMap © OpenStreetMap」と、標高に使う「地理院タイルを加工して作成」を並べて常時表示。モック／HTTPを切り替え、HTTPモードでは表示領域のbboxを`GET /v1/map-data`へ送る。実データの結合・モバイル実機は未検証 |
+| 現在地表示 | 利用者の操作で現在地を1回取得して表示。拒否・タイムアウト・非対応でも地図と手動の地点指定は使える。位置は保存しない。送信は出発地（既定は現在地）として経路検索に使うときだけ | `features/geolocation/`に実装。仕様と制約は[geolocation.md](geolocation.md) |
 | 経路探索 | FEは出発地・目的地・車種・4つの設定を送り、返却された単一経路を描画する | `features/route/` と `api/routeAdapter.ts`に実装。HTTPモードは`POST /v1/routes`へ接続し、地点指定は地図タップのみ（住所検索なし）。実BE結合は未検証 |
 | 車種・坂道許容度（Preferences） | 車種・坂道許容度・詳細パラメータ（交通量・路面・押し歩き）を選び、初期値・再検索に使う | `features/preferences/`に実装。選択肢・初期値は`GET /v1/routing-options`、保存・取得は`/v1/auth/me*`（要ログイン）。ログインUIとトークン注入は未実装なので、編集値を検索へ送る機能と、認証済み保存の接続状態を分けて扱う |
-| 標高・勾配 | 距離・獲得標高・下降量・標高プロファイルの表示と勾配色分け | `features/elevation/`に実装し、HTTPモードでは国土地理院DEMをブラウザから取得する。これはルートAPIの応答に含まれないFE側の推定値で、欠測・出典を別表示する。実DEMの結合・実機モバイルは未検証 |
+| 標高・勾配 | 距離・時間・獲得標高・最大上りと標高プロファイルの表示、勾配色分け | `features/elevation/`に実装し、HTTPモードでは国土地理院DEMをブラウザから取得する。これはルートAPIの応答に含まれないFE側の推定値。欠測は結果欄に短く表示し、出典は地図の帰属表示にまとめる。実DEMの結合・実機モバイルは未検証 |
 | 道路・危険情報 | レイヤー・フィルタ・詳細で種類、情報源、更新日時、有効期限を表示 | `features/hazards/` と `api/mapDataLoader.ts`に実装。HTTPモードでは表示領域のbboxを`GET /v1/map-data`へ送り、規制・事故・交通量・観測を別レイヤーとして扱う。出典と鮮度はバックエンドのsource metadataを表示する。認証不要の取得は接続済みだが、実データでの受入検証は未実施 |
 | 口コミ | 地点に紐づく一覧・詳細・投稿、ユーザー情報と公的情報の区別 | `features/reviews/`に実装。HTTPモードでは`GET /v1/observations`を表示bboxで取得し、投稿は`POST /v1/observations`へ送る。投稿にはBearer認証が必要だが、FEのログインUI・トークン保持は未実装なので実BEでは401になる。モデレーション画面、通報窓口、実BEでの結合検証は未実施 |
 

@@ -9,6 +9,7 @@ export type SearchConditions = RouteConditions;
 /** 検索結果に実際に適用された条件。編集中の条件(draft)とは別に保持する。 */
 export interface AppliedSearch extends SearchConditions {
   origin: LngLat;
+  originSource: OriginSource;
   destination: LngLat;
 }
 
@@ -21,8 +22,13 @@ export type SearchStatus =
 
 export type PickMode = "origin" | "destination";
 
+/** 出発地の決め方。current は端末の現在地（表示は「現在地」）。 */
+export type OriginSource = "current" | "map";
+
 export interface RouteSearchState {
   origin: LngLat | null;
+  /** origin が null の間は null。 */
+  originSource: OriginSource | null;
   destination: LngLat | null;
   /** 地図タップで指定中の地点。null は指定モードではない。 */
   pickMode: PickMode | null;
@@ -32,6 +38,8 @@ export interface RouteSearchState {
   elevation: ElevationState;
   /** 検索前の入力検証エラー。次の操作で消える。 */
   validationError: string | null;
+  /** 検索の準備中（出発地にする現在地を取り直している間など）。検索が始まると false に戻る。 */
+  preparing: boolean;
 }
 
 /**
@@ -82,11 +90,15 @@ export interface RouteStore {
   cancelPick(): void;
   /** 地図タップ。指定モード中なら地点として採用して true（他のクリック処理は不要）。 */
   pick(lngLat: LngLat): boolean;
+  /** 地点を直接決める（地図の地点シートや現在地から）。指定モードは終わる。 */
+  setPoint(which: PickMode, lngLat: LngLat, source?: OriginSource): void;
   clearPoint(which: PickMode): void;
   swap(): void;
   /** 地点と結果をすべて消す。 */
   reset(): void;
   setDraft(patch: Partial<SearchConditions>): void;
+  /** 検索の前に時間のかかる準備をする間、探索中として見せる。 */
+  setPreparing(on: boolean): void;
   search(): Promise<void>;
   retryElevation(): void;
 }
@@ -94,12 +106,14 @@ export interface RouteStore {
 export function createRouteStore(api: ApiClient, analyzer: RouteAnalyzer = analyzeRoute): RouteStore {
   let state: RouteSearchState = {
     origin: null,
+    originSource: null,
     destination: null,
     pickMode: null,
     draft: { ...FALLBACK_CONDITIONS },
     status: { kind: "idle" },
     elevation: { kind: "idle" },
     validationError: null,
+    preparing: false,
   };
   const listeners = new Set<(s: RouteSearchState) => void>();
   /** 古い応答が新しい検索結果を上書きしないための連番。 */
@@ -154,46 +168,70 @@ export function createRouteStore(api: ApiClient, analyzer: RouteAnalyzer = analy
     pick(lngLat) {
       const mode = state.pickMode;
       if (!mode) return false;
-      const origin = mode === "origin" ? lngLat : state.origin;
-      const destination = mode === "destination" ? lngLat : state.destination;
-      // 片方だけ未指定なら続けてもう片方を指定させる。
-      const next: PickMode | null = !origin ? "origin" : !destination ? "destination" : null;
-      update({ origin, destination, pickMode: next });
+      if (mode === "origin") {
+        // 出発地を決めたら、目的地が未指定なら続けて指定させる。
+        update({ origin: lngLat, originSource: "map", pickMode: state.destination ? null : "destination" });
+      } else {
+        // 出発地が未指定でも続けて指定させない。既定の現在地で埋めるのは呼び出し側。
+        update({ destination: lngLat, pickMode: null });
+      }
       return true;
     },
+    setPoint(which, lngLat, source = "map") {
+      update(which === "origin" ? { origin: lngLat, originSource: source, pickMode: null } : { destination: lngLat, pickMode: null });
+    },
     clearPoint(which) {
-      update(which === "origin" ? { origin: null } : { destination: null });
+      update(which === "origin" ? { origin: null, originSource: null } : { destination: null });
     },
     swap() {
-      update({ origin: state.destination, destination: state.origin });
+      update({
+        origin: state.destination,
+        originSource: state.destination ? "map" : null,
+        destination: state.origin,
+      });
     },
     reset() {
       invalidatePending();
       cancelElevation();
-      update({ origin: null, destination: null, pickMode: null, status: { kind: "idle" }, elevation: { kind: "idle" } });
+      update({
+        origin: null,
+        originSource: null,
+        destination: null,
+        pickMode: null,
+        preparing: false,
+        status: { kind: "idle" },
+        elevation: { kind: "idle" },
+      });
     },
     setDraft(patch) {
       update({ draft: { ...state.draft, ...patch } });
+    },
+    setPreparing(on) {
+      if (state.preparing !== on) update({ preparing: on, validationError: state.validationError });
     },
     retryElevation() {
       if (state.status.kind === "success" && state.elevation.kind !== "loading") void runElevation(state.status.route);
     },
     async search() {
-      if (state.status.kind === "loading") return;
-      const { origin, destination, draft } = state;
-      if (!origin || !destination) {
-        update({ validationError: "出発地と目的地を地図で指定してください。" });
+      // 検索中でも新しい検索を優先する（目的地を決め直したときなど）。古い応答は seq で捨てる。
+      const { origin, originSource, destination, draft } = state;
+      if (!destination) {
+        update({ validationError: "目的地を地図で指定してください。", preparing: false });
+        return;
+      }
+      if (!origin) {
+        update({ validationError: "出発地が未指定です。現在地を取得するか、地図で指定してください。", preparing: false });
         return;
       }
       if (haversineM(origin, destination) < MIN_DISTANCE_M) {
-        update({ validationError: "出発地と目的地が近すぎます。離れた地点を指定してください。" });
+        update({ validationError: "出発地と目的地が近すぎます。離れた地点を指定してください。", preparing: false });
         return;
       }
-      const applied: AppliedSearch = { origin, destination, ...draft };
+      const applied: AppliedSearch = { origin, originSource: originSource ?? "map", destination, ...draft };
       const mine = ++seq;
       cancelElevation();
       // 検索を始めた時点で古い経路は表示から外す。失敗しても古いルートが新しい結果に見えない。
-      update({ pickMode: null, status: { kind: "loading", applied }, elevation: { kind: "idle" } });
+      update({ pickMode: null, preparing: false, status: { kind: "loading", applied }, elevation: { kind: "idle" } });
       try {
         const route = await api.searchRoute({ origin, destination, ...draft });
         if (mine !== seq) return;
