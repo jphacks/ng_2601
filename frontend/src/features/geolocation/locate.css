@@ -1,0 +1,40 @@
+/* 現在地ボタンの通知。色・形は tokens.css を使う（docs/design-system.md）。 */
+.float-button.is-busy { color: var(--color-primary); animation: locate-pulse 1.2s ease-in-out infinite; }
+@keyframes locate-pulse { 50% { opacity: 0.45; } }
+
+/* 地点指定バナー（上端）の下に置き、地図とメニューボタンを覆わない。 */
+.locate-notice {
+  position: absolute;
+  z-index: 12;
+  top: calc(var(--top-offset) + var(--button-size) + var(--space-2));
+  left: var(--left-offset);
+  right: var(--right-offset);
+  max-width: 420px;
+  pointer-events: none;
+}
+.locate-notice__box {
+  pointer-events: auto;
+  padding: var(--space-3);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  border: 1px solid var(--color-primary);
+  box-shadow: var(--shadow-floating);
+  font-size: 13px;
+}
+.locate-notice__box--alert { border-color: var(--color-warning); }
+.locate-notice__text { margin: 0; color: var(--color-text); }
+.locate-notice__box--alert .locate-notice__text { color: var(--color-warning); }
+.locate-notice__actions { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
+.locate-notice__button {
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-bar);
+  background: var(--color-surface);
+  color: var(--color-primary);
+}
+.locate-notice__button:hover { background: var(--color-hover); }
+
+@media (prefers-reduced-motion: reduce) {
+  .float-button.is-busy { animation: none; opacity: 0.6; }
+}

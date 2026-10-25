@@ -83,6 +83,7 @@
 .map-marker--draft { background: var(--color-accent); color: var(--color-text); }
 .map-marker--origin { background: var(--color-primary); }
 .map-marker--destination { background: var(--color-accent); color: var(--color-text); }
+.map-marker--current { background: var(--color-route); width: 20px; height: 20px; border-width: 3px; }
 /* グラフの選択位置（#9）。操作対象ではないのでポインタを受け取らない。 */
 .map-route-cursor {
   width: 16px;

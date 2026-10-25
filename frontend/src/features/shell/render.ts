@@ -4,6 +4,7 @@ import { icon, type IconName } from "../../ui/icon";
 import { renderState } from "../../ui/state";
 import { api, isMockApi } from "../../api";
 import { createHazardsFeature, type HazardsFeature } from "../hazards/hazardsFeature";
+import { setupLocate } from "../geolocation/renderLocate";
 import { renderLayerPanel } from "../map/layerPanel";
 import { mountMap, type MapController } from "../map/map";
 import { ATTRIBUTION } from "../map/style";
@@ -150,7 +151,6 @@ export function renderShell(root: HTMLElement): void {
   drawer.append(el("h2", { className: "drawer__title", text: "Nature Ride" }), drawerItems, drawerClose);
 
   // --- map controls (right) ---------------------------------------------
-  const unavailable = "準備中です";
   const layersButton = button("地図レイヤー", "float-button", "layers");
   layersButton.addEventListener("click", () => openSearch("layers"));
   const compass = button("方位をリセット", "float-button float-button--accent", "compass");
@@ -159,10 +159,9 @@ export function renderShell(root: HTMLElement): void {
   zoomIn.addEventListener("click", () => mapController.zoomIn());
   const zoomOut = button("ズームアウト", "float-button map-controls__zoom", "minus");
   zoomOut.addEventListener("click", () => mapController.zoomOut());
-  // 現在地はGPS対応（#14）で接続する。
-  const locate = button(`現在地を表示（${unavailable}）`, "float-button", "locate");
-  locate.disabled = true;
-  locate.title = unavailable;
+  // 現在地は押したときだけ取得する（features/geolocation）。検索パネルが通知と地図を覆わないよう閉じる。
+  const locate = button("現在地を表示", "float-button", "locate");
+  const locateNotice = setupLocate(locate, mapController, { onStart: () => closeSearch(false) });
   const controls = el("div", { className: "map-controls" }, [layersButton, compass, locate, zoomIn, zoomOut]);
 
   // --- search card: one DOM instance, only its position/size changes ----
@@ -439,6 +438,7 @@ export function renderShell(root: HTMLElement): void {
     reviewPost.banner,
     reviewPost.status,
     renderPickBanner(routeStore),
+    locateNotice,
     card,
     scrim,
     drawer,
