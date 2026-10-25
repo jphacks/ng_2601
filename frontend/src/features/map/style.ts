@@ -9,8 +9,9 @@ export const BASEMAP_MAX_ZOOM = 18;
 export const BASEMAP_LEGEND_LABEL = "国土地理院 淡色地図";
 
 /** 地図右下に常時表示する帰属。リンクは呼び出し側で組み立てる。 */
+// 経路の標高も国土地理院の標高タイルを加工して出しているので、規約上の出典はここにまとめて書く。
 export const ATTRIBUTION = {
-  label: "地理院タイル",
+  label: "地理院タイル（標高タイルを加工して利用）",
   url: "https://maps.gsi.go.jp/development/ichiran.html",
 } as const;
 
