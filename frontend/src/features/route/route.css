@@ -1,25 +1,7 @@
-/* 経路ビュー（検索条件・ルート結果）。色と余白は tokens.css を使う。 */
+/* 経路ビュー（ルート結果・検索条件）。色と余白は tokens.css を使う。 */
 .route { display: grid; min-width: 0; gap: var(--space-3); }
 .route__pane { display: grid; min-width: 0; gap: var(--space-3); }
 .route__pane:focus { outline: none; }
-
-.route__tabs { display: flex; gap: var(--space-1); }
-.route__tab {
-  flex: 1;
-  min-width: 0;
-  min-height: 40px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-bar);
-  background: var(--color-surface);
-  font-weight: 600;
-}
-.route__tab:hover { background: var(--color-hover); }
-.route__tab[aria-selected="true"] {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: var(--color-surface);
-}
 
 .route__button {
   min-height: 40px;
@@ -99,7 +81,7 @@
 }
 .route__validation { margin: 0; color: var(--color-warning); font-size: 13px; }
 
-.route__summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin: 0; }
+.route__summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); margin: 0; }
 .route__stat {
   display: grid;
   min-width: 0;
@@ -113,12 +95,6 @@
 .route__stat dd { margin: 0; font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
 
 .route__section { display: grid; gap: var(--space-2); }
-.route__heading { margin: 0; font-size: 14px; }
-.route__result-heading { margin: 0; font-size: 16px; }
-.route__endpoints { display: grid; gap: var(--space-1); }
-.route__endpoint { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: var(--space-2); align-items: baseline; }
-.route__endpoint-label { font-size: 13px; font-weight: 600; color: var(--color-text-muted); }
-.route__endpoint-value { min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
 .route__elevation-placeholder {
   display: grid;
   place-items: center;
@@ -131,13 +107,13 @@
   font-size: 13px;
   text-align: center;
 }
-.route__details, .route__applied-details, .route__points {
+.route__details, .route__points {
   min-width: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-panel);
   background: var(--color-surface);
 }
-.route__details > summary, .route__applied-details > summary, .route__points > summary {
+.route__details > summary, .route__points > summary {
   display: flex;
   align-items: center;
   min-height: 44px;
@@ -146,7 +122,7 @@
   font-weight: 600;
   cursor: pointer;
 }
-.route__details > summary:focus-visible, .route__applied-details > summary:focus-visible, .route__points > summary:focus-visible {
+.route__details > summary:focus-visible, .route__points > summary:focus-visible {
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
   border-radius: var(--radius-panel);
@@ -163,10 +139,6 @@
 }
 .route__detail-list dt { color: var(--color-text-muted); }
 .route__detail-list dd { margin: 0; text-align: right; }
-.route__applied { display: grid; grid-template-columns: auto 1fr; gap: var(--space-1) var(--space-3); margin: 0; font-size: 13px; }
-.route__applied dt { color: var(--color-text-muted); }
-.route__applied dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
-.route__applied-details > .route__applied { padding: 0 var(--space-3) var(--space-3); }
 .route__stale {
   margin: 0;
   padding: var(--space-2) var(--space-3);
@@ -213,7 +185,3 @@
   font-size: 12px;
 }
 
-@media (max-width: 767px) {
-  /* The selected endpoints are already visible on the map on small screens. */
-  .route__endpoints { display: none; }
-}

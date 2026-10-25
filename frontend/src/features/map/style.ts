@@ -11,10 +11,11 @@ export const BASEMAP_MAX_ZOOM = 18;
 export const BASEMAP_LEGEND_LABEL = "OpenStreetMap";
 
 /** 地図右下に常時表示する帰属。リンクは呼び出し側で組み立てる。 */
-export const ATTRIBUTION = {
-  label: "© OpenFreeMap © OpenMapTiles © OpenStreetMap",
-  url: "https://www.openstreetmap.org/copyright",
-} as const;
+// 経路の標高も国土地理院の標高タイルを加工して出しているので、規約上の出典はここにまとめて書く。
+export const ATTRIBUTIONS = [
+  { label: "OpenFreeMap © OpenStreetMap", url: "https://www.openstreetmap.org/copyright" },
+  { label: "地理院タイルを加工して作成", url: "https://maps.gsi.go.jp/development/ichiran.html" },
+] as const;
 
 /** 名古屋駅周辺（シードとモックデータの範囲） */
 export const INITIAL_VIEW = { center: [136.8816, 35.1709] as [number, number], zoom: 15 };
