@@ -106,8 +106,8 @@ export function renderPreferences(routeStore: RouteStore, prefs: PreferencesStor
     hillRange.setAttribute("aria-hidden", "true");
     const hillField = el("div", { className: "route__field" }, [
       el("div", { className: "pref__head" }, [hillLabel, hillCurrent]),
-      slider,
       hillRange,
+      slider,
     ]);
 
     // --- 詳細パラメータ（折りたたみ） ---
