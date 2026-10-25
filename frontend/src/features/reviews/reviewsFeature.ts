@@ -110,10 +110,11 @@ export function createReviewsFeature(options: ReviewsFeatureOptions): ReviewsFea
   status.hidden = true;
   const listContent = el("div");
   // 投稿ボタンは再描画で作り直さない（フォーカスを保つ）。
-  const listPost = postButton("口コミを投稿する");
+  const listPost = postButton("口コミを投稿");
   listPost.addEventListener("click", () => onPost?.(null));
+  const listSummary = el("p", { className: "reviews-list__summary" });
   const listPanel = el("div", { className: "reviews-list" }, [
-    el("div", { className: "reviews-actions" }, [listPost]),
+    el("div", { className: "reviews-actions" }, [listSummary, listPost]),
     listContent,
   ]);
 
@@ -236,7 +237,7 @@ export function createReviewsFeature(options: ReviewsFeatureOptions): ReviewsFea
     if (hazards.length === 0) return null;
     return el("section", { className: "review-section" }, [
       el("h3", { className: "review-section__title", text: `道路・規制情報（${hazards.length}件）` }),
-      el("ul", { className: "review-list" }, hazards.map(hazardCard)),
+      el("ul", { className: "review-road-list" }, hazards.map(hazardCard)),
     ]);
   }
 
@@ -275,6 +276,7 @@ export function createReviewsFeature(options: ReviewsFeatureOptions): ReviewsFea
   }
 
   function renderList(): void {
+    listSummary.textContent = loadedOnce && reviews.length > 0 ? `表示中の範囲 ${reviews.length}件` : "";
     if (!loadedOnce) {
       listContent.replaceChildren(
         load === "error"
@@ -288,7 +290,6 @@ export function createReviewsFeature(options: ReviewsFeatureOptions): ReviewsFea
       return;
     }
     listContent.replaceChildren(
-      el("p", { className: "reviews-list__summary", text: `表示中の範囲の口コミ（${reviews.length}件）` }),
       el(
         "ul",
         { className: "review-list" },
