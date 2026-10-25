@@ -10,7 +10,7 @@ export const isMockApi = !useHttp;
 /** VITE_API_MODE=http のとき実API、それ以外はモック。 */
 export const api: ApiClient =
   useHttp
-    ? createHttpClient(import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000")
+    ? createHttpClient(import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080")
     : createMockClient();
 
 export type { ApiClient } from "./client";

@@ -139,7 +139,7 @@ export function renderHazardPanel(filter: HazardFilter, actions: PanelActions): 
       nodes.push(renderState({ kind: "empty", message: "地図を拡大すると道路情報を取得します。" }));
     }
     if (loader.truncated) {
-      const warn = el("p", { className: "hazard-panel__warn", text: `ユーザー報告が上限（${model.limit}件）に達したため、一部しか表示されていない可能性があります。地図を拡大してください。` });
+      const warn = el("p", { className: "hazard-panel__warn", text: `表示件数が上限（${model.limit}件）に達した情報があるため、一部しか表示されていない可能性があります。地図を拡大してください。` });
       warn.setAttribute("role", "status");
       nodes.push(warn);
     }

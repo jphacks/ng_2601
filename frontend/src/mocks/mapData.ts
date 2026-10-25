@@ -1,4 +1,4 @@
-import type { Feature, Geometry } from "geojson";
+import type { Feature, Geometry, Point } from "geojson";
 import type {
   AccidentProps,
   MapDataResponse,
@@ -15,6 +15,12 @@ const feature = <G extends Geometry, P>(geometry: G, properties: P): Feature<G, 
   type: "Feature",
   geometry,
   properties,
+});
+
+// properties.id にしないのは、BE の /v1/map-data が報告の id を Feature.id で返すため。
+const observation = (id: string, geometry: Point, properties: ObservationProps): Feature<Point, ObservationProps> => ({
+  ...feature(geometry, properties),
+  id,
 });
 
 const point = (lng: number, lat: number) => ({ type: "Point" as const, coordinates: [lng, lat] });
@@ -102,9 +108,8 @@ export function buildMockMapData(now: Date = new Date()): MapDataResponse {
     feature(point(139.7712, 35.683), { bicycle_involved: false, fatal_or_serious: false }),
   ];
 
-  const observations: Array<Feature<Geometry, ObservationProps>> = [
-    feature(point(139.7679, 35.6821), {
-      id: "mock-o1",
+  const observations: Array<Feature<Point, ObservationProps>> = [
+    observation("mock-o1", point(139.7679, 35.6821), {
       category: "construction",
       temporal_kind: "temporary",
       observed_at: at(-2),
@@ -115,8 +120,7 @@ export function buildMockMapData(now: Date = new Date()): MapDataResponse {
       description: "歩道の一部が工事中。車道側に迂回が必要です。",
     }),
     // 期限切れ＋未確認。
-    feature(point(139.769, 35.6828), {
-      id: "mock-o2",
+    observation("mock-o2", point(139.769, 35.6828), {
       category: "debris_glass",
       temporal_kind: "temporary",
       observed_at: at(-24 * 6),
@@ -127,8 +131,7 @@ export function buildMockMapData(now: Date = new Date()): MapDataResponse {
       description: "ガラス片が散乱していたとの報告。",
     }),
     // 更新日時が不明（null）。
-    feature(point(139.7655, 35.6828), {
-      id: "mock-o3",
+    observation("mock-o3", point(139.7655, 35.6828), {
       category: "steep_slope",
       temporal_kind: "permanent",
       observed_at: null,
@@ -139,8 +142,7 @@ export function buildMockMapData(now: Date = new Date()): MapDataResponse {
       description: "急な上り坂（約8%）。",
     }),
     // 更新日時のキーがない（欠測）。
-    feature(point(139.7701, 35.6845), {
-      id: "mock-o4",
+    observation("mock-o4", point(139.7701, 35.6845), {
       category: "bike_lane",
       temporal_kind: "permanent",
       status: "active",
@@ -148,8 +150,7 @@ export function buildMockMapData(now: Date = new Date()): MapDataResponse {
       description: "車道左側に自転車レーンあり。",
     }),
     // 解消済み。
-    feature(point(139.7674, 35.6805), {
-      id: "mock-o5",
+    observation("mock-o5", point(139.7674, 35.6805), {
       category: "dangerous_intersection",
       temporal_kind: "permanent",
       observed_at: at(-24 * 20),
@@ -158,8 +159,7 @@ export function buildMockMapData(now: Date = new Date()): MapDataResponse {
       verification_state: "corroborated",
       description: "見通しの悪い交差点。信号の設置工事が完了したとの報告。",
     }),
-    feature(point(139.7717, 35.6838), {
-      id: "mock-o6",
+    observation("mock-o6", point(139.7717, 35.6838), {
       category: "bike_parking",
       temporal_kind: "permanent",
       observed_at: at(-24 * 30),
@@ -168,8 +168,7 @@ export function buildMockMapData(now: Date = new Date()): MapDataResponse {
       verification_state: "corroborated",
       description: "約30台分の駐輪場。",
     }),
-    feature(point(139.7636, 35.6812), {
-      id: "mock-o7",
+    observation("mock-o7", point(139.7636, 35.6812), {
       category: "traffic_regulation",
       temporal_kind: "date_range",
       observed_at: at(-24),
@@ -221,7 +220,7 @@ export function buildMockMapData(now: Date = new Date()): MapDataResponse {
     },
     observations: {
       type: "FeatureCollection",
-      features: observations as Array<Feature<ReturnType<typeof point>, ObservationProps>>,
+      features: observations,
       source: { source_id: "user_report", authority: "community", routing_effect: "none_until_validated" },
     },
   };
