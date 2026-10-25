@@ -37,8 +37,10 @@ button { cursor: pointer; }
   height: var(--attr-h);
   display: flex;
   align-items: center;
+  gap: var(--space-2);
   padding-inline: var(--space-2);
   font-size: 11px;
+  white-space: nowrap;
   color: var(--color-text-muted);
   z-index: 5;
 }

@@ -15,7 +15,7 @@ import { renderState } from "../../ui/state";
 import { CATEGORY_GLYPH, CATEGORY_LABEL } from "../reviews/catalog";
 import type { ReviewPlace } from "../reviews/grouping";
 import { createMarker, hideMarker, showMarker, type MarkerSpec } from "./markers";
-import { BASEMAP_LEGEND_LABEL, BASEMAP_MAX_ZOOM, INITIAL_VIEW, createStyle } from "./style";
+import { BASEMAP_LEGEND_LABEL, BASEMAP_MAX_ZOOM, BASEMAP_SOURCE, BASEMAP_STYLE_URL, INITIAL_VIEW, simplifyStyle } from "./style";
 
 // MapLibre v6 のWorkerをViteで依存ファイルごとビルドし、生成URLを指定する。
 maplibregl.setWorkerUrl(workerUrl);
@@ -180,6 +180,7 @@ function segmentProperties(routeId: string, segment: RouteGradientSegment, index
 export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): MapController {
   let map: maplibregl.Map | null = null;
   let loaded = false;
+  let basemapLayerIds: string[] = [];
   let routes: Route[] = [];
   let roadItems: readonly RoadInfoItem[] = [];
   let roadNow = new Date();
@@ -369,7 +370,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
     if (!visible.routes) clearGradientSelection();
     if (!map || !loaded) return;
     const vis = (on: boolean) => (on ? "visible" : "none");
-    map.setLayoutProperty("basemap", "visibility", vis(visible.basemap));
+    for (const id of basemapLayerIds) map.setLayoutProperty(id, "visibility", vis(visible.basemap));
     map.setLayoutProperty(ROUTE_LAYER, "visibility", vis(visible.routes));
     for (const id of ROAD_LAYERS) map.setLayoutProperty(id, "visibility", vis(visible.hazards));
     const groups: Array<[boolean, maplibregl.Marker[]]> = [[visible.reviews, reviewMarkers]];
@@ -539,17 +540,18 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
       const selectionColor = rootStyles.getPropertyValue("--color-accent").trim() || "#dda15e";
       const m = new maplibregl.Map({
         container: canvas,
-        style: createStyle(),
         center: INITIAL_VIEW.center,
         zoom: INITIAL_VIEW.zoom,
         maxZoom: BASEMAP_MAX_ZOOM,
         // 帰属表示はシェルの .attribution に常時表示する。
         attributionControl: false,
       });
+      m.setStyle(BASEMAP_STYLE_URL, { transformStyle: simplifyStyle });
       map = m;
 
       m.on("load", () => {
         loaded = true;
+        basemapLayerIds = m.getStyle().layers.filter((layer) => layer.type !== "background").map((layer) => layer.id);
         m.addSource(ROUTE_SOURCE, { type: "geojson", data: routeCollection() });
         m.addLayer({
           id: ROUTE_LAYER,
@@ -658,7 +660,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
         notice.hidden = false;
       });
       m.on("sourcedata", (e) => {
-        if (e.sourceId !== "basemap" || !e.tile) return;
+        if (e.sourceId !== BASEMAP_SOURCE || !e.tile) return;
         failed.delete(tileKey(e.tile));
         if (failed.size === 0) notice.hidden = true;
       });

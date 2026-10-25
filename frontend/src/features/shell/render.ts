@@ -7,7 +7,7 @@ import { createHazardsFeature, type HazardsFeature } from "../hazards/hazardsFea
 import { setupLocate } from "../geolocation/renderLocate";
 import { renderLayerPanel } from "../map/layerPanel";
 import { mountMap, type MapController } from "../map/map";
-import { ATTRIBUTION } from "../map/style";
+import { ATTRIBUTIONS } from "../map/style";
 import { createReviewPostFeature, type ReviewPostFeature } from "../reviews/postForm";
 import { formatOrigin, formatPoint, renderRouteView } from "../route/renderRoute";
 import { createPreferencesStore } from "../preferences/preferencesState";
@@ -141,11 +141,14 @@ export function renderShell(root: HTMLElement): void {
       reviews?.close();
     },
   });
-  const attributionLink = el("a", { text: ATTRIBUTION.label });
-  attributionLink.href = ATTRIBUTION.url;
-  attributionLink.target = "_blank";
-  attributionLink.rel = "noopener noreferrer";
-  const attribution = el("div", { className: "attribution" }, [attributionLink]);
+  const attributionLinks = ATTRIBUTIONS.map(({ label, url }) => {
+    const link = el("a", { text: label });
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    return link;
+  });
+  const attribution = el("div", { className: "attribution" }, attributionLinks);
 
   // --- hamburger + drawer -----------------------------------------------
   const menuButton = button("メニューを開く", "float-button menu-button", "menu");
