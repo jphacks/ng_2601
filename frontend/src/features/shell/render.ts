@@ -178,6 +178,7 @@ export function renderShell(root: HTMLElement): void {
     const focused = account.contains(document.activeElement);
     renderAccount();
     if (focused) account.querySelector("button")?.focus();
+    void prefsStore.load();
   });
   renderAccount();
   drawer.append(el("h2", { className: "drawer__title", text: "Nature Ride" }), account, drawerItems, drawerClose);
