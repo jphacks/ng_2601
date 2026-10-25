@@ -12,6 +12,8 @@ import hmac
 import os
 import secrets
 import smtplib
+import socket
+import ssl
 from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 from typing import Any, Literal
@@ -99,12 +101,83 @@ class AuthService:
         self.google_callback_url = os.getenv(
             "GOOGLE_CALLBACK_URL", "http://localhost:8080/v1/auth/google/callback"
         )
-        self.smtp_host = os.getenv("SMTP_HOST", "smtp-relay.gmail.com")
+        self.smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
         self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        self.smtp_security = os.getenv("SMTP_SECURITY", "auto").strip().lower()
+        self.smtp_auth_mode = os.getenv("SMTP_AUTH_MODE", "required").strip().lower()
+        self.smtp_helo_name = os.getenv("SMTP_HELO_NAME", "").strip() or socket.getfqdn()
         self.smtp_sender = os.getenv("SMTP_SENDER", "")
         self.smtp_username = os.getenv("SMTP_USERNAME", "")
         self.smtp_password = os.getenv("SMTP_PASSWORD", "")
         self._oauth_states: dict[str, datetime] = {}
+
+    def _send_smtp(self, message: EmailMessage) -> None:
+        if self.smtp_security not in {"auto", "starttls", "ssl"}:
+            raise HTTPException(status_code=503, detail="SMTP_SECURITY must be auto, starttls, or ssl")
+        if self.smtp_auth_mode not in {"required", "auto", "none"}:
+            raise HTTPException(status_code=503, detail="SMTP_AUTH_MODE must be required, auto, or none")
+
+        security = self.smtp_security
+        if security == "auto" and self.smtp_port == 465:
+            security = "ssl"
+        tls_context = ssl.create_default_context()
+
+        def send_once(mode: str, host: str, port: int) -> None:
+            if mode == "ssl":
+                with smtplib.SMTP_SSL(
+                    host, port, timeout=20, local_hostname=self.smtp_helo_name, context=tls_context
+                ) as smtp:
+                    self._smtp_ehlo(smtp)
+                    self._smtp_authenticate(smtp)
+                    smtp.send_message(message)
+                return
+            with smtplib.SMTP(host, port, timeout=20, local_hostname=self.smtp_helo_name) as smtp:
+                self._smtp_ehlo(smtp)
+                smtp.starttls(context=tls_context)
+                self._smtp_ehlo(smtp)
+                self._smtp_authenticate(smtp)
+                smtp.send_message(message)
+
+        try:
+            send_once(security, self.smtp_host, self.smtp_port)
+        except (smtplib.SMTPNotSupportedError, smtplib.SMTPResponseException) as error:
+            # Some relay configurations expose implicit TLS on 465 but do not
+            # advertise STARTTLS on the configured 587 listener. Retrying on
+            # 465 is encrypted and safe; silently falling back to plaintext is
+            # never acceptable when SMTP AUTH credentials are present.
+            retryable_response = not isinstance(error, smtplib.SMTPResponseException) or (
+                400 <= error.smtp_code < 500 and error.smtp_code != 421
+            )
+            if security == "auto" and self.smtp_port == 587 and retryable_response:
+                send_once("ssl", self.smtp_host, 465)
+            else:
+                raise
+
+    @staticmethod
+    def _smtp_ehlo(smtp: smtplib.SMTP) -> None:
+        code, response = smtp.ehlo()
+        if code != 250:
+            raise smtplib.SMTPResponseException(code, response)
+
+    def _smtp_authenticate(self, smtp: smtplib.SMTP) -> None:
+        """Authenticate when required or when an auto relay advertises AUTH.
+
+        Google Workspace SMTP relay can be restricted by source IP instead of
+        SMTP AUTH. Such a listener intentionally omits the AUTH extension; the
+        connection is still encrypted, but calling ``login`` can never work.
+        ``auto`` accepts that documented relay mode while ``required`` keeps
+        account authentication mandatory for ordinary SMTP servers.
+        """
+        if self.smtp_auth_mode == "none":
+            return
+        auth_advertised = "auth" in getattr(smtp, "esmtp_features", {})
+        if self.smtp_auth_mode == "auto" and not auth_advertised:
+            return
+        if not auth_advertised:
+            raise smtplib.SMTPNotSupportedError("SMTP AUTH is not advertised by the server")
+        if not self.smtp_username or not self.smtp_password:
+            raise smtplib.SMTPAuthenticationError(535, b"SMTP credentials are required")
+        smtp.login(self.smtp_username, self.smtp_password)
 
     def _connect(self) -> psycopg.Connection[Any]:
         return psycopg.connect(self.database_url)
@@ -147,7 +220,11 @@ class AuthService:
     def request_magic_link(self, email: str) -> None:
         normalized = email.strip().lower()
         raw_token = secrets.token_urlsafe(32)
-        if not self.smtp_password or not self.smtp_sender or not self.smtp_username:
+        if self.smtp_auth_mode not in {"required", "auto", "none"}:
+            raise HTTPException(status_code=503, detail="SMTP_AUTH_MODE must be required, auto, or none")
+        if not self.smtp_sender or (
+            self.smtp_auth_mode == "required" and (not self.smtp_password or not self.smtp_username)
+        ):
             raise HTTPException(status_code=503, detail="SMTP is not fully configured")
 
         link = f"{self.frontend_origin}/auth/magic-link?token={raw_token}"
@@ -178,12 +255,7 @@ class AuthService:
                 (normalized, _hash(raw_token), _now() + MAGIC_LINK_TTL),
             )
             try:
-                with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=20) as smtp:
-                    smtp.ehlo()
-                    smtp.starttls()
-                    smtp.ehlo()
-                    smtp.login(self.smtp_username, self.smtp_password)
-                    smtp.send_message(message)
+                self._send_smtp(message)
             except (OSError, smtplib.SMTPException) as error:
                 raise HTTPException(status_code=502, detail="Unable to send sign-in email") from error
 
@@ -316,6 +388,13 @@ class AuthService:
             )
 
     def begin_google(self) -> str:
+        if (
+            not self.google_client_id
+            or self.google_client_id.startswith("dummy")
+            or not self.google_client_secret
+            or not self.google_callback_url
+        ):
+            raise HTTPException(status_code=503, detail="Google OAuth is not configured")
         now = _now()
         self._oauth_states = {key: expiry for key, expiry in self._oauth_states.items() if expiry > now}
         state = secrets.token_urlsafe(24)

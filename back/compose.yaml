@@ -20,7 +20,7 @@ services:
 
   brouter:
     build:
-      context: ../brouter
+      context: ./submodule/brouter
     image: cyclerhub-back-brouter:local
     volumes:
       - ./brouter_extension/segments:/segments4:ro
@@ -40,11 +40,11 @@ services:
     environment:
       BROUTER_URL: http://brouter:17777
       ROUTING_CATALOG_PATH: /app/config/routing_catalog.json
-      RESTRICTIONS_PATH: /data/restrictions/jartic.geojson
-      JARTIC_RESTRICTIONS_PATH: /data/restrictions/jartic.geojson
-      MLIT_RESTRICTIONS_PATH: /data/restrictions/mlit.geojson
-      NPA_ACCIDENTS_PATH: /data/context/npa_accidents.geojson
-      TRAFFIC_VOLUME_PATH: /data/context/mlit_jartic_traffic.geojson
+      RESTRICTIONS_PATH: /data/normalized/restrictions/jartic.geojson
+      JARTIC_RESTRICTIONS_PATH: /data/normalized/restrictions/jartic.geojson
+      MLIT_RESTRICTIONS_PATH: /data/normalized/restrictions/mlit.geojson
+      NPA_ACCIDENTS_PATH: /data/normalized/context/npa_accidents.geojson
+      TRAFFIC_VOLUME_PATH: /data/normalized/context/traffic_volume.geojson
       DATABASE_URL: postgresql://cyclerhub-back:${POSTGRES_PASSWORD:-cyclerhub-back-local-dev}@db:5432/cyclerhub-back
     env_file:
       - path: ./backend/.env

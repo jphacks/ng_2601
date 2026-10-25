@@ -63,7 +63,7 @@ def is_unconditional(row: dict[str, str], schedule: dict[str, str]) -> bool:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("input", type=Path, nargs="+", help="JARTIC Type-D ZIP files")
-    parser.add_argument("--output", type=Path, default=Path("data/restrictions/jartic.geojson"))
+    parser.add_argument("--output", type=Path, default=Path("data/normalized/restrictions/jartic.geojson"))
     parser.add_argument(
         "--include-warnings",
         action="store_true",

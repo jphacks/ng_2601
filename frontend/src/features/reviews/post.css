@@ -1,0 +1,109 @@
+/* 口コミ投稿フォーム。シートの枠は reviews.css の .review-sheet を共用する。色は tokens.css を使う（docs/design-system.md）。 */
+
+/* 入力項目が多いので、一覧シートより高さを取る。 */
+.review-sheet.post-sheet {
+  max-height: calc(var(--vvh) - var(--top-offset) - var(--bottom-offset) - var(--row-height) - var(--space-4) * 2);
+}
+
+.post-form { display: grid; gap: var(--space-4); }
+.post-form__field { display: grid; gap: var(--space-2); margin: 0; padding: 0; border: 0; min-width: 0; }
+.post-form__label { padding: 0; font-size: 13px; font-weight: 600; }
+.post-form__location { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.post-form__value { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
+
+.post-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.post-chip {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: var(--button-size);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-input-border);
+  border-radius: var(--radius-bar);
+  background: var(--color-surface);
+  font-size: 14px;
+  cursor: pointer;
+}
+/* ラジオ本体は見えなくするが、キーボード操作とフォーカス表示は残す。 */
+.post-chip input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.post-chip:has(input:checked) { background: var(--color-selected); border-color: var(--color-selected); font-weight: 600; }
+.post-chip:has(input:focus-visible) { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.post-chip:has(input:disabled) { opacity: 0.6; cursor: not-allowed; }
+
+.post-form__textarea {
+  width: 100%;
+  min-height: 112px;
+  padding: var(--space-3);
+  border: 1px solid var(--color-input-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+  color: inherit;
+  font: inherit;
+  font-size: 16px; /* iOSのフォーカス時ズーム防止 */
+  line-height: 1.5;
+  resize: vertical;
+}
+.post-form__textarea[aria-invalid="true"] { border-color: var(--color-warning); }
+.post-form__counter { margin: 0; font-size: 12px; text-align: right; color: var(--color-text-muted); }
+.post-form__counter.is-over { color: var(--color-warning); font-weight: 600; }
+.post-form__error { margin: 0; font-size: 13px; color: var(--color-warning); }
+.post-form__notice {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-hover);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+.post-form__submit-error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-warning);
+  border-radius: 12px;
+  font-size: 13px;
+  color: var(--color-warning);
+}
+
+.post-form__actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+.post-form__primary, .post-form__secondary {
+  min-height: var(--button-size);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-bar);
+}
+.post-form__primary { background: var(--color-primary); color: var(--color-surface); font-weight: 600; }
+.post-form__secondary { background: var(--color-surface); color: var(--color-primary); }
+.post-form__location .post-form__secondary { min-height: 36px; padding: 0 var(--space-3); }
+.post-form [aria-disabled="true"] { opacity: 0.6; cursor: not-allowed; }
+
+/* 投稿成功の通知（地図の上、検索カードより下）。 */
+.post-toast {
+  position: absolute;
+  z-index: 26;
+  top: calc(var(--top-offset) + var(--button-size) + var(--space-2));
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 2 * var(--gutter));
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-bar);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-floating);
+  font-size: 14px;
+}
+
+/* 一覧・シート内の投稿導線。 */
+.review-post-action {
+  min-height: var(--button-size);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-bar);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+.review-post-action:hover { background: var(--color-hover); }
+.reviews-actions { margin-bottom: var(--space-3); }

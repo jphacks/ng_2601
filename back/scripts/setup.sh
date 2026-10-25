@@ -8,8 +8,7 @@ set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 app_dir=$(CDPATH= cd -- "$script_dir/.." && pwd)
-upstream_dir="${BROUTER_DIR:-$app_dir/../brouter}"
-upstream_url="https://github.com/abrensch/brouter.git"
+upstream_dir="${BROUTER_DIR:-$app_dir/submodule/brouter}"
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "Python 3 is required for CyclerHub-back data scripts. Provision it in the protected host environment, then rerun setup.sh." >&2
@@ -17,7 +16,7 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 if ! command -v git >/dev/null 2>&1; then
-  echo "Git is required to recover the BRouter dependency. Provision it in the protected host environment, then rerun setup.sh." >&2
+  echo "Git is required to use the BRouter submodule. Provision it in the protected host environment, then rerun setup.sh." >&2
   exit 1
 fi
 
@@ -32,24 +31,27 @@ if ! docker compose version >/dev/null 2>&1; then
 fi
 
 if ! git -C "$upstream_dir" rev-parse --git-dir >/dev/null 2>&1; then
-  if [ -e "$upstream_dir" ] && [ "$(find "$upstream_dir" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
-    echo "BRouter path exists but is not a Git checkout: $upstream_dir" >&2
-    exit 1
-  fi
-  echo "Cloning the unmodified BRouter dependency into $upstream_dir"
-  git clone "$upstream_url" "$upstream_dir"
-else
-  origin=$(git -C "$upstream_dir" remote get-url origin 2>/dev/null || true)
-  case "$origin" in
-    https://github.com/abrensch/brouter.git|https://github.com/abrensch/brouter) ;;
-    *) echo "Unexpected BRouter origin: ${origin:-missing} (expected $upstream_url)" >&2; exit 1 ;;
-  esac
-  if [ -n "$(git -C "$upstream_dir" status --porcelain)" ]; then
-    echo "Warning: BRouter upstream has local changes; CyclerHub-back does not modify or repair them." >&2
-  fi
+  echo "BRouter submodule is not initialized at $upstream_dir. Run 'git submodule update --init --recursive' from the repository root, then rerun setup.sh." >&2
+  exit 1
 fi
 
-mkdir -p "$app_dir/brouter_extension/segments" "$app_dir/data/jartic/raw" "$app_dir/data/restrictions"
+origin=$(git -C "$upstream_dir" remote get-url origin 2>/dev/null || true)
+case "$origin" in
+  https://github.com/abrensch/brouter.git|https://github.com/abrensch/brouter) ;;
+  *) echo "Unexpected BRouter origin: ${origin:-missing} (expected https://github.com/abrensch/brouter.git)" >&2; exit 1 ;;
+esac
+if [ -n "$(git -C "$upstream_dir" status --porcelain)" ]; then
+  echo "Warning: BRouter upstream has local changes; CyclerHub-back does not modify or repair them." >&2
+fi
+
+mkdir -p \
+  "$app_dir/brouter_extension/segments" \
+  "$app_dir/data/raw/jartic" \
+  "$app_dir/data/raw/mlit" \
+  "$app_dir/data/raw/npa" \
+  "$app_dir/data/raw/traffic" \
+  "$app_dir/data/normalized/restrictions" \
+  "$app_dir/data/normalized/context"
 
 if [ ! -f "$app_dir/backend/.env" ]; then
   ( umask 077 && cp "$app_dir/backend/.env.example" "$app_dir/backend/.env" )

@@ -1,11 +1,10 @@
 import { toApiError, type ApiClient } from "../../api";
 import { haversineM } from "../../lib/geo";
-import type { BikeType, HillMode, LngLat, Route } from "../../types/api";
+import type { LngLat, Route, RouteConditions } from "../../types/api";
+import { analyzeRoute, type ElevationState, type RouteAnalyzer } from "../elevation/analyze";
 
-export interface SearchConditions {
-  bikeType: BikeType;
-  hillMode: HillMode;
-}
+/** 検索に使う車種と経路条件。 */
+export type SearchConditions = RouteConditions;
 
 /** 検索結果に実際に適用された条件。編集中の条件(draft)とは別に保持する。 */
 export interface AppliedSearch extends SearchConditions {
@@ -30,26 +29,32 @@ export interface RouteSearchState {
   /** 編集中の条件。検索するまで結果には影響しない。 */
   draft: SearchConditions;
   status: SearchStatus;
+  elevation: ElevationState;
   /** 検索前の入力検証エラー。次の操作で消える。 */
   validationError: string | null;
 }
 
-export const BIKE_TYPE_OPTIONS: ReadonlyArray<{ value: BikeType; label: string }> = [
-  { value: "city", label: "シティ" },
-  { value: "electric_assist", label: "電動アシスト" },
-  { value: "road", label: "ロード" },
-  { value: "gravel", label: "グラベル" },
-  { value: "mamachari", label: "ママチャリ" },
-];
+/**
+ * 選択肢の取得(#10)が終わるまでの仮の条件。BEの車種`city`の初期値（back/config/routing_catalog.json）に合わせてある。
+ * 取得後は、保存済みの設定またはその車種の初期値で置き換える。
+ */
+const FALLBACK_CONDITIONS: SearchConditions = {
+  bikeType: "city",
+  hillMode: "balanced",
+  trafficMode: "balanced",
+  surfaceMode: "comfortable",
+  walkingMode: "short",
+};
 
-export const HILL_MODE_OPTIONS: ReadonlyArray<{ value: HillMode; label: string }> = [
-  { value: "avoid", label: "避ける" },
-  { value: "balanced", label: "ふつう" },
-  { value: "accept", label: "許容する" },
-];
-
-export const bikeTypeLabel = (v: BikeType) => BIKE_TYPE_OPTIONS.find((o) => o.value === v)?.label ?? v;
-export const hillModeLabel = (v: HillMode) => HILL_MODE_OPTIONS.find((o) => o.value === v)?.label ?? v;
+export function sameConditions(a: SearchConditions, b: SearchConditions): boolean {
+  return (
+    a.bikeType === b.bikeType &&
+    a.hillMode === b.hillMode &&
+    a.trafficMode === b.trafficMode &&
+    a.surfaceMode === b.surfaceMode &&
+    a.walkingMode === b.walkingMode
+  );
+}
 
 /** 出発地と目的地がこれ未満しか離れていない場合は検索しない。 */
 const MIN_DISTANCE_M = 20;
@@ -62,8 +67,7 @@ export function isStale(state: RouteSearchState): boolean {
   if (status.kind === "idle") return false;
   const a = status.applied;
   return (
-    a.bikeType !== state.draft.bikeType ||
-    a.hillMode !== state.draft.hillMode ||
+    !sameConditions(a, state.draft) ||
     !state.origin ||
     !state.destination ||
     !sameLngLat(a.origin, state.origin) ||
@@ -84,20 +88,23 @@ export interface RouteStore {
   reset(): void;
   setDraft(patch: Partial<SearchConditions>): void;
   search(): Promise<void>;
+  retryElevation(): void;
 }
 
-export function createRouteStore(api: ApiClient): RouteStore {
+export function createRouteStore(api: ApiClient, analyzer: RouteAnalyzer = analyzeRoute): RouteStore {
   let state: RouteSearchState = {
     origin: null,
     destination: null,
     pickMode: null,
-    draft: { bikeType: "city", hillMode: "balanced" },
+    draft: { ...FALLBACK_CONDITIONS },
     status: { kind: "idle" },
+    elevation: { kind: "idle" },
     validationError: null,
   };
   const listeners = new Set<(s: RouteSearchState) => void>();
   /** 古い応答が新しい検索結果を上書きしないための連番。 */
   let seq = 0;
+  let elevationController: AbortController | null = null;
 
   function update(patch: Partial<RouteSearchState>): void {
     state = { ...state, validationError: null, ...patch };
@@ -106,6 +113,35 @@ export function createRouteStore(api: ApiClient): RouteStore {
 
   /** 検索中に地点・結果の前提が変わったら、進行中の応答は捨てる。 */
   const invalidatePending = () => void seq++;
+
+  function cancelElevation(): void {
+    elevationController?.abort();
+    elevationController = null;
+  }
+
+  async function runElevation(route: Route): Promise<void> {
+    cancelElevation();
+    const controller = new AbortController();
+    elevationController = controller;
+    const current = () => elevationController === controller && !controller.signal.aborted;
+    const setElevation = (elevation: ElevationState) => {
+      // 解析の進捗通知で、利用者の入力検証メッセージを消さない。
+      if (current()) update({ elevation, validationError: state.validationError });
+    };
+    setElevation({ kind: "loading", done: 0, total: 0 });
+    try {
+      const analysis = await analyzer(route, {
+        signal: controller.signal,
+        onProgress: (done, total) => setElevation({ kind: "loading", done, total }),
+      });
+      if (analysis) setElevation({ kind: "ready", analysis });
+      else setElevation({ kind: "error", message: "標高解析が完了しませんでした。再試行してください。" });
+    } catch (error) {
+      setElevation({ kind: "error", message: error instanceof Error ? error.message : "標高を取得できませんでした。" });
+    } finally {
+      if (elevationController === controller) elevationController = null;
+    }
+  }
 
   return {
     getState: () => state,
@@ -133,10 +169,14 @@ export function createRouteStore(api: ApiClient): RouteStore {
     },
     reset() {
       invalidatePending();
-      update({ origin: null, destination: null, pickMode: null, status: { kind: "idle" } });
+      cancelElevation();
+      update({ origin: null, destination: null, pickMode: null, status: { kind: "idle" }, elevation: { kind: "idle" } });
     },
     setDraft(patch) {
       update({ draft: { ...state.draft, ...patch } });
+    },
+    retryElevation() {
+      if (state.status.kind === "success" && state.elevation.kind !== "loading") void runElevation(state.status.route);
     },
     async search() {
       if (state.status.kind === "loading") return;
@@ -151,12 +191,14 @@ export function createRouteStore(api: ApiClient): RouteStore {
       }
       const applied: AppliedSearch = { origin, destination, ...draft };
       const mine = ++seq;
+      cancelElevation();
       // 検索を始めた時点で古い経路は表示から外す。失敗しても古いルートが新しい結果に見えない。
-      update({ pickMode: null, status: { kind: "loading", applied } });
+      update({ pickMode: null, status: { kind: "loading", applied }, elevation: { kind: "idle" } });
       try {
         const route = await api.searchRoute({ origin, destination, ...draft });
         if (mine !== seq) return;
         update({ status: { kind: "success", applied, route } });
+        void runElevation(route);
       } catch (e) {
         if (mine !== seq) return;
         const err = toApiError(e);

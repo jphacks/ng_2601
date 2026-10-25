@@ -6,10 +6,19 @@ export async function renderOverview(root: HTMLElement): Promise<void> {
   root.replaceChildren(el("p", { text: "読み込み中…" }));
   try {
     const [route, hazards, reviews, prefs] = await Promise.all([
-      api.searchRoute({ origin: [139.7671, 35.6812], destination: [139.7702, 35.6838] }),
+      api.searchRoute({
+        origin: [139.7671, 35.6812],
+        destination: [139.7702, 35.6838],
+        bikeType: "city",
+        hillMode: "balanced",
+        trafficMode: "balanced",
+        surfaceMode: "comfortable",
+        walkingMode: "short",
+      }),
       api.listHazards(),
       api.listReviews(),
-      api.getPreferences(),
+      // 設定の取得にはログインが必要なため、失敗しても疎通確認の一覧は表示する。
+      api.getPreferences().catch(() => null),
     ]);
     const list = (title: string, items: string[]) =>
       el("section", {}, [
@@ -26,7 +35,7 @@ export async function renderOverview(root: HTMLElement): Promise<void> {
         ),
       ),
       list("危険情報", hazards.map((h) => `[${h.type}] ${h.description}`)),
-      list("口コミ", reviews.map((r) => `★${r.rating} ${r.comment}`)),
+      list("口コミ", reviews.map((r) => `[${r.rawCategory}] ${r.comment}`)),
       list("Preferences", [JSON.stringify(prefs)]),
     );
   } catch (e) {

@@ -32,8 +32,8 @@ current_fingerprint=$(
   {
     find backend config brouter_extension/profiles -type f -print | sort | while IFS= read -r file; do hash_file "$file"; done
     hash_file compose.yaml
-    git -C "$app_dir/../brouter" rev-parse HEAD
-    git -C "$app_dir/../brouter" status --porcelain
+    git -C "$app_dir/submodule/brouter" rev-parse HEAD
+    git -C "$app_dir/submodule/brouter" status --porcelain
   } | hash_file /dev/stdin | awk '{print $1}'
 )
 
