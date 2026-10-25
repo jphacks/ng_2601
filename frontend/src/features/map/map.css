@@ -30,18 +30,6 @@
   width: max-content;
   max-width: calc(100% - 2 * var(--gutter));
 }
-.map__gradient-select {
-  min-width: 0;
-  max-width: 100%;
-  text-overflow: ellipsis;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-panel);
-  background: var(--color-surface);
-  color: var(--color-text);
-  box-shadow: var(--shadow-floating);
-  font-size: 13px;
-}
 .map__gradient-selection {
   margin: 0;
   padding: var(--space-2) var(--space-3);

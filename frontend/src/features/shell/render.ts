@@ -5,6 +5,7 @@ import { renderState } from "../../ui/state";
 import { api, apiBaseUrl, isMockApi } from "../../api";
 import { revokeSession } from "../../api/session";
 import { createHazardsFeature, type HazardsFeature } from "../hazards/hazardsFeature";
+import { getCurrentLocation } from "../geolocation/geolocation";
 import { setupLocate } from "../geolocation/renderLocate";
 import { renderLayerPanel } from "../map/layerPanel";
 import { mountMap, type MapController } from "../map/map";
@@ -253,7 +254,11 @@ export function renderShell(root: HTMLElement): void {
   routeButton.setAttribute("aria-label", "経路を開く");
   routeButton.setAttribute("aria-expanded", "false");
   routeButton.setAttribute("aria-controls", "search-panel");
-  routeButton.addEventListener("click", () => openSearch("route"));
+  // 目的地が決まっていれば、選び直しではなく結果を見たいはずなのでパネルを開くだけにする。
+  routeButton.addEventListener("click", () => {
+    if (routeStore.getState().destination) openSearch("route");
+    else routeStore.startPick("destination");
+  });
 
   // --- search card: one DOM instance, only its position/size changes ----
   const panelClose = button("パネルを閉じる", "panel__close", "close");
@@ -644,6 +649,11 @@ export function renderShell(root: HTMLElement): void {
   window.addEventListener("resize", syncViewport);
   syncViewport();
   renderView();
+
+  // 起動時は locator.locate を使わない。取得できなければ初期表示（名古屋駅）のままで足り、開くたびに失敗の通知を出すと邪魔になる。
+  void getCurrentLocation().then((result) => {
+    if (result.ok) mapController.setCurrentLocation({ lngLat: result.lngLat, accuracyM: result.accuracyM }, true);
+  });
 
   root.replaceChildren(
     map,
