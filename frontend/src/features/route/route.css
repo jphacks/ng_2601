@@ -1,25 +1,7 @@
-/* 経路ビュー（検索条件・ルート結果）。色と余白は tokens.css を使う。 */
+/* 経路ビュー（ルート結果・検索条件）。色と余白は tokens.css を使う。 */
 .route { display: grid; min-width: 0; gap: var(--space-3); }
 .route__pane { display: grid; min-width: 0; gap: var(--space-3); }
 .route__pane:focus { outline: none; }
-
-.route__tabs { display: flex; gap: var(--space-1); }
-.route__tab {
-  flex: 1;
-  min-width: 0;
-  min-height: 40px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-bar);
-  background: var(--color-surface);
-  font-weight: 600;
-}
-.route__tab:hover { background: var(--color-hover); }
-.route__tab[aria-selected="true"] {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: var(--color-surface);
-}
 
 .route__button {
   min-height: 40px;

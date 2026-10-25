@@ -15,13 +15,6 @@ import {
   type RouteStore,
 } from "./routeState";
 
-type SubTab = "conditions" | "result";
-
-const SUB_TABS: ReadonlyArray<{ id: SubTab; label: string }> = [
-  { id: "result", label: "ルート結果" },
-  { id: "conditions", label: "検索条件" },
-];
-
 const POINT_LABEL: Record<PickMode, string> = { origin: "出発地", destination: "目的地" };
 
 export function formatPoint(p: LngLat | null, empty = "未指定"): string {
@@ -49,38 +42,9 @@ export function renderPickBanner(store: RouteStore): HTMLElement {
   return banner;
 }
 
-/** 「経路」ビュー本体。検索条件とルート結果の2つのサブタブ。link は標高グラフと地図の選択位置を共有する。 */
+/** 「経路」ビュー本体。ルート結果の下に検索条件を並べる。link は標高グラフと地図の選択位置を共有する。 */
 export function renderRouteView(store: RouteStore, prefs: PreferencesStore, link: RouteLink): HTMLElement {
-  let tab: SubTab = "result";
   let detailsOpen = false;
-
-  // --- sub tabs ---------------------------------------------------------
-  const tablist = el("div", { className: "route__tabs" });
-  tablist.setAttribute("role", "tablist");
-  tablist.setAttribute("aria-label", "経路の表示切り替え");
-  const tabButtons = new Map<SubTab, HTMLButtonElement>();
-  for (const def of SUB_TABS) {
-    const t = textButton(def.label, "route__tab");
-    t.id = `route-tab-${def.id}`;
-    t.setAttribute("role", "tab");
-    t.setAttribute("aria-controls", `route-pane-${def.id}`);
-    t.addEventListener("click", () => showTab(def.id));
-    tabButtons.set(def.id, t);
-    tablist.append(t);
-  }
-  tablist.addEventListener("keydown", (e) => {
-    if (!["ArrowRight", "ArrowLeft", "Home", "End"].includes(e.key)) return;
-    const ids = SUB_TABS.map((d) => d.id);
-    const current = ids.indexOf(tab);
-    let next = current;
-    if (e.key === "ArrowRight") next = (current + 1) % ids.length;
-    if (e.key === "ArrowLeft") next = (current - 1 + ids.length) % ids.length;
-    if (e.key === "Home") next = 0;
-    if (e.key === "End") next = ids.length - 1;
-    e.preventDefault();
-    showTab(ids[next]);
-    tabButtons.get(ids[next])!.focus();
-  });
 
   // --- conditions pane (built once; values are synced in place so focus is kept) ---
   const pointViews = new Map<PickMode, { value: HTMLElement; pick: HTMLButtonElement; clear: HTMLButtonElement }>();
@@ -121,33 +85,19 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore, link
 
   // 車種・坂道許容度・詳細パラメータ(#10)。縦に長くなるので、検索ボタンはパネル下部に固定して常に押せるようにする。
   const submitBar = el("div", { className: "route__submit-bar" }, [validation, submit]);
-  const conditionsPane = el("div", { className: "route__pane route__pane--conditions" }, [
+  const conditionsPane = el("section", { className: "route__pane route__pane--conditions" }, [
+    el("h3", { className: "route__result-heading", text: "検索条件" }),
     pointDetails,
     renderPreferences(store, prefs),
     submitBar,
   ]);
-  conditionsPane.id = "route-pane-conditions";
-  conditionsPane.setAttribute("role", "tabpanel");
-  conditionsPane.setAttribute("aria-labelledby", "route-tab-conditions");
 
   // --- result pane (re-rendered on every state change) --------------------
-  const resultPane = el("div", { className: "route__pane route__pane--result" });
-  resultPane.id = "route-pane-result";
-  resultPane.setAttribute("role", "tabpanel");
-  resultPane.setAttribute("aria-labelledby", "route-tab-result");
+  const resultPane = el("section", { className: "route__pane route__pane--result" });
+  resultPane.setAttribute("aria-label", "ルート結果");
   resultPane.tabIndex = -1;
 
-  const root = el("div", { className: "route" }, [tablist, conditionsPane, resultPane]);
-
-  function showTab(id: SubTab): void {
-    tab = id;
-    for (const [tid, b] of tabButtons) {
-      b.setAttribute("aria-selected", String(tid === id));
-      b.tabIndex = tid === id ? 0 : -1;
-    }
-    conditionsPane.hidden = id !== "conditions";
-    resultPane.hidden = id !== "result";
-  }
+  const root = el("div", { className: "route" }, [resultPane, conditionsPane]);
 
   function appliedList(applied: AppliedSearch): HTMLElement {
     const rows: Array<[string, string]> = [
@@ -187,10 +137,9 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore, link
     const active = document.activeElement instanceof HTMLElement && resultPane.contains(document.activeElement)
       ? document.activeElement.dataset.resultControl : undefined;
     const { status } = state;
+    resultPane.hidden = status.kind === "idle";
     if (status.kind === "idle") {
-      resultPane.replaceChildren(
-        renderState({ kind: "empty", message: "出発地と目的地を指定して検索すると、ルートがここに表示されます。" }),
-      );
+      resultPane.replaceChildren();
       return;
     }
     if (status.kind === "loading") {
@@ -223,7 +172,7 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore, link
         className: "route__stale",
         text:
           status.kind === "success"
-            ? "検索条件が変更されています。表示中のルートは、上の条件で検索した結果です。"
+            ? "検索条件が変更されています。表示中のルートは、変更前の条件で検索した結果です。"
             : "検索条件が変更されています。",
       });
       notice.setAttribute("role", "status");
@@ -263,10 +212,10 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore, link
     syncConditions(state);
     renderResult(state);
     const kind = state.status.kind;
-    // 検索を始めたとき、成功したときは結果タブを見せる（検索中・空・失敗もそこで伝える）。
+    // 検索を始めたとき、成功したときは結果までスクロールする（検索中・空・失敗もそこで伝える）。
     if (kind !== prevKind && (kind === "loading" || kind === "success")) {
-      showTab("result");
       resultPane.focus({ preventScroll: true });
+      resultPane.scrollIntoView({ block: "start" });
     }
     prevKind = kind;
   });
@@ -274,6 +223,5 @@ export function renderRouteView(store: RouteStore, prefs: PreferencesStore, link
   const initial = store.getState();
   syncConditions(initial);
   renderResult(initial);
-  showTab("result");
   return root;
 }
