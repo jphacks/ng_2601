@@ -197,7 +197,7 @@ export function renderPreferences(routeStore: RouteStore, prefs: PreferencesStor
   return root;
 }
 
-/** 「設定」タブ。経路ビューで選んでいる車種・坂道許容度を次回からの初期値として保存する。 */
+/** 「設定」タブ。経路ビューで選んでいる条件（車種・坂道許容度・詳細パラメータ）を次回からの初期値として保存する。 */
 export function renderPreferencesSave(routeStore: RouteStore, prefs: PreferencesStore): HTMLElement {
   const current = el("p", { className: "pref__current-summary" });
   const status = el("p", { className: "pref__status" });
@@ -235,7 +235,7 @@ export function renderPreferencesSave(routeStore: RouteStore, prefs: Preferences
   prefs.subscribe(sync);
   sync();
   return el("section", { className: "pref" }, [
-    el("p", { className: "pref__status", text: "「経路」で選んだ車種と坂道許容度を、次回からの初期値として保存します。" }),
+    el("p", { className: "pref__status", text: "「経路」で選んだ条件（詳細パラメータを含む）を、次回からの初期値として保存します。" }),
     current,
     saveRow,
   ]);
