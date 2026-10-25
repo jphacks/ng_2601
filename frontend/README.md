@@ -16,6 +16,12 @@ npm run build      # 型チェック + 本番ビルド
 * `VITE_API_MODE=mock`（既定）: `src/mocks/data.ts`・`src/mocks/mapData.ts`（道路・危険情報。日時は実行時刻からの相対）のサンプルデータを返す。バックエンド不要。実際の道路状況ではない。
 * `VITE_API_MODE=http`: `VITE_API_BASE_URL` のバックエンドを呼ぶ（`src/api/http.ts`）。経路検索は `POST /v1/routes`、道路・危険情報は `GET /v1/map-data`。
 
+### Google ログインを使う場合
+
+Google 側にフロントエンドの `http://localhost:5173/auth/google/callback` をリダイレクト先として登録し、`back/backend/.env` の `GOOGLE_CALLBACK_URL` に同じ URL を設定する。フロントエンドの `.env.local` は `VITE_API_MODE=http`、`VITE_API_BASE_URL=`（空欄）にする。Vite の `/v1` プロキシは既定で `http://localhost:8080` を向く。バックエンドが別ポートなら `API_PROXY_TARGET` を変更する。Google ログインは認証状態の Cookie を同じブラウザオリジンで扱うため、この設定が必要。
+
+ログイン画面は Google 認証に対応する。メールリンクはバックエンド API に実装済みで、実 API モードの画面にはまだ表示しない。設定の保存画面は `/v1/auth/me/preferences` を使う。地点・経路の保存 API はバックエンドにあり、画面は今後接続する。
+
 ### ローカルのバックエンドにつなぐ
 ```bash
 # リポジトリ直下で（初回のみ）

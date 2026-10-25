@@ -47,7 +47,6 @@ fi
 mkdir -p \
   "$app_dir/brouter_extension/segments" \
   "$app_dir/data/raw/jartic" \
-  "$app_dir/data/raw/mlit" \
   "$app_dir/data/raw/npa" \
   "$app_dir/data/raw/traffic" \
   "$app_dir/data/normalized/restrictions" \

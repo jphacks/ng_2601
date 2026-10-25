@@ -34,7 +34,7 @@ intentionally kept server-side.
 
 ### `GET /v1/routing-sources`
 
-Returns the loaded status and metadata for JARTIC/MLIT restrictions, NPA
+Returns the loaded status and metadata for JARTIC restrictions, NPA
 accident history, MLIT/JARTIC traffic volume, and the PostgreSQL preference
 store. This is useful for diagnostics and a data-status screen. It does not
 return raw files.
@@ -107,7 +107,7 @@ partial, stale, or unavailable snapshot leaves the first legal candidate in plac
 when no other candidate has available coverage.
 
 The routing effects are deliberately separate: BRouter's graph/profile and the
-catalog preferences always form the base route; an imported JARTIC/MLIT record
+catalog preferences always form the base route; an imported JARTIC record
 with explicit `enforcement: "block"` can discard a candidate; measured traffic
 can rank legal alternatives when coverage is adequate; NPA accident history is
 returned for context only. Rows in PostgreSQL `observations` are not read by
@@ -131,7 +131,7 @@ not supported by this version. Each group includes `truncated: true` when more
 than `limit` matching features were available. The default maximum bbox area is
 25 square degrees and can be changed with `MAX_MAP_BBOX_AREA_DEG2`.
 
-- `restrictions`: active JARTIC/MLIT official restriction features;
+- `restrictions`: active JARTIC official restriction features;
 - `route_context.accidents`: NPA historical accident features;
 - `route_context.traffic`: MLIT/JARTIC measured traffic features;
 - `observations`: active, non-expired community reports.
@@ -139,8 +139,7 @@ than `limit` matching features were available. The default maximum bbox area is
 `route_context.surface` returns experimental CoreS3 bump/roughness points from
 PostgreSQL within the bbox and the last 30 days. It has `truncated` and
 `source_status`, uses `source_id: cores3_surface_v1`, and has no routing effect.
-See [device-surface.md](device-surface.md) for `POST /v1/device-events`, its
-dedicated bearer token, validation, and retry/deduplication contract.
+The experimental device ingest contract is described below.
 
 Each group contains its source status or source metadata. The map endpoint is
 public, but private saved places/routes are never included.
@@ -224,6 +223,35 @@ Requires `Authorization: Bearer <MODERATOR_API_TOKEN>`. This is a backend-only
 token endpoint; there is no moderator table or frontend moderator account.
 The body may set `status` (`active`, `resolved`, `withdrawn`, `expired`) and/or
 `verification_state` (`unverified`, `corroborated`, `moderated`).
+
+## Experimental: CoreS3 road-surface measurements
+
+The [CoreS3 firmware](../../seams/README.md) sends candidate bumps and roughness, not verified road hazards. Measurements are kept separate from community reports and do not affect BRouter or route selection.
+
+### `POST /v1/device-events`
+
+Accepts one event and returns HTTP 201 with `event_id`, `accepted: true`, and `duplicate`. It requires `Authorization: Bearer <DEVICE_INGEST_TOKEN>`, a token dedicated to device ingestion. Set the token in `backend/.env` and restart the backend. Use HTTPS outside a trusted development LAN.
+
+```json
+{
+  "schema_version": 1,
+  "device_id": "cores3-demo",
+  "event_id": "a1b2c3d4_00000001",
+  "kind": "bump",
+  "observed_at": "2026-10-25T02:00:00Z",
+  "location": {"lat": 35.170, "lon": 136.880},
+  "peak_delta_g": 0.8,
+  "rms_g": 0.3,
+  "gps_hdop": 1.2,
+  "speed_kmph": 12.0
+}
+```
+
+Coordinates are WGS84 decimal degrees. The event needs a timezone-aware time no more than five minutes in the future or 30 days in the past; GPS HDOP must be within (0, 5]. Unknown fields and out-of-range values are rejected. `(device_id, event_id)` deduplicates retries: the same payload is accepted again, while a changed payload with the same key returns 409. Existing databases need `./scripts/db/migrate.sh` from `back/` for migration 004; new Compose volumes apply it on initialization.
+
+### Device measurements in `GET /v1/map-data`
+
+`route_context.surface` contains events inside the requested bounding box from the last 30 days. Its GeoJSON collection includes `features`, `truncated`, and `source_status`. A point includes `kind`, `observed_at`, `peak_delta_g`, `rms_g`, `gps_hdop`, `source_id: cores3_surface_v1`, `authority: device_measurement`, `verification_state: unverified`, and `routing_effect: none`. Public map responses omit the device ID and full GPS trace. Detection thresholds and real-ride accuracy still need evaluation.
 
 ## Errors
 
