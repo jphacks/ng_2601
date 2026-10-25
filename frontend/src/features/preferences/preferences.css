@@ -11,6 +11,8 @@
 .pref__icon { display: grid; place-items: center; }
 .pref__icon svg { width: 28px; height: 28px; }
 
+/* fieldset の gap は legend に効かないので、余白は legend 側に付ける。 */
+.pref .route__fieldset > legend { margin-bottom: var(--space-3); }
 .pref__head { width: 100%; display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
 .pref__current { font-size: 13px; font-weight: 600; color: var(--color-primary); }
 .pref__slider { width: 100%; min-height: 44px; margin: 0; accent-color: var(--color-primary); }
