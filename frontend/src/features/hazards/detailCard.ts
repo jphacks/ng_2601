@@ -28,7 +28,7 @@ export function stateBadges(item: RoadInfoItem, freshness: Freshness): HTMLEleme
 
 function infoClassIcon(item: RoadInfoItem): HTMLElement {
   const label = `${CATEGORY_LABEL[item.category]} · ${INFO_CLASS_LABEL[item.infoClass]}`;
-  const wrap = el("span", { className: "hazard-detail__class" }, [icon("person")]);
+  const wrap = el("span", { className: "hazard-detail__class" }, [icon(item.infoClass === "measurement" ? "warning" : "person")]);
   wrap.setAttribute("role", "img");
   wrap.setAttribute("aria-label", label);
   wrap.title = label;
@@ -48,7 +48,7 @@ export function renderDetailContent(item: RoadInfoItem, now: Date): HTMLElement 
   const title = el("h3", { className: "hazard-detail__title", text: item.title });
   title.id = "hazard-detail-title";
   title.tabIndex = -1;
-  const source = item.infoClass === "community" ? "ユーザー" : (item.source.authority ?? item.source.name);
+  const source = item.infoClass === "community" ? "ユーザー" : item.infoClass === "measurement" ? item.source.name : (item.source.authority ?? item.source.name);
   const meta = el("p", { className: "hazard-detail__meta" }, [infoClassIcon(item)]);
   const metaText = [source, item.updatedAt.state === "known" ? `${formatStamp(item.updatedAt)} 更新` : undefined].filter(Boolean).join(" · ");
   if (metaText) meta.append(el("span", { text: metaText }));

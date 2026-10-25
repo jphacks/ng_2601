@@ -30,12 +30,14 @@ export const INFO_CLASS_DEFS: readonly InfoClassDef[] = [
   { id: "official", label: "公的規制" },
   { id: "statistics", label: "統計（過去の実績）" },
   { id: "community", label: "ユーザー報告" },
+  { id: "measurement", label: "機器による計測" },
 ];
 
 export const INFO_CLASS_LABEL: Record<InfoClass, string> = {
   official: "公的規制",
   statistics: "統計（過去の実績）",
   community: "ユーザー報告",
+  measurement: "機器による計測",
 };
 
 export const ORIGIN_LABEL: Record<Origin, string> = {
@@ -43,6 +45,7 @@ export const ORIGIN_LABEL: Record<Origin, string> = {
   accident: "事故履歴",
   traffic: "交通量",
   observation: "ユーザー報告",
+  surface: "路面の計測",
 };
 
 /** 提供元（BEのレイヤー）→ 情報区分・分類。FE側の暫定対応表で、BEの合意ではない。 */
@@ -51,6 +54,7 @@ export const ORIGIN_DEFAULTS: Record<Origin, { infoClass: InfoClass; category: R
   accident: { infoClass: "statistics", category: "danger" },
   traffic: { infoClass: "statistics", category: "danger" },
   observation: { infoClass: "community", category: "danger" },
+  surface: { infoClass: "measurement", category: "terrain" },
 };
 
 /**
