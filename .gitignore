@@ -25,3 +25,6 @@ __pycache__/
 # Downloaded source snapshots and generated external datasets
 /back/data/raw/
 /back/data/normalized/
+
+# PlatformIO build output (keep device source/configuration reviewable)
+**/.pio/

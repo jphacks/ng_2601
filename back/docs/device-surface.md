@@ -30,3 +30,11 @@ Run `./scripts/db/migrate.sh` from `back/` to add migration 004 to an existing d
 `GET /v1/map-data` adds `route_context.surface`, a GeoJSON FeatureCollection with `features`, `truncated`, and `source_status`. The response includes events in the requested bounding box observed within the last 30 days. Each point carries `kind`, `observed_at`, `peak_delta_g`, `rms_g`, `gps_hdop`, `source_id: cores3_surface_v1`, `authority: device_measurement`, `verification_state: unverified`, and `routing_effect: none`. The device ID and full GPS trace are not in the public map response.
 
 The frontend labels these points as experimental measurements. The heuristic thresholds, GPS accuracy, and mounting need real-ride calibration before any route scoring or safety claim.
+
+## Backend validation
+
+Fresh migration, authenticated ingest, payload validation, idempotent retry,
+changed-payload conflict, and bbox map read passed with PostgreSQL/PostGIS in
+the [backend audit](validation.md). This does not establish device GPS/Wi-Fi or
+ride calibration. The local device token is intentionally unconfigured until
+an operator enables the device.
