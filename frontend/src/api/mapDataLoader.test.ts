@@ -152,7 +152,6 @@ describe("createMapDataLoader", () => {
     await tick();
     const data = buildMockMapData();
     data.restrictions.truncated = true;
-    data.observations.truncated = false;
     calls[0].resolve(data);
     await vi.advanceTimersByTimeAsync(0);
     expect(loader.getState().truncated).toBe(true);

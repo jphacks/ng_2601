@@ -74,9 +74,8 @@ export function createMapDataLoader(client: ApiClient, options: MapDataLoaderOpt
       const layers = [data.restrictions, data.route_context.accidents, data.route_context.traffic, data.observations];
       // 件数だけで判定しないのは、BE が limit+1 件で調べた正確な truncated を返すため（ちょうど limit 件でも欠けていない）。
       const truncated =
-        data.observations.truncated === undefined
-          ? data.observations.features.length >= limit
-          : layers.some((l) => l.truncated);
+        layers.some((l) => l.truncated === true) ||
+        (data.observations.truncated === undefined && data.observations.features.length >= limit);
       loaded = { box, truncated };
       setState({ status: "ok", data, truncated });
     } catch (e) {
