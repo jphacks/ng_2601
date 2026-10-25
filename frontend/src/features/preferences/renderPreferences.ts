@@ -3,6 +3,7 @@ import type { BikeType, PreferenceModes, RoutingOptions } from "../../types/api"
 import { el } from "../../ui/dom";
 import { renderState } from "../../ui/state";
 import type { RouteStore } from "../route/routeState";
+import { BIKE_TYPE_ICONS } from "./bikeIcons";
 import { BIKE_TYPE_ORDER, DETAIL_MODE_KEYS, MODE_META, bikeTypeLabel, modeLabel } from "./labels";
 import { defaultsFor, isUnsaved, type PreferencesState, type PreferencesStore } from "./preferencesState";
 
@@ -18,6 +19,7 @@ function segments<T extends string>(
   values: readonly T[],
   label: (v: T) => string,
   onChange: (v: T) => void,
+  iconOf?: (v: T) => string,
 ): { root: HTMLElement; inputs: Map<T, HTMLInputElement> } {
   const inputs = new Map<T, HTMLInputElement>();
   const root = el("div", { className: "route__segments pref__segments" });
@@ -30,7 +32,16 @@ function segments<T extends string>(
       if (input.checked) onChange(v);
     });
     inputs.set(v, input);
-    root.append(el("label", { className: "route__segment" }, [input, el("span", { text: label(v) })]));
+    const content = el("span", { text: label(v) });
+    if (iconOf) {
+      input.setAttribute("aria-label", label(v));
+      content.className = "pref__icon";
+      content.innerHTML = iconOf(v);
+      content.setAttribute("aria-hidden", "true");
+    }
+    const option = el("label", { className: "route__segment" }, [input, content]);
+    if (iconOf) option.title = label(v);
+    root.append(option);
   }
   return { root, inputs };
 }
@@ -57,10 +68,19 @@ export function renderPreferences(routeStore: RouteStore, prefs: PreferencesStor
   function buildControls(options: RoutingOptions): Controls {
     // --- 車種 ---
     const bikes = BIKE_TYPE_ORDER.filter((b) => options.bikeTypes[b]);
-    const bike = segments<BikeType>("pref-bike-type", bikes, bikeTypeLabel, (b) => prefs.selectBike(b));
+    const bike = segments<BikeType>(
+      "pref-bike-type",
+      bikes,
+      bikeTypeLabel,
+      (b) => prefs.selectBike(b),
+      (b) => BIKE_TYPE_ICONS[b],
+    );
     bike.root.classList.add("pref__bikes");
+    // 選んだ車種名は各ラジオの aria-label で読み上げられるので、見出し横の表示は読み上げない。
+    const bikeCurrent = el("span", { className: "pref__current" });
+    bikeCurrent.setAttribute("aria-hidden", "true");
     const bikeSet = el("fieldset", { className: "route__fieldset" }, [
-      el("legend", { className: "route__field-label", text: "自転車の種類" }),
+      el("legend", { className: "route__field-label pref__head" }, [el("span", { text: "自転車の種類" }), bikeCurrent]),
       bike.root,
     ]);
 
@@ -125,6 +145,7 @@ export function renderPreferences(routeStore: RouteStore, prefs: PreferencesStor
         input.checked = b === draft.bikeType;
         input.disabled = busy;
       }
+      bikeCurrent.textContent = bikeTypeLabel(draft.bikeType);
       slider.value = String(Math.max(hillValues.indexOf(draft.hillMode), 0));
       slider.disabled = busy;
       const hillText = modeLabel("hillMode", draft.hillMode);
