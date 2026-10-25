@@ -18,13 +18,19 @@ npm run build      # 型チェック + 本番ビルド
 
 ### ローカルのバックエンドにつなぐ
 ```bash
-# back/ で（初回は back/docs/environment.md の準備が必要）
+# リポジトリ直下で（初回のみ）
+git submodule update --init --recursive   # BRouter。未初期化だと setup.sh が止まる
+
+# back/ で
+./scripts/setup.sh           # 初回のみ。backend/.env の作成と日本全域の RD5 ダウンロード（約500MB）
+# backend/.env の SESSION_SECRET を32文字以上のランダムな値に置き換える（下記）
 ./scripts/launch.sh          # http://localhost:8080
 ./scripts/db/seed_dev.sh     # 開発用のユーザー報告（名古屋駅付近に2件）
 
 # frontend/ で
 VITE_API_MODE=http npm run dev
 ```
+* `backend/.env.example` の `SESSION_SECRET` は26文字の仮の値で、バックエンドは32文字未満だと起動しない（`launch.sh` のヘルスチェックが失敗する）。`openssl rand -hex 32` などで作った値に置き換える。
 * バックエンドの CORS は `FRONTEND_ORIGIN`（既定 `http://localhost:5173`）だけを許可する。Vite が別のポートで起動したら、`back/backend/.env` に `CORS_ALLOW_ORIGINS=http://localhost:5173,http://localhost:5174` のように並べて書き、`launch.sh` で起動し直す。
 * 地図の初期表示は東京駅付近。シードを見るには、ズーム12以上のまま名古屋駅付近へ地図を動かす。
 * 経路検索には BRouter と RD5 データが要る。無いときは 503 になり、「ルート探索サービスを利用できません」と表示される。
