@@ -9,7 +9,7 @@ export type LocateResult =
 /** 位置は1回だけ取得する（走行中の追跡は将来機能）。保存・送信はせず、呼び出し側が画面表示にだけ使う。 */
 const OPTIONS: PositionOptions = { enableHighAccuracy: true, timeout: 15_000, maximumAge: 30_000 };
 
-/** 失敗は reject せず理由で返す。利用者の操作（ボタン押下）から呼ぶこと。 */
+/** 失敗は reject せず理由で返す。 */
 export function getCurrentLocation(): Promise<LocateResult> {
   // HTTP（localhost以外）ではブラウザーが位置情報を拒否するため、許可確認を出す前に理由を伝える。
   if (!window.isSecureContext) return Promise.resolve({ ok: false, reason: "insecure" });

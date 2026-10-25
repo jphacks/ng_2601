@@ -4,6 +4,7 @@ import { icon, type IconName } from "../../ui/icon";
 import { renderState } from "../../ui/state";
 import { api, isMockApi } from "../../api";
 import { createHazardsFeature, type HazardsFeature } from "../hazards/hazardsFeature";
+import { getCurrentLocation } from "../geolocation/geolocation";
 import { setupLocate } from "../geolocation/renderLocate";
 import { renderLayerPanel } from "../map/layerPanel";
 import { mountMap, type MapController } from "../map/map";
@@ -600,6 +601,11 @@ export function renderShell(root: HTMLElement): void {
   window.addEventListener("resize", syncViewport);
   syncViewport();
   renderView();
+
+  // 起動時は locator.locate を使わない。取得できなければ初期表示（名古屋駅）のままで足り、開くたびに失敗の通知を出すと邪魔になる。
+  void getCurrentLocation().then((result) => {
+    if (result.ok) mapController.setCurrentLocation({ lngLat: result.lngLat, accuracyM: result.accuracyM }, true);
+  });
 
   root.replaceChildren(
     map,
