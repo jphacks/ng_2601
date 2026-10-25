@@ -11,7 +11,6 @@ import {
   isStale,
   type AppliedSearch,
   type OriginSource,
-  type PickMode,
   type RouteSearchState,
   type RouteStore,
 } from "./routeState";
@@ -22,8 +21,6 @@ const SUB_TABS: ReadonlyArray<{ id: SubTab; label: string }> = [
   { id: "result", label: "ルート結果" },
   { id: "conditions", label: "検索条件" },
 ];
-
-const POINT_LABEL: Record<PickMode, string> = { origin: "出発地", destination: "目的地" };
 
 export function formatPoint(p: LngLat | null, empty = "未指定"): string {
   return p ? `緯度 ${p[1].toFixed(5)} / 経度 ${p[0].toFixed(5)}` : empty;
@@ -38,21 +35,6 @@ function textButton(label: string, className = "route__button"): HTMLButtonEleme
   const b = el("button", { className, text: label });
   b.type = "button";
   return b;
-}
-
-/** 地図で地点を指定している間、地図上部に出す案内。キャンセルできる。 */
-export function renderPickBanner(store: RouteStore): HTMLElement {
-  const text = el("span", { className: "pick-banner__text" });
-  const cancel = textButton("キャンセル", "pick-banner__cancel");
-  cancel.addEventListener("click", () => store.cancelPick());
-  const banner = el("div", { className: "pick-banner" }, [text, cancel]);
-  banner.setAttribute("role", "status");
-  banner.hidden = true;
-  store.subscribe((state) => {
-    banner.hidden = state.pickMode === null;
-    if (state.pickMode) text.textContent = `地図をタップして${POINT_LABEL[state.pickMode]}を指定`;
-  });
-  return banner;
 }
 
 export interface RouteViewOptions {

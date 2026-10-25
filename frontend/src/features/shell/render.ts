@@ -9,9 +9,9 @@ import { renderLayerPanel } from "../map/layerPanel";
 import { mountMap, type MapController } from "../map/map";
 import { ATTRIBUTION } from "../map/style";
 import { createReviewPostFeature, type ReviewPostFeature } from "../reviews/postForm";
-import { formatOrigin, formatPoint, renderPickBanner, renderRouteView } from "../route/renderRoute";
+import { formatOrigin, formatPoint, renderRouteView } from "../route/renderRoute";
 import { createPreferencesStore } from "../preferences/preferencesState";
-import { createRouteStore } from "../route/routeState";
+import { createRouteStore, type PickMode, type RouteSearchState } from "../route/routeState";
 import { buildRouteGradientSegments, type RouteGradientSegment } from "../elevation/gradientSegments";
 import type { RouteAnalysis } from "../elevation/analyze";
 import { createRouteLink, type RouteLink } from "../elevation/link";
@@ -184,7 +184,12 @@ export function renderShell(root: HTMLElement): void {
   zoomOut.addEventListener("click", () => mapController.zoomOut());
   // 現在地は押したときだけ取得する（features/geolocation）。検索パネルが通知と地図を覆わないよう閉じる。
   const locate = button("現在地を表示", "float-button", "locate");
-  const locator = setupLocate(locate, mapController, { onStart: () => closeSearch(false) });
+  // 地点指定中は、パネル（指定中の行）を出したままにする。
+  const locator = setupLocate(locate, mapController, {
+    onStart: () => {
+      if (!routeStore.getState().pickMode) closeSearch(false);
+    },
+  });
   const controls = el("div", { className: "map-controls" }, [layersButton, compass, locate, zoomIn, zoomOut]);
 
   // --- route button (bottom right): opens the search card -------------------
@@ -200,30 +205,60 @@ export function renderShell(root: HTMLElement): void {
   // --- search card: one DOM instance, only its position/size changes ----
   const panelClose = button("パネルを閉じる", "panel__close", "close");
 
-  function pointRow(
-    mode: "origin" | "destination",
-    label: string,
-    placeholder: string,
-    name: IconName,
-  ): { row: HTMLElement; input: HTMLInputElement } {
+  interface PointRow {
+    row: HTMLElement;
+    input: HTMLInputElement;
+    /** 指定中だけ出す「キャンセル」。 */
+    cancel: HTMLButtonElement;
+    sync(state: RouteSearchState, value: string): void;
+  }
+
+  /**
+   * 出発地・目的地の行。タップするとパネルを開いたまま地図での指定に入り、行が「地図をタップして…を指定」になる。
+   * 指定中にもう一度タップするか「キャンセル」で指定をやめる。
+   */
+  function pointRow(mode: PickMode, label: string, placeholder: string, name: IconName): PointRow {
     const input = el("input", { className: "row__input" });
     input.type = "text";
     input.readOnly = true;
     input.placeholder = placeholder;
     input.setAttribute("aria-label", `${label}（タップして地図で指定）`);
     input.autocomplete = "off";
-    input.addEventListener("click", () => routeStore.startPick(mode));
+    const toggle = () => {
+      if (routeStore.getState().pickMode === mode) routeStore.cancelPick();
+      else routeStore.startPick(mode);
+    };
+    input.addEventListener("click", toggle);
     input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") routeStore.startPick(mode);
+      if (e.key === "Enter") toggle();
     });
+    const cancel = el("button", { className: "row__action row__action--cancel", text: "キャンセル" });
+    cancel.type = "button";
+    cancel.setAttribute("aria-label", `${label}の指定をやめる`);
+    cancel.addEventListener("click", () => routeStore.cancelPick());
     const row = el("label", { className: "row" }, [
       el("span", { className: "row__icon" }, [icon(name)]),
       el("span", { className: "row__label", text: label }),
       input,
+      cancel,
     ]);
-    return { row, input };
+    return {
+      row,
+      input,
+      cancel,
+      sync(state, value) {
+        const picking = state.pickMode === mode;
+        row.classList.toggle("row--picking", picking);
+        input.value = picking ? "" : value;
+        // 行の見出しで出発地か目的地かは分かるので、案内は狭い幅でも切れない長さにする。
+        input.placeholder = picking ? "地図をタップして指定" : placeholder;
+        input.setAttribute("aria-pressed", String(picking));
+        cancel.hidden = !picking;
+      },
+    };
   }
-  const { row: originField, input: origin } = pointRow("origin", "出発地", "現在地", "locate");
+  const originPoint = pointRow("origin", "出発地", "現在地", "locate");
+  const { row: originField } = originPoint;
   // 地図で指定した出発地を、既定の現在地へ戻す。
   const useCurrent = el("button", { className: "row__action", text: "現在地" });
   useCurrent.type = "button";
@@ -233,9 +268,12 @@ export function renderShell(root: HTMLElement): void {
     routeStore.setPoint("origin", here, "current");
     if (routeStore.getState().destination) void searchRoute();
   });
-  originField.append(useCurrent);
-  const { row: destinationField, input: destination } = pointRow("destination", "目的地", "地図で指定", "pin");
-  const originRow = el("div", { className: "points" }, [originField, destinationField]);
+  originField.insertBefore(useCurrent, originPoint.cancel);
+  const destinationPoint = pointRow("destination", "目的地", "地図で指定", "pin");
+  // 指定の開始・終了を読み上げる（見た目は行の強調で伝える）。
+  const pickStatus = el("p", { className: "visually-hidden" });
+  pickStatus.setAttribute("role", "status");
+  const originRow = el("div", { className: "points" }, [originField, destinationPoint.row, pickStatus]);
 
   const tablist = el("div", { className: "tabs" });
   tablist.setAttribute("role", "tablist");
@@ -375,13 +413,15 @@ export function renderShell(root: HTMLElement): void {
   }
 
   function setView(id: ViewId): void {
+    // 地点指定は経路ビューの行で行う。別のビューへ移ったら指定をやめる。
+    if (id !== "route" && routeStore.getState().pickMode) routeStore.cancelPick();
     view = id;
     renderView();
   }
 
-  function openSearch(id: ViewId = view): void {
-    // 指定中は何もしないようにするとメニューやレイヤーのボタンが効かなくなるので、指定をやめてから開く。
-    if (routeStore.getState().pickMode) routeStore.cancelPick();
+  /** keepPick は地点指定を始めたときにパネルを開く場合。それ以外（メニューやレイヤーから開く）は指定をやめる。 */
+  function openSearch(id: ViewId = view, { keepPick = false } = {}): void {
+    if (!keepPick && routeStore.getState().pickMode) routeStore.cancelPick();
     setView(id);
     if (searchOpen) {
       syncRoutePanel();
@@ -404,6 +444,8 @@ export function renderShell(root: HTMLElement): void {
   function closeSearch(blur: boolean, restoreFocus = false): void {
     if (!searchOpen) return;
     searchOpen = false;
+    // 指定中かどうかはパネルの行でしか分からないので、パネルを閉じたら指定もやめる。
+    if (routeStore.getState().pickMode) routeStore.cancelPick();
     card.classList.remove("is-open");
     syncRoutePanel();
     panel.inert = true;
@@ -451,7 +493,10 @@ export function renderShell(root: HTMLElement): void {
   };
 
   panelClose.addEventListener("click", () => closeSearch(true, true));
-  map.addEventListener("pointerdown", () => closeSearch(true));
+  // 地図に触れたらパネルを閉じる。ただし地点指定中は、パネルを出したまま地図をタップして選ぶ。
+  map.addEventListener("pointerdown", () => {
+    if (!routeStore.getState().pickMode) closeSearch(true);
+  });
   menuButton.addEventListener("click", () => setMenu(true));
   drawerClose.addEventListener("click", () => setMenu(false));
   scrim.addEventListener("click", () => setMenu(false));
@@ -468,10 +513,13 @@ export function renderShell(root: HTMLElement): void {
     if (picking) reviewPost?.hide();
     mapController.setPicking(picking);
     mapController.setEndpoints({ origin: state.origin, destination: state.destination });
-    origin.value = state.origin ? formatOrigin(state.origin, state.originSource) : "";
+    originPoint.sync(state, state.origin ? formatOrigin(state.origin, state.originSource) : "");
+    destinationPoint.sync(state, state.destination ? formatPoint(state.destination) : "");
     // 未指定のときは既定の「現在地」が表示されているので、地図で指定したときだけ戻すボタンを出す。
-    useCurrent.hidden = state.originSource !== "map";
-    destination.value = state.destination ? formatPoint(state.destination) : "";
+    useCurrent.hidden = state.originSource !== "map" || picking;
+    const pickText = state.pickMode ? `地図をタップして${state.pickMode === "origin" ? "出発地" : "目的地"}を指定してください。` : "";
+    if (pickStatus.textContent !== pickText) pickStatus.textContent = pickText;
+    card.classList.toggle("search-card--picking", picking);
     mapFilter.hidden = picking;
     syncRouteButton();
 
@@ -494,13 +542,12 @@ export function renderShell(root: HTMLElement): void {
     }
     link.setRoute(route, analysis, shownSegments);
 
-    // 指定中は地図を見せるためカードを閉じ、指定が終わったら経路ビューに戻す。
-    // 閉じるだけだと下へ移動するアニメーション中に案内バナーと重なるので、指定中は隠す。
-    card.hidden = picking;
-    if (picking) {
+    // 指定中は経路パネルを出したまま（行を強調し、結果などは畳んで地図を広く見せる）地図をタップして選ぶ。
+    // 地点シートなどパネルが閉じた状態から指定を始めたときも、パネルを開いてどこを指定中か見せる。
+    if (picking && !wasPicking) {
       reviews?.close();
-      closeSearch(true);
-    } else if (wasPicking) openSearch("route");
+      if (!searchOpen || view !== "route") openSearch("route", { keepPick: true });
+    }
     wasPicking = picking;
   });
 
@@ -546,7 +593,6 @@ export function renderShell(root: HTMLElement): void {
     reviewPost.sheet,
     reviewPost.banner,
     reviewPost.status,
-    renderPickBanner(routeStore),
     locator.notice,
     card,
     scrim,

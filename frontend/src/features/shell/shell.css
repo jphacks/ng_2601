@@ -249,6 +249,33 @@ button { cursor: pointer; }
   font-size: 13px;
 }
 .row__action:hover { background: var(--color-hover); }
+/* 地図で指定中の行。枠と背景で強調し、案内文（placeholder）も主色にする。 */
+.row--picking {
+  border: 2px solid var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+}
+.row--picking .row__input::placeholder { color: var(--color-primary); font-weight: 600; }
+.row__action--cancel { background: var(--color-primary); color: var(--color-surface); }
+.row__action--cancel:hover { background: color-mix(in srgb, var(--color-primary) 88%, var(--color-text)); }
+
+/* 地点指定中は、パネルを見出しと出発地・目的地の行だけに畳み、残りの画面で地図をタップできるようにする。 */
+.search-card--picking .view { display: none; }
+.search-card.search-card--picking.is-open .panel { height: auto; }
+@media (min-width: 768px) {
+  .search-card.search-card--picking.search-card--route-results { bottom: auto; }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
 /* 結果表示中は地図とグラフを広く見せるため、出発地・目的地の行を詰める。 */
 .search-card--route-results .points { gap: var(--space-1); }
 .search-card--route-results .points .row { height: 40px; }
