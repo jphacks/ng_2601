@@ -7,9 +7,9 @@ export const mockRoutes: Route[] = [
     distanceM: 1200,
     durationSec: 900,
     coordinates: [
-      [139.7671, 35.6812],
-      [139.7685, 35.6825],
-      [139.7702, 35.6838],
+      [136.8816, 35.1709],
+      [136.8830, 35.1722],
+      [136.8847, 35.1735],
     ],
     elevationProfile: {
       points: [
@@ -28,9 +28,9 @@ export const mockRoutes: Route[] = [
     distanceM: 950,
     durationSec: 780,
     coordinates: [
-      [139.7671, 35.6812],
-      [139.7679, 35.6821],
-      [139.7702, 35.6838],
+      [136.8816, 35.1709],
+      [136.8824, 35.1718],
+      [136.8847, 35.1735],
     ],
     elevationProfile: {
       points: [
@@ -50,7 +50,7 @@ export const mockHazards: Hazard[] = [
     id: "hazard-1",
     type: "steep_slope",
     severity: 3,
-    location: [139.7679, 35.6821],
+    location: [136.8824, 35.1718],
     description: "急な上り坂（約8%）",
     source: "official",
   },
@@ -58,7 +58,7 @@ export const mockHazards: Hazard[] = [
     id: "hazard-2",
     type: "construction",
     severity: 2,
-    location: [139.769, 35.6828],
+    location: [136.8835, 35.1725],
     description: "歩道の一部が工事中",
     source: "official",
   },
@@ -73,7 +73,7 @@ export const mockHazardRouteIds: Record<string, string[]> = {
 export const mockReviews: Review[] = [
   {
     id: "review-1",
-    location: [139.7685, 35.6825],
+    location: [136.8830, 35.1722],
     category: "surface",
     rawCategory: "road_surface",
     comment: "路面がなめらかで走りやすかった。",
@@ -83,7 +83,7 @@ export const mockReviews: Review[] = [
   },
   {
     id: "review-2",
-    location: [139.7679, 35.6821],
+    location: [136.8824, 35.1718],
     category: "slope",
     rawCategory: "steep_slope",
     comment: "坂がきつくベビーカーには厳しい。電動アシストでも立ちこぎになる。",
@@ -93,7 +93,7 @@ export const mockReviews: Review[] = [
   },
   {
     id: "review-3",
-    location: [139.76795, 35.68212],
+    location: [136.88245, 35.17182],
     category: "traffic",
     rawCategory: "heavy_traffic",
     comment: "夕方は車が多く、左側の余裕が少ない。",
@@ -101,7 +101,7 @@ export const mockReviews: Review[] = [
   },
   {
     id: "review-4",
-    location: [139.7698, 35.6833],
+    location: [136.8843, 35.1730],
     category: "facility",
     rawCategory: "bike_parking",
     comment: "屋根付きの駐輪場があり、雨の日も助かる。",

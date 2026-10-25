@@ -14,8 +14,8 @@ export const ATTRIBUTION = {
   url: "https://maps.gsi.go.jp/development/ichiran.html",
 } as const;
 
-/** 東京駅周辺（モックデータの範囲） */
-export const INITIAL_VIEW = { center: [139.7685, 35.6825] as [number, number], zoom: 15 };
+/** 名古屋駅周辺（シードとモックデータの範囲） */
+export const INITIAL_VIEW = { center: [136.8816, 35.1709] as [number, number], zoom: 15 };
 
 export function createStyle(): StyleSpecification {
   return {
