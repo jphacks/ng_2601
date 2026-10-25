@@ -17,6 +17,8 @@ import type { RouteAnalysis } from "../elevation/analyze";
 import { createRouteLink, type RouteLink } from "../elevation/link";
 import type { Route } from "../../types/api";
 import { createReviewsFeature, type ReviewsFeature } from "../reviews/reviewsFeature";
+import { createAuthStore } from "../auth/authState";
+import { createLoginScreen } from "../auth/loginScreen";
 
 type ViewId = "route" | "settings" | "hazards" | "reviews" | "layers" | "help" | "about";
 
@@ -58,6 +60,8 @@ export function renderShell(root: HTMLElement): void {
   let layerPanel: HTMLElement | undefined;
   const routeStore = createRouteStore(api);
   const prefsStore = createPreferencesStore(api, routeStore);
+  const auth = createAuthStore(localStorage);
+  const login = createLoginScreen(auth, isMockApi);
 
   // --- map area ---------------------------------------------------------
   const map = el("div", { className: "map" });
@@ -107,7 +111,10 @@ export function renderShell(root: HTMLElement): void {
       closeSearch(false);
       reviewPost?.hide();
     },
-    onPost: (at) => reviewPost?.start(at),
+    onPost: (at) => {
+      if (auth.getUser()) reviewPost?.start(at);
+      else login.open("口コミを投稿するにはログインしてください。", () => reviewPost?.start(at));
+    },
   });
   reviewPost = createReviewPostFeature({
     map: mapController,
@@ -148,7 +155,32 @@ export function renderShell(root: HTMLElement): void {
     });
     drawerItems.append(el("li", {}, [item]));
   }
-  drawer.append(el("h2", { className: "drawer__title", text: "Nature Ride" }), drawerItems, drawerClose);
+  const account = el("div", { className: "drawer__account" });
+  function renderAccount(): void {
+    const user = auth.getUser();
+    const action = el("button", {
+      className: user ? "drawer__account-button" : "drawer__account-button drawer__account-button--primary",
+      text: user ? "ログアウト" : "ログイン",
+    });
+    action.type = "button";
+    action.addEventListener("click", () => {
+      if (user) {
+        auth.logout();
+        return;
+      }
+      setMenu(false, false);
+      login.open();
+    });
+    const name = user ? `${user.name} でログイン中` : "ログインすると口コミを投稿できます";
+    account.replaceChildren(el("span", { className: "drawer__account-name", text: name }), action);
+  }
+  auth.subscribe(() => {
+    const focused = account.contains(document.activeElement);
+    renderAccount();
+    if (focused) account.querySelector("button")?.focus();
+  });
+  renderAccount();
+  drawer.append(el("h2", { className: "drawer__title", text: "Nature Ride" }), account, drawerItems, drawerClose);
 
   // --- map controls (right) ---------------------------------------------
   const layersButton = button("地図レイヤー", "float-button", "layers");
@@ -442,6 +474,7 @@ export function renderShell(root: HTMLElement): void {
     card,
     scrim,
     drawer,
+    login.dialog,
   );
   // MapLibre initializes while the shell is being assembled off-DOM; size it after insertion.
   mapController.resize();

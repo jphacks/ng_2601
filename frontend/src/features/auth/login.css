@@ -1,0 +1,97 @@
+.login {
+  width: min(400px, calc(100vw - var(--gutter) * 2));
+  max-height: calc(var(--vvh, 100dvh) - var(--gutter) * 2);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-floating);
+}
+.login::backdrop { background: var(--color-overlay); }
+.login[open] { display: grid; gap: var(--space-3); }
+
+.login__header { display: flex; align-items: center; justify-content: space-between; }
+.login__title { margin: 0; font-size: 18px; color: var(--color-primary); }
+.login__close {
+  display: grid;
+  place-items: center;
+  width: var(--button-size);
+  height: var(--button-size);
+  margin-right: calc(var(--space-2) * -1);
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+}
+.login__close:hover { background: var(--color-hover); }
+
+.login__reason {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-accent) 25%, var(--color-surface));
+  font-size: 14px;
+  font-weight: 600;
+}
+.login__lead { margin: 0; font-size: 14px; line-height: 1.6; color: var(--color-text-muted); }
+
+.login__google, .login__primary {
+  min-height: var(--row-height);
+  border-radius: var(--radius-bar);
+  font-size: 15px;
+  font-weight: 600;
+}
+.login__google { border: 1px solid var(--color-input-border); background: var(--color-surface); color: var(--color-text); }
+.login__google:hover:not(:disabled) { background: var(--color-hover); }
+.login__primary { border: 1px solid var(--color-primary); background: var(--color-primary); color: var(--color-surface); }
+.login__google:disabled, .login__primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.login__or {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.login__or::before, .login__or::after { content: ""; flex: 1; border-top: 1px solid var(--color-border); }
+
+.login__form { display: grid; gap: var(--space-3); }
+.login__label { display: grid; gap: var(--space-2); font-size: 13px; font-weight: 600; }
+.login__input {
+  min-height: var(--row-height);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-input-border);
+  border-radius: var(--radius-bar);
+  background: var(--color-surface);
+  color: inherit;
+  font: inherit;
+  font-size: 16px; /* iOSのフォーカス時ズーム防止 */
+}
+
+.login__note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--color-text-muted); }
+
+/* ドロワーのアカウント欄 */
+.drawer__account {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: 16px;
+  background: var(--color-hover);
+  font-size: 14px;
+}
+.drawer__account-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.drawer__account-button {
+  flex: none;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-bar);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+.drawer__account-button--primary { background: var(--color-primary); color: var(--color-surface); }
