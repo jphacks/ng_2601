@@ -1,11 +1,9 @@
 import { toApiError, type ApiClient } from "../../api";
 import { haversineM } from "../../lib/geo";
-import type { BikeType, HillMode, LngLat, Route } from "../../types/api";
+import type { LngLat, Route, RouteConditions } from "../../types/api";
 
-export interface SearchConditions {
-  bikeType: BikeType;
-  hillMode: HillMode;
-}
+/** 検索に使う車種と経路条件。 */
+export type SearchConditions = RouteConditions;
 
 /** 検索結果に実際に適用された条件。編集中の条件(draft)とは別に保持する。 */
 export interface AppliedSearch extends SearchConditions {
@@ -34,22 +32,27 @@ export interface RouteSearchState {
   validationError: string | null;
 }
 
-export const BIKE_TYPE_OPTIONS: ReadonlyArray<{ value: BikeType; label: string }> = [
-  { value: "city", label: "シティ" },
-  { value: "electric_assist", label: "電動アシスト" },
-  { value: "road", label: "ロード" },
-  { value: "gravel", label: "グラベル" },
-  { value: "mamachari", label: "ママチャリ" },
-];
+/**
+ * 選択肢の取得(#10)が終わるまでの仮の条件。BEの車種`city`の初期値（back/config/routing_catalog.json）に合わせてある。
+ * 取得後は、保存済みの設定またはその車種の初期値で置き換える。
+ */
+const FALLBACK_CONDITIONS: SearchConditions = {
+  bikeType: "city",
+  hillMode: "balanced",
+  trafficMode: "balanced",
+  surfaceMode: "comfortable",
+  walkingMode: "short",
+};
 
-export const HILL_MODE_OPTIONS: ReadonlyArray<{ value: HillMode; label: string }> = [
-  { value: "avoid", label: "避ける" },
-  { value: "balanced", label: "ふつう" },
-  { value: "accept", label: "許容する" },
-];
-
-export const bikeTypeLabel = (v: BikeType) => BIKE_TYPE_OPTIONS.find((o) => o.value === v)?.label ?? v;
-export const hillModeLabel = (v: HillMode) => HILL_MODE_OPTIONS.find((o) => o.value === v)?.label ?? v;
+export function sameConditions(a: SearchConditions, b: SearchConditions): boolean {
+  return (
+    a.bikeType === b.bikeType &&
+    a.hillMode === b.hillMode &&
+    a.trafficMode === b.trafficMode &&
+    a.surfaceMode === b.surfaceMode &&
+    a.walkingMode === b.walkingMode
+  );
+}
 
 /** 出発地と目的地がこれ未満しか離れていない場合は検索しない。 */
 const MIN_DISTANCE_M = 20;
@@ -62,8 +65,7 @@ export function isStale(state: RouteSearchState): boolean {
   if (status.kind === "idle") return false;
   const a = status.applied;
   return (
-    a.bikeType !== state.draft.bikeType ||
-    a.hillMode !== state.draft.hillMode ||
+    !sameConditions(a, state.draft) ||
     !state.origin ||
     !state.destination ||
     !sameLngLat(a.origin, state.origin) ||
@@ -91,7 +93,7 @@ export function createRouteStore(api: ApiClient): RouteStore {
     origin: null,
     destination: null,
     pickMode: null,
-    draft: { bikeType: "city", hillMode: "balanced" },
+    draft: { ...FALLBACK_CONDITIONS },
     status: { kind: "idle" },
     validationError: null,
   };

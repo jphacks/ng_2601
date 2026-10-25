@@ -2,11 +2,10 @@ import "./route.css";
 import type { LngLat, Route } from "../../types/api";
 import { el } from "../../ui/dom";
 import { renderState } from "../../ui/state";
+import { MODE_META, bikeTypeLabel, modeLabel } from "../preferences/labels";
+import type { PreferencesStore } from "../preferences/preferencesState";
+import { renderPreferences } from "../preferences/renderPreferences";
 import {
-  BIKE_TYPE_OPTIONS,
-  HILL_MODE_OPTIONS,
-  bikeTypeLabel,
-  hillModeLabel,
   isStale,
   type AppliedSearch,
   type PickMode,
@@ -17,8 +16,8 @@ import {
 type SubTab = "conditions" | "result";
 
 const SUB_TABS: ReadonlyArray<{ id: SubTab; label: string }> = [
-  { id: "conditions", label: "検索条件" },
   { id: "result", label: "ルート結果" },
+  { id: "conditions", label: "検索条件" },
 ];
 
 const POINT_LABEL: Record<PickMode, string> = { origin: "出発地", destination: "目的地" };
@@ -58,8 +57,8 @@ export function renderPickBanner(store: RouteStore): HTMLElement {
 }
 
 /** 「経路」ビュー本体。検索条件とルート結果の2つのサブタブ。 */
-export function renderRouteView(store: RouteStore): HTMLElement {
-  let tab: SubTab = "conditions";
+export function renderRouteView(store: RouteStore, prefs: PreferencesStore): HTMLElement {
+  let tab: SubTab = "result";
 
   // --- sub tabs ---------------------------------------------------------
   const tablist = el("div", { className: "route__tabs" });
@@ -112,38 +111,13 @@ export function renderRouteView(store: RouteStore): HTMLElement {
   }
   const swap = textButton("出発地と目的地を入れ替え");
   swap.addEventListener("click", () => store.swap());
-
-  const bikeSelect = el("select", { className: "route__select" });
-  bikeSelect.id = "route-bike-type";
-  for (const o of BIKE_TYPE_OPTIONS) {
-    const opt = el("option", { text: o.label });
-    opt.value = o.value;
-    bikeSelect.append(opt);
-  }
-  bikeSelect.addEventListener("change", () => {
-    const v = BIKE_TYPE_OPTIONS.find((o) => o.value === bikeSelect.value);
-    if (v) store.setDraft({ bikeType: v.value });
-  });
-  const bikeLabel = el("label", { className: "route__field-label", text: "車種" });
-  bikeLabel.htmlFor = bikeSelect.id;
-
-  const hillSet = el("fieldset", { className: "route__fieldset" }, [
-    el("legend", { className: "route__field-label", text: "坂道許容度" }),
+  const initialPoints = store.getState();
+  let pointsWereComplete = initialPoints.origin !== null && initialPoints.destination !== null;
+  const pointDetails = el("details", { className: "route__points" }, [
+    el("summary", { text: "出発地・目的地" }),
+    el("div", { className: "route__point-editor" }, [...pointRows, swap]),
   ]);
-  const hillRadios = new Map<string, HTMLInputElement>();
-  const segments = el("div", { className: "route__segments" });
-  for (const o of HILL_MODE_OPTIONS) {
-    const input = el("input");
-    input.type = "radio";
-    input.name = "route-hill-mode";
-    input.value = o.value;
-    input.addEventListener("change", () => {
-      if (input.checked) store.setDraft({ hillMode: o.value });
-    });
-    hillRadios.set(o.value, input);
-    segments.append(el("label", { className: "route__segment" }, [input, el("span", { text: o.label })]));
-  }
-  hillSet.append(segments);
+  pointDetails.open = !pointsWereComplete;
 
   const submit = textButton("経路を検索", "route__submit");
   submit.addEventListener("click", () => void store.search());
@@ -151,20 +125,19 @@ export function renderRouteView(store: RouteStore): HTMLElement {
   validation.setAttribute("role", "alert");
   validation.hidden = true;
 
-  const conditionsPane = el("div", { className: "route__pane" }, [
-    ...pointRows,
-    swap,
-    el("div", { className: "route__field" }, [bikeLabel, bikeSelect]),
-    hillSet,
-    validation,
-    submit,
+  // 車種・坂道許容度・詳細パラメータ(#10)。縦に長くなるので、検索ボタンはパネル下部に固定して常に押せるようにする。
+  const submitBar = el("div", { className: "route__submit-bar" }, [validation, submit]);
+  const conditionsPane = el("div", { className: "route__pane route__pane--conditions" }, [
+    pointDetails,
+    renderPreferences(store, prefs),
+    submitBar,
   ]);
   conditionsPane.id = "route-pane-conditions";
   conditionsPane.setAttribute("role", "tabpanel");
   conditionsPane.setAttribute("aria-labelledby", "route-tab-conditions");
 
   // --- result pane (re-rendered on every state change) --------------------
-  const resultPane = el("div", { className: "route__pane" });
+  const resultPane = el("div", { className: "route__pane route__pane--result" });
   resultPane.id = "route-pane-result";
   resultPane.setAttribute("role", "tabpanel");
   resultPane.setAttribute("aria-labelledby", "route-tab-result");
@@ -187,28 +160,82 @@ export function renderRouteView(store: RouteStore): HTMLElement {
       ["出発地", formatPoint(applied.origin)],
       ["目的地", formatPoint(applied.destination)],
       ["車種", bikeTypeLabel(applied.bikeType)],
-      ["坂道許容度", hillModeLabel(applied.hillMode)],
+      ["坂道許容度", modeLabel("hillMode", applied.hillMode)],
+      [MODE_META.trafficMode.title, modeLabel("trafficMode", applied.trafficMode)],
+      [MODE_META.surfaceMode.title, modeLabel("surfaceMode", applied.surfaceMode)],
+      [MODE_META.walkingMode.title, modeLabel("walkingMode", applied.walkingMode)],
     ];
     const dl = el("dl", { className: "route__applied" });
     for (const [k, v] of rows) dl.append(el("dt", { text: k }), el("dd", { text: v }));
-    return el("section", { className: "route__section" }, [
-      el("h3", { className: "route__heading", text: "検索に使った条件" }),
+    const details = el("details", { className: "route__applied-details" }, [
+      el("summary", { text: "検索に使った条件" }),
       dl,
     ]);
+    return details;
   }
 
   function summary(route: Route): HTMLElement {
-    const ascent = route.elevationProfile.totalAscentM;
     const items: Array<[string, string]> = [
       ["距離", formatDistance(route.distanceM)],
       ["所要時間", formatDuration(route.durationSec)],
-      ["獲得標高", ascent === null ? "データなし" : `${Math.round(ascent)} m`],
+      ["獲得標高", "準備中"],
     ];
     const list = el("dl", { className: "route__summary" });
     for (const [k, v] of items) {
       list.append(el("div", { className: "route__stat" }, [el("dt", { text: k }), el("dd", { text: v })]));
     }
     return list;
+  }
+
+  function endpoints(applied: AppliedSearch): HTMLElement {
+    const rows = ([
+      ["出発地", applied.origin],
+      ["目的地", applied.destination],
+    ] as const).map(([label, point]) =>
+      el("div", { className: "route__endpoint" }, [
+        el("span", { className: "route__endpoint-label", text: label }),
+        el("span", { className: "route__endpoint-value", text: formatPoint(point) }),
+      ]),
+    );
+    const section = el("section", { className: "route__endpoints" }, rows);
+    section.setAttribute("aria-label", "検索した経路");
+    return section;
+  }
+
+  /** #7 の解析・グラフを後から接続するための、データ未取得時の表示領域。 */
+  function elevationProfileSlot(): HTMLElement {
+    const placeholder = el("div", {
+      className: "route__elevation-placeholder",
+      text: "標高データを準備中です。",
+    });
+    placeholder.setAttribute("role", "status");
+    const section = el("section", { className: "route__section route__elevation" }, [
+      el("h3", { className: "route__heading", text: "標高プロファイル" }),
+      placeholder,
+    ]);
+    section.setAttribute("data-elevation-slot", "profile");
+    return section;
+  }
+
+  /** #7 の解析値を表示する場所だけ確保する。標高データはここでは計算しない。 */
+  function routeDetails(): HTMLElement {
+    const detailRows: Array<[string, string]> = [
+      ["平均勾配", "準備中"],
+      ["最高標高", "準備中"],
+      ["最低標高", "準備中"],
+      ["獲得標高", "準備中"],
+    ];
+    const list = el("dl", { className: "route__detail-list" });
+    for (const [label, value] of detailRows) {
+      list.append(el("dt", { text: label }), el("dd", { text: value }));
+    }
+    const details = el("details", { className: "route__details" }, [
+      el("summary", { text: "ルート詳細" }),
+      el("p", { className: "route__details-note", text: "標高解析の統合後に表示します。" }),
+      list,
+    ]);
+    details.setAttribute("data-elevation-slot", "details");
+    return details;
   }
 
   function renderResult(state: RouteSearchState): void {
@@ -220,21 +247,27 @@ export function renderRouteView(store: RouteStore): HTMLElement {
       return;
     }
     if (status.kind === "loading") {
-      resultPane.replaceChildren(renderState({ kind: "loading", message: "ルートを検索中…" }));
+      resultPane.replaceChildren(endpoints(status.applied), renderState({ kind: "loading", message: "ルートを検索中…" }));
       return;
     }
 
     const parts: HTMLElement[] = [];
     if (status.kind === "success") {
-      parts.push(summary(status.route));
+      parts.push(
+        endpoints(status.applied),
+        el("h3", { className: "route__result-heading", text: "検索されたルート" }),
+        summary(status.route),
+        elevationProfileSlot(),
+        routeDetails(),
+      );
     } else if (status.kind === "empty") {
       parts.push(
+        endpoints(status.applied),
         renderState({ kind: "empty", message: "条件に合うルートが見つかりませんでした。条件を変えて再検索してください。" }),
       );
     } else {
-      parts.push(renderState({ kind: "error", message: status.message }));
+      parts.push(endpoints(status.applied), renderState({ kind: "error", message: status.message }));
     }
-    parts.push(appliedList(status.applied));
     if (isStale(state)) {
       const notice = el("p", {
         className: "route__stale",
@@ -246,14 +279,16 @@ export function renderRouteView(store: RouteStore): HTMLElement {
       notice.setAttribute("role", "status");
       parts.push(notice);
     }
-    const again = textButton("この条件で再検索", "route__submit");
-    again.addEventListener("click", () => void store.search());
-    parts.push(again);
+    parts.push(appliedList(status.applied));
     resultPane.replaceChildren(...parts);
   }
 
   function syncConditions(state: RouteSearchState): void {
     const loading = state.status.kind === "loading";
+    const pointsComplete = state.origin !== null && state.destination !== null;
+    if (!pointsComplete) pointDetails.open = true;
+    else if (!pointsWereComplete) pointDetails.open = false;
+    pointsWereComplete = pointsComplete;
     for (const [mode, v] of pointViews) {
       const p = state[mode];
       v.value.textContent = formatPoint(p);
@@ -261,19 +296,15 @@ export function renderRouteView(store: RouteStore): HTMLElement {
       v.clear.disabled = loading || p === null;
     }
     swap.disabled = loading || (!state.origin && !state.destination);
-    bikeSelect.value = state.draft.bikeType;
-    bikeSelect.disabled = loading;
-    for (const [value, input] of hillRadios) {
-      input.checked = value === state.draft.hillMode;
-      input.disabled = loading;
-    }
     validation.textContent = state.validationError ?? "";
     validation.hidden = state.validationError === null;
     submit.textContent = state.status.kind === "idle" ? "経路を検索" : "この条件で再検索";
-    submit.disabled = loading;
+    // 選択肢の取得中は、仮の条件で検索しないよう待たせる。取得に失敗した場合は仮の条件のまま検索できる。
+    submit.disabled = loading || prefs.getState().options.kind === "loading";
   }
 
   let prevKind = store.getState().status.kind;
+  prefs.subscribe(() => syncConditions(store.getState()));
   store.subscribe((state) => {
     syncConditions(state);
     renderResult(state);
@@ -289,6 +320,6 @@ export function renderRouteView(store: RouteStore): HTMLElement {
   const initial = store.getState();
   syncConditions(initial);
   renderResult(initial);
-  showTab("conditions");
+  showTab("result");
   return root;
 }

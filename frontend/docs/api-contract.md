@@ -27,10 +27,11 @@
 | 危険情報一覧（旧・想定） | `GET /hazards` | query: 任意の`routeId` | `Hazard[]`。#11では使わない（`/dev/overview`と#10の`Preferences`が`Hazard`型を参照するため型は残置） |
 | 道路・危険情報（表示領域） | `GET /v1/map-data` | query: `min_lon`,`min_lat`,`max_lon`,`max_lat`、任意`limit`（1〜500、既定200） | `MapDataResponse`（下記）。**BE担当共有のスニペットに基づく暫定。リポジトリ内のどのブランチにも未確認** |
 | 口コミ一覧 | `GET /reviews` | query: 任意の`routeId`、`hazardId` | `Review[]` |
-| 設定取得 | `GET /preferences` | なし | `Preferences` |
-| 設定更新 | `PUT /preferences` | body: `Preferences` | `Preferences` |
+| 設定の選択肢・初期値 | `GET /v1/routing-options`（BE実装あり。[#10](https://github.com/jphacks/ng_2601/issues/10)） | なし | BE: `{bike_types: {車種: {defaults, capabilities}}, preferences: {条件: values[]}}` → FE `RoutingOptions` |
+| 設定取得 | `GET /v1/auth/me`（BE実装あり・要ログイン。#10） | なし（`Authorization: Bearer`） | BE: `{bike_type, preferences: {hill_mode, traffic_mode, surface_mode, walking_mode}}` → FE `RouteConditions` |
+| 設定更新 | `PUT /v1/auth/me/preferences`（BE実装あり・要ログイン。#10） | body: `{bike_type, hill_mode, traffic_mode, surface_mode, walking_mode}`（FEは5項目すべて送る） | BEは`{status}`のみ返すため、FEは続けて`GET /v1/auth/me`で再取得する |
 
-経路検索のみ、[PR #25（未マージ）](https://github.com/jphacks/ng_2601/pull/25)（確認したhead `9715d5b1f6f5002a669041fb89ac48e6b0cec479`）の`frontend/src/api/http.ts`が`POST /v1/routes`を呼びます（BE: `back/backend/app/main.py`）。リクエスト／応答の変換はPR #25の`frontend/src/api/routeAdapter.ts`、エラーは`{detail}`をFE形式へ正規化（409=`no_route`、422=`invalid_request`、502/503=`routing_unavailable`、タイムアウト=`timeout`）。HTTP 200でもGeoJSONの形式が不正なら、`fromBackendResponse`がstatus 502／`invalid_response`のエラーにします。BEが返さない下降量・最大勾配は`null`で、FEで推測しません。実BEとの結合は未検証です。他の行は引き続き暫定です。
+経路検索は、`frontend/src/api/http.ts`が`POST /v1/routes`を呼びます（BE: `back/backend/app/main.py`）。リクエスト／応答の変換はPR #25の`frontend/src/api/routeAdapter.ts`、エラーは`{detail}`をFE形式へ正規化（409=`no_route`、422=`invalid_request`、502/503=`routing_unavailable`、タイムアウト=`timeout`）。HTTP 200でもGeoJSONの形式が不正なら、`fromBackendResponse`がstatus 502／`invalid_response`のエラーにします。BEが返さない下降量・最大勾配は`null`で、FEで推測しません。実BEとの結合は未検証です。リクエストの`bike_type`と`preferences`（`hill_mode`・`traffic_mode`・`surface_mode`・`walking_mode`）は、FEが編集中の値をすべて明示して送ります（変換は`frontend/src/api/preferencesAdapter.ts`の`toBackendRoutePreferences`）。設定の3行は[#10](https://github.com/jphacks/ng_2601/issues/10)でBEの実装（`back/backend/app/main.py`・`auth.py`）に合わせた契約で、応答は`preferencesAdapter.ts`が形式を検証します。FEにログイン機能がないため（[#23](https://github.com/jphacks/ng_2601/issues/23)）、実BEでは設定の取得・保存が401（FE `unauthorized`）になる想定で未検証です。他の行は引き続き暫定です。
 
 [#13](https://github.com/jphacks/ng_2601/issues/13)には口コミ投稿の想定`POST /reviews`がありますが、確認したPRのApiClientに投稿操作・リクエスト型はありません。未実装・未合意として扱います。
 
@@ -46,8 +47,7 @@
 
 | 項目 | 確認できた差分・次の確認先 |
 | --- | --- |
-| Preferences更新 | [#10](https://github.com/jphacks/ng_2601/issues/10)は`PATCH`案、PR #16は`PUT`。どちらを採るかFE・BEで決める |
-| Preferencesの意味 | #10は車種・坂道許容度・設定範囲を取得する要件。暫定型は最大勾配・階段回避・危険種別回避であり、車種・範囲・初期値の取得はない。重みか上限かも含めて合意する |
+| Preferences更新・意味 | #10の`PATCH`案・PR #16の暫定`PUT /preferences`・最大勾配等の暫定型は採用せず、BEの`PUT /v1/auth/me/preferences`に合わせた。「坂道許容度」は最大勾配(%)でも数値の重みでもなく、BEの3段階`hill_mode`（avoid / balanced / accept。BRouterへ0/1/2で渡る）。車種ごとの初期値は`routing-options`で取得する。`routing-options`は日本語表示名を返さないため、表示名はFEが持つ（BEの値の意味は未確認）。#10の暫定候補（クロス・MTB）とBEの車種（グラベル・ママチャリ）が食い違うため、BEの5車種を採用した |
 | 経路形状・標高 | [#6](https://github.com/jphacks/ng_2601/issues/6)はGeoJSONまたは合意した形状を想定。暫定型は座標配列。区間勾配、形状との対応、null等の欠測表現、計算責務は[#7](https://github.com/jphacks/ng_2601/issues/7)・[#8](https://github.com/jphacks/ng_2601/issues/8)と調整する |
 | 危険情報の取得・鮮度 | [#11](https://github.com/jphacks/ng_2601/issues/11)は`GET /v1/map-data`（`restrictions`／`route_context.accidents`・`traffic`／`observations`のGeoJSON FeatureCollectionと各`source_status`／`source`）に合わせて実装。型は[`frontend/src/types/api.ts`](../src/types/api.ts)の`MapDataResponse`、取得は`ApiClient.getMapData`。未確認・未合意: (1) `_observation_features`のproperties（FEは`observations`テーブル列名と同名と仮定）と`category`の値一覧（FEは部分一致で4分類に対応づけ、未知は「危険／その他」）、(2) `limit`が`observations`以外にも効くか、広域bboxの上限（FEはzoom12未満で取得しない）、(3) 認証、(4) 他エンドポイントと違い`/v1`接頭辞を持つ点、(5) `restrictions`の`confidence`値（FEは`high`＝確認済み、`low`＝未確認、それ以外＝不明と扱う）、(6) 事故履歴・交通量に更新日時・個別IDがなく、`source_status.metadata`の日時で代替している点 |
 | 口コミの位置・投稿 | [#12](https://github.com/jphacks/ng_2601/issues/12)は地点単位。暫定型は任意のrouteId／hazardIdで、位置は持たない。#13の投稿型、認証・公開位置・投稿制限も調整する |

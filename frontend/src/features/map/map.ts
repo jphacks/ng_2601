@@ -81,6 +81,8 @@ export interface MapController {
   zoomIn(): void;
   zoomOut(): void;
   resetNorth(): void;
+  /** コンテナをDOMへ接続した後、地図キャンバスを実際の表示サイズに合わせる。 */
+  resize(): void;
   destroy(): void;
 }
 
@@ -412,13 +414,16 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
         (b, c) => b.extend(c),
         new maplibregl.LngLatBounds(route.coordinates[0], route.coordinates[0]),
       );
-      // 検索パネルは広い画面で左側、狭い画面で上側を覆う。覆われない範囲に収める。
+      // 検索パネルは広い画面で左側を、狭い画面では経路結果シートが下側を覆う。覆われない範囲に収める。
+      // 狭い画面のシートは下から高さ約65%（shell.cssの.search-card--route-results）を占める。
       const w = container.clientWidth;
       const h = container.clientHeight;
+      // 画面が低いとh-200の上限がシートの高さを下回り、経路の下端がシートに隠れる。シートの高さは必ず確保する。
+      const sheet = Math.round(h * 0.65);
       const padding =
         w >= 768
           ? { top: 64, bottom: 64, left: 464, right: 96 }
-          : { top: Math.min(Math.round(h * 0.65) + 80, h - 200), bottom: 48, left: 32, right: 32 };
+          : { top: 48, bottom: Math.max(Math.min(sheet + 80, h - 200), sheet), left: 32, right: 32 };
       map.fitBounds(bounds, { padding, maxZoom: 16 });
     },
     setRoadInfo(items, now = new Date()) {
@@ -466,6 +471,7 @@ export function mountMap(container: HTMLElement, handlers: MapHandlers = {}): Ma
     zoomIn: () => void map?.zoomIn(),
     zoomOut: () => void map?.zoomOut(),
     resetNorth: () => void map?.resetNorth(),
+    resize: () => map?.resize(),
     destroy() {
       map?.remove();
       map = null;

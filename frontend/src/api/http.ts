@@ -1,6 +1,7 @@
 import type { ApiClient } from "./client";
 import { ApiError } from "./errors";
 import { assertMapData } from "./mapDataValidation";
+import { fromBackendMe, fromBackendOptions, toBackendPreferences } from "./preferencesAdapter";
 import { fromBackendResponse, toBackendRequest } from "./routeAdapter";
 import type { ApiErrorBody } from "../types/api";
 
@@ -25,8 +26,19 @@ function routeError(status: number, parsed: unknown): ApiErrorBody {
   return { code: "http_error", message: `ルート検索に失敗しました（HTTP ${status}）。`, details };
 }
 
-// エンドポイントは暫定。経路検索以外はバックエンド確定後に合わせる。
-export function createHttpClient(baseUrl: string): ApiClient {
+/** 設定の取得・保存（`/v1/auth/me*`）のエラー。FastAPIの`{detail}`を`details`に残す。 */
+function preferencesError(status: number, parsed: unknown): ApiErrorBody {
+  const details = typeof parsed === "object" && parsed !== null ? (parsed as { detail?: unknown }).detail : undefined;
+  if (status === 401 || status === 403) {
+    return { code: "unauthorized", message: "設定の保存・取得にはログインが必要です。", details };
+  }
+  if (status === 422) return { code: "invalid_request", message: "設定の内容が受け付けられませんでした。", details };
+  return { code: "http_error", message: `設定の通信に失敗しました（HTTP ${status}）。`, details };
+}
+
+// エンドポイントは暫定。経路検索・設定以外はバックエンド確定後に合わせる。
+// getAccessToken: ログイン済みのときアクセストークンを返す。認証UIは未実装（#23）のため現状は未指定。
+export function createHttpClient(baseUrl: string, getAccessToken?: () => string | null): ApiClient {
   async function request<T>(
     method: string,
     path: string,
@@ -50,12 +62,16 @@ export function createHttpClient(baseUrl: string): ApiClient {
       opts.signal?.aborted
         ? new DOMException("aborted", "AbortError")
         : new ApiError(0, { code: "timeout", message: opts.timeoutMessage ?? "ルート探索に時間がかかっています。時間をおいて再試行してください。" });
+    const headers: Record<string, string> = {};
+    if (body !== undefined) headers["Content-Type"] = "application/json";
+    const token = getAccessToken?.();
+    if (token) headers.Authorization = `Bearer ${token}`;
     try {
       let res: Response;
       try {
         res = await fetch(baseUrl + path, {
           method,
-          headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+          headers: Object.keys(headers).length > 0 ? headers : undefined,
           body: body === undefined ? undefined : JSON.stringify(body),
           signal: controller.signal,
         });
@@ -116,7 +132,16 @@ export function createHttpClient(baseUrl: string): ApiClient {
     getRoute: (id) => request("GET", `/routes/${encodeURIComponent(id)}`),
     listHazards: (routeId) => request("GET", `/hazards${qs({ routeId })}`),
     listReviews: (params = {}) => request("GET", `/reviews${qs(params)}`),
-    getPreferences: () => request("GET", "/preferences"),
-    updatePreferences: (p) => request("PUT", "/preferences", p),
+    async getRoutingOptions() {
+      return fromBackendOptions(await request<unknown>("GET", "/v1/routing-options"));
+    },
+    async getPreferences() {
+      return fromBackendMe(await request<unknown>("GET", "/v1/auth/me", undefined, { toError: preferencesError }));
+    },
+    async updatePreferences(p) {
+      await request<unknown>("PUT", "/v1/auth/me/preferences", toBackendPreferences(p), { toError: preferencesError });
+      // PUTの応答は`{status}`だけなので、保存された値を再取得して返す。
+      return fromBackendMe(await request<unknown>("GET", "/v1/auth/me", undefined, { toError: preferencesError }));
+    },
   };
 }

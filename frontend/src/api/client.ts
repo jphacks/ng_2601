@@ -2,10 +2,11 @@ import type {
   BBox,
   Hazard,
   MapDataResponse,
-  Preferences,
   Review,
   Route,
+  RouteConditions,
   RouteSearchRequest,
+  RoutingOptions,
 } from "../types/api";
 
 /** モックと実APIが共通で実装するインターフェース。画面はこれだけに依存する。 */
@@ -17,8 +18,12 @@ export interface ApiClient {
   /** 表示領域の道路・危険情報（GET /v1/map-data）。信号が中断されたら AbortError を投げる。 */
   getMapData(bbox: BBox, opts?: MapDataOptions): Promise<MapDataResponse>;
   listReviews(params?: { routeId?: string; hazardId?: string }): Promise<Review[]>;
-  getPreferences(): Promise<Preferences>;
-  updatePreferences(p: Preferences): Promise<Preferences>;
+  /** 車種・各条件の選択肢と、車種ごとの初期値。 */
+  getRoutingOptions(): Promise<RoutingOptions>;
+  /** 保存済みの車種・条件。未ログインなどで取得できない場合は code `unauthorized` の ApiError。 */
+  getPreferences(): Promise<RouteConditions>;
+  /** 車種・条件を保存し、保存後にサーバーから再取得した値を返す。 */
+  updatePreferences(p: RouteConditions): Promise<RouteConditions>;
 }
 
 export interface MapDataOptions {
