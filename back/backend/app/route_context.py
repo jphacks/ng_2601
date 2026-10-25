@@ -61,6 +61,27 @@ class GeoJsonRouteContext:
             "metadata": self.metadata,
         }
 
+    def nearby_properties(self, segments: list[tuple[list[float], list[float]]]) -> list[dict[str, Any]]:
+        # Reject distant points before the more expensive per-segment metric
+        # check. Annual nationwide NPA snapshots contain hundreds of thousands
+        # of points; comparing each one to every route segment stalls requests.
+        points = [point for segment in segments for point in segment]
+        if not points:
+            return []
+        latitude_padding = self.radius_m / 111_000
+        longitude_padding = latitude_padding / max(0.01, math.cos(math.radians(max(abs(p[1]) for p in points))))
+        west = min(p[0] for p in points) - longitude_padding
+        east = max(p[0] for p in points) + longitude_padding
+        south = min(p[1] for p in points) - latitude_padding
+        north = max(p[1] for p in points) + latitude_padding
+        results = []
+        for feature in self.collection.get("features", []):
+            geometry = feature.get("geometry") or {}
+            point = geometry.get("coordinates") if geometry.get("type") == "Point" else None
+            if point and west <= point[0] <= east and south <= point[1] <= north and _point_near_route(point, segments, self.radius_m):
+                results.append(feature.get("properties") or {})
+        return results
+
     def features_in_bbox(
         self, bbox: tuple[float, float, float, float], limit: int | None = None
     ) -> list[dict[str, Any]]:
@@ -93,12 +114,7 @@ class AccidentHistoryProvider(GeoJsonRouteContext):
         segments = list(_route_segments(route))
         if not self.enabled or not segments:
             return {"status": "unavailable", "source_id": self.source_id}
-        hits = []
-        for feature in self.collection.get("features", []):
-            geometry = feature.get("geometry") or {}
-            point = geometry.get("coordinates") if geometry.get("type") == "Point" else None
-            if point and _point_near_route(point, segments, self.radius_m):
-                hits.append(feature.get("properties") or {})
+        hits = self.nearby_properties(segments)
         window = self.metadata.get("window")
         return {
             # A loaded dataset with zero nearby records is a complete query
@@ -127,27 +143,32 @@ class TrafficProvider(GeoJsonRouteContext):
         route_length = _route_length_m(segments)
         if not self.enabled or not segments:
             return {"status": "unavailable", "source_id": self.source_id, "routing_penalty": 0}
-        observations = []
-        for feature in self.collection.get("features", []):
-            geometry = feature.get("geometry") or {}
-            point = geometry.get("coordinates") if geometry.get("type") == "Point" else None
-            if point and _point_near_route(point, segments, self.radius_m):
-                observations.append(feature.get("properties") or {})
+        observations = self.nearby_properties(segments)
         values = [float(item.get("vehicle_count", 0)) for item in observations]
+        # A local file can outlive the traffic it describes. Never rank a
+        # present-day trip using an old or undated measurement snapshot.
+        observed_at = self.metadata.get("observed_at")
+        try:
+            timestamp = datetime.fromisoformat(str(observed_at).replace("Z", "+00:00"))
+            age = (evaluated_at - timestamp).total_seconds() if timestamp.tzinfo else None
+        except (ValueError, TypeError):
+            age = None
+        fresh = age is not None and 0 <= age <= 4 * 60 * 60
         matched_length = min(route_length, len(observations) * 250.0)
         coverage = matched_length / route_length if route_length else 0
         weight = {"avoid": 1.0, "balanced": 0.35, "direct": 0.0}.get(mode, 0.35)
         return {
-            "status": "available" if coverage >= 0.5 else "partial",
+            "status": "unavailable" if age is None else "stale" if not fresh else "available" if coverage >= 0.5 else "partial",
             "source_id": self.source_id,
             "authority": self.metadata.get("authority", "MLIT"),
             "source": self.metadata.get("source", "MLIT/JARTIC traffic volume API"),
             "retrieved_at": self.metadata.get("retrieved_at"),
             "evaluated_at": evaluated_at.isoformat(),
-            "observation_age_seconds": self.metadata.get("observation_age_seconds"),
+            "observed_at": observed_at,
+            "observation_age_seconds": round(age) if age is not None else None,
             "matched_length_m": round(matched_length, 1),
             "route_length_m": round(route_length, 1),
             "coverage_ratio": round(coverage, 3),
             "observation_count": len(observations),
-            "routing_penalty": round(sum(values) * weight, 2) if coverage >= 0.5 else 0,
+            "routing_penalty": round(sum(values) * weight, 2) if fresh and coverage >= 0.5 else 0,
         }

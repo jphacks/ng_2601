@@ -71,7 +71,7 @@ The moderator token is checked only by the backend moderation endpoint; it is no
 ## Tests
 ```bash
 cd backend
-uv run --python 3.12 --with pytest pytest tests -q
+uv run --python 3.12 --dev pytest tests -q
 ```
 These are safe automated unit tests and do not contact Google or send email. The manual provider smoke test is separate: run `python3 scripts/auth/check_auth_providers.py` from `back` when you intentionally want to open OAuth or send one message to `SMTP_TEST_RECEIVER`. `uv` is only needed for development tests since the runtime backend dependencies are installed inside the Docker image.
 
@@ -101,3 +101,32 @@ rm -rf backend/.venv backend/.pytest_cache
 
 find backend scripts -type d -name __pycache__ -prune -exec rm -rf {} +
 ```
+
+## Verified local deployment notes (2026-10-25)
+
+The local SMTP test succeeded using `SMTP_PORT=465`, `SMTP_SECURITY=ssl`, and
+`SMTP_AUTH_MODE=required`, with certificate/hostname verification. Port 587
+timed out on this environment. These are deployment settings: the example
+retains the standard STARTTLS/auto defaults; use 465/ssl when 587 is blocked.
+Google OAuth still has dummy credentials and cannot complete a real login.
+`DEVICE_INGEST_TOKEN` is optional and currently blank; device uploads return
+503 until it is configured, even though the surface map layer is readable.
+
+`docker compose up` currently cannot bind host port 8080 because another local
+service owns it. Stop the conflicting service yourself or choose a different
+host port in a local Compose override; update the frontend API URL and Google
+registered callback together. The integration harness does not bind a host port.
+
+Run `./scripts/db/migrate.sh` when upgrading an existing volume. Compose's
+initialization directory only runs on a new database volume. The migration
+runner handles 002–004 and records versions in `schema_migrations`; a fresh
+Compose initialization also creates all tables before the runner is needed.
+
+For repeatable integration checks, start `db` and `brouter`, build the backend
+image, then run `./scripts/db/check_integration.sh` from `back/`. It creates a
+disposable `cyclerhub_audit_*` database, applies all migrations, runs the manual
+API harness using the mounted current application code, and drops that database
+on exit. It never binds a host port. The harness intercepts SMTP delivery and
+Google's remote exchange; use the separate provider smoke test for real email
+or Google authorization. It also uses generated test session/moderator/device
+tokens, so tests do not alter the deployed credentials.
